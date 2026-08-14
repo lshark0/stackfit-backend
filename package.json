@@ -1,0 +1,19 @@
+{
+  "name": "stackfit-backend",
+  "version": "0.1.0",
+  "description": "STACKFIT IT인력 매칭 플랫폼 - 백엔드 API 서버 (MVP)",
+  "type": "commonjs",
+  "main": "server.js",
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "seed:reset": "rm -f data/stackfit.db && node -e \"require('./src/db')\""
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "multer": "^2.0.0"
+  }
+}
