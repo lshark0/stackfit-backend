@@ -1,0 +1,953 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>스택핏 STACKFIT</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/icons/favicon-32.png" sizes="32x32">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="theme-color" content="#14171C">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="스택핏">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" rel="stylesheet">
+<style>
+  :root{
+    --ink:#14171C; --ink-soft:#1E232B; --ink-line:#2B313B;
+    --paper:#F7F6F2; --paper-dim:#ECEAE3; --card:#FFFFFF;
+    --amber:#E8A33D; --amber-deep:#C6822A; --amber-soft:#F7E2BB;
+    --cyan:#2FB6A6; --cyan-soft:#CFF0EA;
+    --slate:#5B6472; --slate-light:#9AA1AC; --line:#E1DED6; --danger:#E2604F;
+    --radius-lg:22px; --radius-md:14px;
+    --mono:'JetBrains Mono',monospace;
+    --sans:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%;}
+  body{
+    background:var(--paper);
+    font-family:var(--sans); min-height:100vh; min-height:100dvh;
+    display:flex; justify-content:center;
+  }
+  .app-shell{
+    width:100%; max-width:480px; min-height:100vh; min-height:100dvh;
+    background:var(--paper); display:flex; flex-direction:column; position:relative;
+    box-shadow:0 0 40px rgba(0,0,0,.08);
+  }
+  .safe-top{flex:0 0 auto; height:env(safe-area-inset-top, 0px); background:var(--paper);}
+  .safe-bottom-spacer{height:env(safe-area-inset-bottom, 0px); flex:0 0 auto; background:var(--paper);}
+  .screen{background:var(--paper); flex:1; width:100%; overflow:hidden; display:flex; flex-direction:column; position:relative; min-height:0;}
+  .statusbar{height:6px; flex:0 0 auto;}
+  .statusbar .dots{display:flex; gap:4px; align-items:flex-end;}
+  .statusbar .bar{width:3px; background:var(--ink); border-radius:1px;}
+  .app-header{padding:2px 20px 12px; flex:0 0 auto; display:flex; flex-direction:column; gap:10px;}
+  .app-header .row{display:flex; align-items:center; justify-content:space-between; gap:10px;}
+  .role-chip{font-family:var(--mono); font-size:10.5px; letter-spacing:.08em; padding:5px 10px; border-radius:999px; background:var(--ink); color:var(--amber-soft); display:inline-flex; align-items:center; gap:6px; text-transform:uppercase;}
+  .role-chip .dot{width:6px; height:6px; border-radius:50%; background:var(--amber);}
+  .icon-btn{width:36px; height:36px; border-radius:11px; background:var(--card); border:1px solid var(--line); display:flex; align-items:center; justify-content:center; color:var(--ink); position:relative; cursor:pointer;}
+  .icon-btn .badge{position:absolute; top:-4px; right:-4px; background:var(--danger); color:#fff; font-family:var(--mono); font-size:9px; font-weight:700; min-width:15px; height:15px; border-radius:8px; display:flex; align-items:center; justify-content:center; padding:0 3px;}
+  .page-title{font-size:22px; font-weight:700; color:var(--ink); letter-spacing:-.01em;}
+  .page-sub{font-size:12.5px; color:var(--slate); font-family:var(--mono);}
+  .back-row{display:flex; align-items:center; gap:12px;}
+  .back-btn{width:34px; height:34px; border-radius:10px; background:var(--card); border:1px solid var(--line); display:flex; align-items:center; justify-content:center; color:var(--ink); cursor:pointer; flex:0 0 auto;}
+  .content{flex:1 1 auto; overflow-y:auto; padding:0 20px 18px; -ms-overflow-style:none; scrollbar-width:none;}
+  .content::-webkit-scrollbar{display:none;}
+  .section-label{font-family:var(--mono); font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--slate); margin:16px 0 10px; display:flex; align-items:center; gap:8px;}
+  .section-label::after{content:""; flex:1; height:1px; background:var(--line);}
+  .search-box{display:flex; align-items:center; gap:8px; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:10px 13px; margin-top:2px;}
+  .search-box input{border:none; outline:none; font-family:var(--sans); font-size:13px; flex:1; background:transparent; color:var(--ink);}
+  .search-box input::placeholder{color:var(--slate-light);}
+  .search-box svg{flex:0 0 auto; color:var(--slate-light);}
+  .chip-row{display:flex; gap:8px; margin:12px 0 4px; overflow-x:auto;}
+  .chip{font-family:var(--mono); font-size:11.5px; border-radius:999px; padding:7px 13px; background:var(--paper-dim); color:var(--ink); border:1px solid var(--line); cursor:pointer; white-space:nowrap; flex:0 0 auto;}
+  .chip.active{background:var(--ink); color:var(--amber-soft); border-color:var(--ink);}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:var(--radius-md); padding:15px; margin-bottom:10px; transition:.15s;}
+  .card.clickable{cursor:pointer;}
+  .card.clickable:active{transform:scale(.98);}
+  .card-top{display:flex; justify-content:space-between; align-items:flex-start; gap:10px;}
+  .card-title{font-size:15px; font-weight:700; color:var(--ink); line-height:1.35;}
+  .card-org{font-size:12px; color:var(--slate); margin-top:2px;}
+  .tag-row{display:flex; flex-wrap:wrap; gap:6px; margin-top:10px;}
+  .tag{font-family:var(--mono); font-size:10.5px; padding:4px 8px; border-radius:6px; background:var(--paper-dim); color:var(--ink); border:1px solid var(--line);}
+  .tag.on{background:var(--ink); color:var(--amber-soft); border-color:var(--ink);}
+  .tag.rm{cursor:pointer;}
+  .meta-row{display:flex; align-items:center; gap:12px; margin-top:11px; font-size:11.5px; color:var(--slate); flex-wrap:wrap;}
+  .meta-row span{display:flex; align-items:center; gap:4px;}
+  .rate{font-family:var(--mono); font-weight:700; color:var(--ink); font-size:13px;}
+  .gauge{display:flex; align-items:center; gap:8px; margin-top:12px;}
+  .gauge-label{font-family:var(--mono); font-size:9.5px; letter-spacing:.1em; color:var(--slate); text-transform:uppercase; white-space:nowrap;}
+  .gauge-track{flex:1; height:7px; border-radius:4px; position:relative; overflow:hidden; background:repeating-linear-gradient(90deg, var(--paper-dim) 0 8px, #E4E1D8 8px 9px);}
+  .gauge-fill{position:absolute; top:0; left:0; height:100%; border-radius:4px; background:linear-gradient(90deg, var(--amber), var(--cyan));}
+  .gauge-value{font-family:var(--mono); font-weight:700; font-size:12px; color:var(--ink); min-width:34px; text-align:right;}
+  .avatar{width:44px; height:44px; border-radius:12px; flex:0 0 auto; background:linear-gradient(150deg, var(--ink), var(--ink-soft)); color:var(--amber-soft); font-family:var(--mono); font-weight:700; font-size:14px; display:flex; align-items:center; justify-content:center;}
+  .avatar.lg{width:64px; height:64px; border-radius:16px; font-size:19px;}
+  .star-btn{width:34px; height:34px; border-radius:10px; background:var(--card); border:1px solid var(--line); display:flex; align-items:center; justify-content:center; color:var(--slate-light); cursor:pointer; flex:0 0 auto;}
+  .star-btn.filled{color:var(--amber); border-color:var(--amber-soft); background:var(--amber-soft);}
+  .btn{font-family:var(--sans); font-weight:600; font-size:14px; padding:13px 18px; border-radius:12px; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; width:100%;}
+  .btn-primary{background:var(--ink); color:#F5D9A8;}
+  .btn-primary:disabled{background:var(--paper-dim); color:var(--slate-light); cursor:default;}
+  .btn-outline{background:var(--card); color:var(--ink); border:1px solid var(--line);}
+  .btn-ghost{background:transparent; color:var(--slate); border:1px dashed var(--line);}
+  .onb-wrap{flex:1; display:flex; flex-direction:column; justify-content:center; padding:0 26px 40px; gap:20px;}
+  .brand-mark{display:flex; align-items:center; gap:10px;}
+  .brand-mark .sq{width:34px; height:34px; border-radius:9px; background:var(--ink); position:relative;}
+  .brand-mark .sq::before,.brand-mark .sq::after{content:""; position:absolute; background:var(--amber); border-radius:2px;}
+  .brand-mark .sq::before{width:14px; height:3px; top:11px; left:10px;}
+  .brand-mark .sq::after{width:3px; height:14px; top:10px; left:15.5px;}
+  .brand-name{font-weight:700; font-size:18px; letter-spacing:-.01em; color:var(--ink);}
+  .brand-tag{font-family:var(--mono); font-size:10.5px; color:var(--slate); letter-spacing:.08em; text-transform:uppercase;}
+  .onb-headline{font-size:24px; font-weight:700; line-height:1.32; color:var(--ink); letter-spacing:-.015em;}
+  .onb-headline em{font-style:normal; color:var(--amber-deep);}
+  .role-card{background:var(--card); border:1.5px solid var(--line); border-radius:16px; padding:16px; display:flex; align-items:center; gap:14px; cursor:pointer;}
+  .role-card:active{border-color:var(--ink);}
+  .role-card .ic{width:46px; height:46px; border-radius:13px; background:var(--paper-dim); display:flex; align-items:center; justify-content:center; color:var(--ink); flex:0 0 auto;}
+  .role-card .tt{font-weight:700; font-size:14.5px; color:var(--ink);}
+  .role-card .ds{font-size:11.5px; color:var(--slate); margin-top:2px;}
+  .server-line{font-family:var(--mono); font-size:10.5px; color:var(--slate); text-align:center; line-height:1.6;}
+  .server-line b{color:var(--ink); cursor:pointer; text-decoration:underline;}
+  .stat-strip{display:flex; gap:8px; margin-top:4px;}
+  .stat-box{flex:1; background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px;}
+  .stat-num{font-family:var(--mono); font-weight:700; font-size:19px; color:var(--ink);}
+  .stat-lbl{font-size:10.5px; color:var(--slate); margin-top:3px;}
+  .banner{background:linear-gradient(135deg, var(--ink) 0%, var(--ink-soft) 100%); border-radius:18px; padding:18px; color:#fff; position:relative; overflow:hidden; margin-top:16px; cursor:pointer;}
+  .banner::after{content:""; position:absolute; right:-30px; top:-30px; width:120px; height:120px; border-radius:50%; background:radial-gradient(circle, rgba(232,163,61,.35), transparent 70%);}
+  .banner-eyebrow{font-family:var(--mono); font-size:10px; letter-spacing:.12em; color:var(--amber-soft); text-transform:uppercase;}
+  .banner-title{font-size:16px; font-weight:700; margin-top:6px; line-height:1.4;}
+  .banner-sub{font-size:11.5px; color:#B8BEC8; margin-top:5px;}
+  .profile-bar{background:rgba(255,255,255,.18); border-radius:8px; height:8px; overflow:hidden; margin-top:8px;}
+  .profile-bar.light{background:var(--paper-dim);}
+  .profile-bar-fill{height:100%; background:linear-gradient(90deg,var(--amber),var(--cyan));}
+  .detail-hero{background:var(--ink); color:#fff; padding:18px 20px 22px; border-radius:0 0 24px 24px; margin:0 -20px 16px;}
+  .detail-hero .org{font-family:var(--mono); font-size:11px; color:var(--amber-soft); letter-spacing:.06em;}
+  .detail-hero h2{font-size:19px; font-weight:700; margin-top:6px; line-height:1.4;}
+  .kv-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:16px;}
+  .kv-box{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:11px 12px;}
+  .kv-lbl{font-family:var(--mono); font-size:9.5px; color:var(--slate); text-transform:uppercase; letter-spacing:.06em;}
+  .kv-val{font-size:13.5px; font-weight:700; color:var(--ink); margin-top:3px;}
+  .para{font-size:13px; color:var(--ink); line-height:1.75; margin-top:4px;}
+  .chat-row{display:flex; gap:12px; padding:12px 0; border-bottom:1px solid var(--line); cursor:pointer; align-items:center;}
+  .chat-row:last-child{border-bottom:none;}
+  .chat-body{flex:1; min-width:0;}
+  .chat-name{font-weight:700; font-size:13.5px; color:var(--ink); display:flex; justify-content:space-between;}
+  .chat-time{font-family:var(--mono); font-size:10px; color:var(--slate-light); font-weight:400;}
+  .chat-preview{font-size:12px; color:var(--slate); margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .unread{background:var(--amber); color:var(--ink); font-family:var(--mono); font-weight:700; font-size:10px; width:17px; height:17px; border-radius:50%; display:flex; align-items:center; justify-content:center;}
+  .bubble-wrap{display:flex; flex-direction:column; gap:10px; padding:6px 0 14px;}
+  .bubble{max-width:76%; padding:10px 13px; border-radius:14px; font-size:13px; line-height:1.5;}
+  .bubble.them{background:var(--card); border:1px solid var(--line); color:var(--ink); align-self:flex-start; border-bottom-left-radius:4px;}
+  .bubble.me{background:var(--ink); color:#F5EFE4; align-self:flex-end; border-bottom-right-radius:4px;}
+  .bubble-time{font-family:var(--mono); font-size:9.5px; color:var(--slate-light); margin-top:3px;}
+  .chat-input-bar{display:flex; gap:8px; padding:10px 20px 16px; border-top:1px solid var(--line); background:var(--paper); flex:0 0 auto;}
+  .chat-input{flex:1; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:11px 14px; font-size:13px; color:var(--ink); font-family:var(--sans); outline:none;}
+  .send-btn{width:42px; height:42px; border-radius:12px; background:var(--ink); color:var(--amber-soft); display:flex; align-items:center; justify-content:center; flex:0 0 auto; cursor:pointer; border:none;}
+  .mypage-head{display:flex; align-items:center; gap:14px; margin-bottom:6px;}
+  .list-item{display:flex; align-items:center; justify-content:space-between; padding:14px 2px; border-bottom:1px solid var(--line); cursor:pointer;}
+  .list-item:last-child{border-bottom:none;}
+  .list-item .li-l{display:flex; align-items:center; gap:12px;}
+  .li-icon{width:34px; height:34px; border-radius:9px; background:var(--paper-dim); display:flex; align-items:center; justify-content:center; color:var(--ink);}
+  .li-tt{font-size:13.5px; font-weight:600; color:var(--ink);}
+  .tl-item{display:flex; gap:12px; padding-bottom:18px; position:relative;}
+  .tl-item::before{content:""; position:absolute; left:6px; top:16px; bottom:-2px; width:1px; background:var(--line);}
+  .tl-item:last-child::before{display:none;}
+  .tl-dot{width:13px; height:13px; border-radius:50%; border:3px solid var(--amber); background:var(--paper); flex:0 0 auto; margin-top:2px;}
+  .tl-dot.done{border-color:var(--cyan); background:var(--cyan);}
+  .tl-tt{font-weight:700; font-size:13px; color:var(--ink);}
+  .tl-ds{font-size:11.5px; color:var(--slate); margin-top:2px; line-height:1.5;}
+  .form-field{margin-bottom:14px;}
+  .form-label{font-size:12px; font-weight:600; color:var(--ink); margin-bottom:6px; display:block;}
+  .form-input{width:100%; border:1px solid var(--line); background:var(--card); border-radius:10px; padding:12px 13px; font-size:13px; font-family:var(--sans); color:var(--ink); outline:none;}
+  .form-input::placeholder{color:var(--slate-light);}
+  .form-input:focus{border-color:var(--ink);}
+  textarea.form-input{resize:none; height:76px;}
+  .add-tag-row{display:flex; gap:8px; margin-top:8px;}
+  .add-tag-row input{flex:1;}
+  .fab{position:absolute; right:20px; bottom:96px; width:52px; height:52px; border-radius:16px; background:var(--amber); color:var(--ink); display:flex; align-items:center; justify-content:center; box-shadow:0 10px 20px -6px rgba(232,163,61,.55); z-index:12; cursor:pointer; border:none;}
+  .toast{position:absolute; bottom:96px; left:50%; transform:translateX(-50%); background:var(--ink); color:#F5EFE4; font-size:12.5px; font-weight:600; padding:11px 18px; border-radius:999px; z-index:30; box-shadow:0 10px 24px rgba(0,0,0,.3); white-space:nowrap; opacity:0; pointer-events:none; transition:opacity .2s, transform .2s; max-width:80%; overflow:hidden; text-overflow:ellipsis;}
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(-6px);}
+  .empty{display:flex; flex-direction:column; align-items:center; text-align:center; gap:6px; padding:50px 20px; color:var(--slate);}
+  .empty .ic{width:52px; height:52px; border-radius:16px; background:var(--paper-dim); display:flex; align-items:center; justify-content:center; color:var(--slate); margin-bottom:6px;}
+  .empty .tt{font-weight:700; color:var(--ink); font-size:14px;}
+  .empty .ds{font-size:12px; max-width:260px; line-height:1.6;}
+  .center-fill{display:flex; align-items:center; justify-content:center; height:100%;}
+  .spinner-txt{font-family:var(--mono); font-size:12px; color:var(--slate);}
+  .tabbar{flex:0 0 auto; display:flex; padding:8px 6px 22px; border-top:1px solid var(--line); background:var(--paper); position:relative; z-index:10;}
+  .tab-btn{flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; padding:6px 0; cursor:pointer; color:var(--slate-light); position:relative; background:none; border:none; font-family:var(--sans);}
+  .tab-btn.active{color:var(--ink);}
+  .tab-btn.active::before{content:""; position:absolute; top:-8px; left:50%; transform:translateX(-50%); width:16px; height:3px; border-radius:2px; background:var(--amber);}
+  .tab-lbl{font-family:var(--mono); font-size:9.5px; letter-spacing:.02em;}
+  .tab-badge{position:absolute; top:-2px; right:22%; width:7px; height:7px; border-radius:50%; background:var(--danger);}
+  .jump-strip{display:flex; flex-wrap:wrap; gap:8px; max-width:460px; justify-content:center;}
+  .jump-chip{font-family:var(--mono); font-size:11px; color:#C7CCD4; background:#1E232B; border:1px solid var(--ink-line); padding:7px 12px; border-radius:999px; cursor:pointer; transition:.15s;}
+  .jump-chip:hover{border-color:var(--amber); color:var(--amber-soft);}
+  .jump-strip-label{font-family:var(--mono); font-size:10px; letter-spacing:.12em; color:var(--slate-light); text-transform:uppercase; width:100%; text-align:center; margin-bottom:2px;}
+  .note-strip{font-family:var(--mono); font-size:10.5px; color:var(--slate-light); max-width:420px; text-align:center; line-height:1.6;}
+  svg{display:block;}
+  button{font-family:inherit;}
+</style>
+</head>
+<body>
+
+  <div class="app-shell">
+    <div class="safe-top"></div>
+    <div class="screen" id="screen"></div>
+    <div class="safe-bottom-spacer"></div>
+  </div>
+
+<script>
+/* ---------------- Config & API ---------------- */
+let API_BASE = "/api";
+let state = { role:null, screen:"onboarding", param:null, prevScreen:"onboarding", token:null, userId:null };
+
+function debounce(fn, ms){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms); }; }
+function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+
+async function apiFetch(path, opts={}){
+  const res = await fetch(API_BASE + path, {
+    method: opts.method || 'GET',
+    headers: { 'Content-Type':'application/json', ...(state.token ? {Authorization:'Bearer '+state.token} : {}) },
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+  });
+  let data = null;
+  try{ data = await res.json(); }catch(e){ /* no body */ }
+  if(!res.ok){
+    throw new Error((data && data.error) || `요청 실패 (${res.status})`);
+  }
+  return data;
+}
+function fileUrl(relPath){
+  if(!relPath) return null;
+  return API_BASE.replace(/\/api\/?$/, '') + relPath;
+}
+async function unreadCount(){
+  if(!state.token) return 0;
+  try{ const d = await apiFetch('/notifications'); return d.notifications.filter(n=>!n.is_read).length; }
+  catch(e){ return 0; }
+}
+
+/* ---------------- Icons ---------------- */
+const I = {
+  home:`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 12 L12 5 L20 12" stroke-linecap="round" stroke-linejoin="round"/><path d="M6.5 10.5V19H17.5V10.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="15.2" r="1.1" fill="currentColor" stroke="none"/></svg>`,
+  jobs:`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="8" width="16" height="11" rx="2"/><path d="M9 8V6.5A2.5 2.5 0 0 1 11.5 4h1A2.5 2.5 0 0 1 15 6.5V8"/><path d="M4 12.5H20"/></svg>`,
+  talent:`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="9" r="3.2"/><path d="M3.5 19c.6-3.2 3-5 5.5-5s4.9 1.8 5.5 5"/><circle cx="17" cy="8" r="2.3"/><path d="M15.2 12.3c2 .2 3.6 1.8 4.1 4.4"/></svg>`,
+  chat:`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v7A2.5 2.5 0 0 1 17.5 16H10l-4.5 3.5V16A2.5 2.5 0 0 1 4 13.5Z" stroke-linejoin="round"/></svg>`,
+  proj:`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10H20"/><path d="M8 4V6.5M16 4V6.5"/></svg>`,
+  user:`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8.3" r="3.5"/><path d="M4.5 19.5c1-4 3.8-6.2 7.5-6.2s6.5 2.2 7.5 6.2"/></svg>`,
+  bell:`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 10.5a6 6 0 0 1 12 0c0 4 1.3 5.3 1.3 5.3H4.7S6 14.5 6 10.5Z" stroke-linejoin="round"/><path d="M10 18.5a2 2 0 0 0 4 0"/></svg>`,
+  back:`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 5L8 12L15 19" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  building:`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="6" y="4" width="9" height="16" rx="1"/><rect x="15" y="9" width="4.5" height="11" rx="1"/><path d="M9 7.5H12M9 10.5H12M9 13.5H12M9 16.5H12"/></svg>`,
+  code:`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 8L4.5 12L9 16"/><path d="M15 8L19.5 12L15 16"/></svg>`,
+  send:`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 12L20 4L14 20L11 13L4 12Z" stroke-linejoin="round"/></svg>`,
+  search:`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="6.5"/><path d="M20 20L16 16" stroke-linecap="round"/></svg>`,
+  plus:`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5V19M5 12H19" stroke-linecap="round"/></svg>`,
+  star:`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3.5l2.6 5.6 6.1.6-4.6 4.1 1.3 6-5.4-3.1-5.4 3.1 1.3-6-4.6-4.1 6.1-.6Z" stroke-linejoin="round"/></svg>`,
+  pin:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 21s-6.5-5.6-6.5-11A6.5 6.5 0 0 1 18.5 10c0 5.4-6.5 11-6.5 11Z"/><circle cx="12" cy="10" r="2"/></svg>`,
+  clock:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><path d="M12 8V12L15 14"/></svg>`,
+  logout:`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M13 4H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h6"/><path d="M17 16l4-4-4-4"/><path d="M21 12H9"/></svg>`,
+  x:`<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 5L19 19M5 19L19 5" stroke-linecap="round"/></svg>`,
+  gear:`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M12 3v2.2M12 18.8V21M4.9 4.9l1.5 1.5M17.6 17.6l1.5 1.5M3 12h2.2M18.8 12H21M4.9 19.1l1.5-1.5M17.6 6.4l1.5-1.5"/></svg>`,
+};
+
+/* ---------------- Nav / shell ---------------- */
+function go(screen, param){
+  if(state.screen!=='alerts') state.prevScreen = state.screen;
+  state.screen = screen; state.param = param ?? null;
+  render();
+}
+window.go = go;
+
+function toast(msg){
+  const t = document.getElementById('toast');
+  if(!t) return;
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(window.__toastTimer);
+  window.__toastTimer = setTimeout(()=>t.classList.remove('show'), 2000);
+}
+
+function gauge(pct){
+  return `<div class="gauge"><span class="gauge-label">스택매치</span>
+    <div class="gauge-track"><div class="gauge-fill" style="width:${pct}%"></div></div>
+    <span class="gauge-value">${pct}%</span></div>`;
+}
+function statusbar(){
+  return `<div class="statusbar"></div>`;
+}
+function emptyHtml(msg, icon){
+  return `<div class="empty"><div class="ic">${icon||I.jobs}</div><div class="tt">${esc(msg)}</div></div>`;
+}
+function loadingShell(){
+  return `${statusbar()}<div class="content"><div class="center-fill"><div class="spinner-txt">불러오는 중...</div></div></div>`;
+}
+function errorShell(msg){
+  return `${statusbar()}<div class="content"><div class="empty">
+    <div class="ic">${I.bell}</div><div class="tt">연결에 문제가 있어요</div>
+    <div class="ds">${esc(msg)}<br>서버가 실행 중인지, 서버 주소가 올바른지 확인해주세요.</div>
+    <button class="btn btn-outline" style="margin-top:14px; width:auto; padding:10px 18px;" onclick="go('serverSetup')">서버 연결 설정 열기</button>
+  </div></div>`;
+}
+
+function tabs(nc){
+  if(state.role==="freelancer"){
+    return [{k:"home",l:"홈",i:I.home},{k:"jobs",l:"공고",i:I.jobs},{k:"projects",l:"프로젝트",i:I.proj},{k:"chatList",l:"채팅",i:I.chat},{k:"mypage",l:"MY",i:I.user}];
+  }
+  return [{k:"home",l:"홈",i:I.home},{k:"talent",l:"인재풀",i:I.talent},{k:"jobs",l:"공고관리",i:I.jobs},{k:"chatList",l:"채팅",i:I.chat},{k:"mypage",l:"MY",i:I.user}];
+}
+function tabbar(active){
+  return `<div class="tabbar">${tabs().map(t=>`
+    <button class="tab-btn ${t.k===active?'active':''}" onclick="go('${t.k}')">${t.i}<span class="tab-lbl">${t.l}</span></button>`).join('')}</div>`;
+}
+function header(title, sub, opts={}, nc=0){
+  return `<div class="app-header"><div class="row">
+    ${opts.back?`<div class="back-row"><div class="back-btn" onclick="go('${opts.back}')">${I.back}</div><div class="page-title">${title}</div></div>`
+    : `<div><div class="page-title">${title}</div>${sub?`<div class="page-sub">${sub}</div>`:''}</div>`}
+    <div style="display:flex; gap:8px; align-items:center;">
+      ${opts.roleChip? `<div class="role-chip"><span class="dot"></span>${state.role==='freelancer'?'프리랜서':'기업'}</div>`:''}
+      ${opts.bell!==false ? `<div class="icon-btn" onclick="go('alerts')">${I.bell}${nc>0?`<span class="badge">${nc}</span>`:''}</div>`:''}
+    </div>
+  </div></div>`;
+}
+
+/* ---------------- Card templates ---------------- */
+function jobCard(j){
+  return `<div class="card clickable" onclick="go('jobDetail', ${j.id})">
+    <div class="card-top">
+      <div><div class="card-title">${esc(j.title)}</div><div class="card-org">${esc(j.org)}${j.applied?' · <span style="color:var(--cyan)">지원완료</span>':''}</div></div>
+      <div class="star-btn ${j.saved?'filled':''}" onclick="toggleSaveJob(${j.id}, event)">${I.star}</div>
+    </div>
+    <div class="tag-row">${j.stack.map(s=>`<span class="tag">${esc(s)}</span>`).join('')}</div>
+    <div class="meta-row"><span>${I.pin}${esc(j.location)}</span><span class="rate">${esc(j.rate)}</span></div>
+    ${gauge(j.match)}
+  </div>`;
+}
+function talentCard(t){
+  return `<div class="card clickable" onclick="go('talentDetail', ${t.user_id})">
+    <div class="card-top">
+      <div style="display:flex; gap:12px; align-items:center;">
+        <div class="avatar">${esc(t.name[0])}</div>
+        <div><div class="card-title">${esc(t.name)} <span style="font-family:var(--mono); font-weight:400; font-size:11px; color:var(--slate);">· ${esc(t.years)}</span></div>
+        <div class="card-org">${esc(t.role_title)}${t.verified?' · 인증됨':''}${t.proposed?' · <span style="color:var(--cyan)">제안완료</span>':''}</div></div>
+      </div>
+    </div>
+    <div class="tag-row">${t.stack.map(s=>`<span class="tag">${esc(s)}</span>`).join('')}</div>
+    <div class="meta-row"><span class="rate">${esc(t.rate)}</span></div>
+    ${gauge(t.match)}
+  </div>`;
+}
+
+/* ---------------- Actions ---------------- */
+async function loginAs(role){
+  try{
+    toast('로그인 중...');
+    const email = role==='freelancer' ? 'lee@stackfit.dev' : 'hr@hanbit.dev';
+    const data = await apiFetch('/auth/login', {method:'POST', body:{email, password:'demo1234'}});
+    state.token = data.token; state.role = role; state.userId = data.user.id;
+    toast('로그인 성공');
+    go('home');
+  }catch(e){
+    toast('로그인 실패: '+e.message);
+    go('serverSetup');
+  }
+}
+function logout(){ state.token=null; state.role=null; state.userId=null; go('onboarding'); }
+
+let signupRole = 'freelancer';
+function setSignupRole(role, el){
+  signupRole = role;
+  document.querySelectorAll('#signupRoleChips .chip').forEach(c=>c.classList.remove('active'));
+  el.classList.add('active');
+  const nameField = document.getElementById('su-namefield');
+  if(nameField) nameField.querySelector('.form-label').textContent = role==='freelancer' ? '이름' : '회사명';
+}
+async function doSignup(){
+  const email = document.getElementById('su-email').value.trim();
+  const password = document.getElementById('su-password').value;
+  const nameVal = document.getElementById('su-name').value.trim();
+  if(!email || !password){ toast('이메일과 비밀번호를 입력해주세요'); return; }
+  if(password.length < 4){ toast('비밀번호는 4자 이상으로 입력해주세요'); return; }
+  try{
+    const body = { email, password, role: signupRole };
+    if(signupRole==='freelancer') body.name = nameVal || '이름 미입력';
+    else body.companyName = nameVal || '회사명 미입력';
+    const data = await apiFetch('/auth/signup', {method:'POST', body});
+    state.token = data.token; state.role = data.user.role; state.userId = data.user.id;
+    toast('가입이 완료됐어요');
+    go('home');
+  }catch(e){ toast(e.message); }
+}
+async function doLogin(){
+  const email = document.getElementById('li-email').value.trim();
+  const password = document.getElementById('li-password').value;
+  if(!email || !password){ toast('이메일과 비밀번호를 입력해주세요'); return; }
+  try{
+    const data = await apiFetch('/auth/login', {method:'POST', body:{email, password}});
+    state.token = data.token; state.role = data.user.role; state.userId = data.user.id;
+    toast('로그인 성공');
+    go('home');
+  }catch(e){ toast(e.message); }
+}
+
+async function testConnection(){
+  const url = document.getElementById('cfg-url').value.trim().replace(/\/$/,'');
+  try{
+    const res = await fetch(url + '/health');
+    const d = await res.json();
+    toast(d.ok ? '연결 성공했어요 🎉' : '서버 응답이 이상해요');
+  }catch(e){ toast('연결 실패 — 주소 또는 네트워크를 확인해주세요'); }
+}
+function saveServerUrl(){
+  API_BASE = document.getElementById('cfg-url').value.trim().replace(/\/$/,'');
+  toast('서버 주소가 저장됐어요');
+  go('onboarding');
+}
+
+async function applyToJob(id){
+  try{ await apiFetch(`/jobs/${id}/apply`, {method:'POST'}); toast('지원이 완료됐어요'); go('jobDetail', id); }
+  catch(e){ toast(e.message); }
+}
+async function toggleSaveJob(id, ev){
+  if(ev) ev.stopPropagation();
+  try{
+    const r = await apiFetch(`/jobs/${id}/save`, {method:'POST'});
+    toast(r.saved ? '공고를 저장했어요' : '저장을 취소했어요');
+    if(state.screen==='jobs') refreshJobList(); else render();
+  }catch(e){ toast(e.message); }
+}
+async function proposeTalent(userId){
+  try{ await apiFetch(`/talents/${userId}/propose`, {method:'POST', body:{}}); toast('제안을 보냈어요'); go('talentDetail', userId); }
+  catch(e){ toast(e.message); }
+}
+async function markAlertRead(id){
+  try{ await apiFetch(`/notifications/${id}/read`, {method:'PATCH'}); render(); }catch(e){ toast(e.message); }
+}
+async function startChatWithTalent(freelancerId){
+  try{ const conv = await apiFetch('/conversations', {method:'POST', body:{freelancerId}}); go('chatRoom', conv.id); }
+  catch(e){ toast(e.message); }
+}
+async function startChatWithCompany(companyId){
+  try{ const conv = await apiFetch('/conversations', {method:'POST', body:{companyId}}); go('chatRoom', conv.id); }
+  catch(e){ toast(e.message); }
+}
+async function sendMessage(convId){
+  const input = document.getElementById('chatInputEl');
+  if(!input) return;
+  const text = input.value.trim();
+  if(!text) return;
+  input.disabled = true;
+  try{ await apiFetch(`/conversations/${convId}/messages`, {method:'POST', body:{body:text}}); go('chatRoom', convId); }
+  catch(e){ toast(e.message); input.disabled=false; }
+}
+function chatKeydown(ev, convId){ if(ev.key==='Enter'){ ev.preventDefault(); sendMessage(convId); } }
+
+async function decideApplicant(jobId, applicationId, status){
+  try{
+    await apiFetch(`/jobs/${jobId}/applicants/${applicationId}`, {method:'PATCH', body:{status}});
+    toast(status==='accepted' ? '지원자를 수락했어요' : '지원자를 거절했어요');
+    go('applicants', jobId);
+  }catch(e){ toast(e.message); }
+}
+
+async function uploadResume(input){
+  const file = input.files && input.files[0];
+  if(!file) return;
+  if(file.type !== 'application/pdf'){ toast('PDF 파일만 업로드할 수 있어요'); return; }
+  const fd = new FormData();
+  fd.append('resume', file);
+  try{
+    toast('업로드 중...');
+    const res = await fetch(API_BASE + '/profile/resume', {
+      method:'POST',
+      headers: state.token ? {Authorization:'Bearer '+state.token} : {},
+      body: fd,
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error || '업로드 실패');
+    toast('경력기술서가 업로드됐어요');
+    go('profileEdit');
+  }catch(e){ toast(e.message); }
+}
+async function deleteResume(){
+  try{ await apiFetch('/profile/resume', {method:'DELETE'}); toast('삭제했어요'); go('profileEdit'); }
+  catch(e){ toast(e.message); }
+}
+
+async function advanceStage(id, nextStage){
+  try{ await apiFetch(`/projects/${id}/stage`, {method:'PATCH', body:{stage:nextStage}}); toast('진행 단계가 업데이트됐어요'); go('projects'); }
+  catch(e){ toast(e.message); }
+}
+
+/* ---- Job search / filter (partial refresh, keeps input focus) ---- */
+let jobQuery="", jobCat="전체";
+async function refreshJobList(){
+  const el = document.getElementById('jobList');
+  if(!el) return;
+  el.innerHTML = `<div class="spinner-txt" style="padding:20px 0; text-align:center;">검색 중...</div>`;
+  try{
+    const qs = new URLSearchParams();
+    if(jobQuery) qs.set('q', jobQuery);
+    if(jobCat && jobCat!=='전체') qs.set('category', jobCat);
+    const data = await apiFetch('/jobs?' + qs.toString());
+    el.innerHTML = data.jobs.length ? data.jobs.map(jobCard).join('') : emptyHtml('조건에 맞는 공고가 없어요', I.jobs);
+  }catch(e){ el.innerHTML = emptyHtml(e.message, I.jobs); }
+}
+const onJobSearch = debounce(v=>{ jobQuery=v; refreshJobList(); }, 350);
+function setJobCat(cat, el){
+  jobCat = cat;
+  document.querySelectorAll('#jobChips .chip').forEach(c=>c.classList.remove('active'));
+  el.classList.add('active');
+  refreshJobList();
+}
+
+let talentQuery="", talentCat="전체";
+async function refreshTalentList(){
+  const el = document.getElementById('talentList');
+  if(!el) return;
+  el.innerHTML = `<div class="spinner-txt" style="padding:20px 0; text-align:center;">검색 중...</div>`;
+  try{
+    const qs = new URLSearchParams();
+    if(talentQuery) qs.set('q', talentQuery);
+    if(talentCat && talentCat!=='전체') qs.set('category', talentCat);
+    const data = await apiFetch('/talents?' + qs.toString());
+    el.innerHTML = data.talents.length ? data.talents.map(talentCard).join('') : emptyHtml('조건에 맞는 인재가 없어요', I.talent);
+  }catch(e){ el.innerHTML = emptyHtml(e.message, I.talent); }
+}
+const onTalentSearch = debounce(v=>{ talentQuery=v; refreshTalentList(); }, 350);
+function setTalentCat(cat, el){
+  talentCat = cat;
+  document.querySelectorAll('#talentChips .chip').forEach(c=>c.classList.remove('active'));
+  el.classList.add('active');
+  refreshTalentList();
+}
+
+/* ---- Profile edit (local pending stack, partial refresh) ---- */
+let pendingStack = [];
+function refreshTagsUI(){
+  const el = document.getElementById('pf-tags');
+  if(!el) return;
+  el.innerHTML = pendingStack.map((s,i)=>`<span class="tag on rm" onclick="removeProfileTag(${i})">${esc(s)} ${I.x}</span>`).join('');
+}
+function addProfileTag(){
+  const input = document.getElementById('pf-newtag');
+  const v = input.value.trim();
+  if(!v) return;
+  pendingStack.push(v); input.value=''; refreshTagsUI();
+}
+function removeProfileTag(i){ pendingStack.splice(i,1); refreshTagsUI(); }
+async function saveProfile(){
+  try{
+    await apiFetch('/profile', {method:'PUT', body:{
+      name: document.getElementById('pf-name').value.trim(),
+      role_title: document.getElementById('pf-role').value.trim(),
+      rate: document.getElementById('pf-rate').value.trim(),
+      stack: pendingStack,
+    }});
+    toast('프로필이 저장됐어요');
+    go('mypage');
+  }catch(e){ toast(e.message); }
+}
+
+async function postJob(){
+  const title = document.getElementById('pj-title').value.trim();
+  if(!title){ toast('공고 제목을 입력해주세요'); return; }
+  const stackRaw = document.getElementById('pj-stack').value.trim();
+  const stack = stackRaw ? stackRaw.split(',').map(s=>s.trim()).filter(Boolean) : [];
+  try{
+    await apiFetch('/jobs', {method:'POST', body:{
+      title,
+      stack,
+      period: document.getElementById('pj-period').value.trim(),
+      rate: document.getElementById('pj-rate').value.trim(),
+      work_type: document.getElementById('pj-type').value.trim(),
+      description: document.getElementById('pj-desc').value.trim(),
+    }});
+    toast('공고가 등록됐어요');
+    go('jobs');
+  }catch(e){ toast(e.message); }
+}
+
+/* ---------------- Screens (async, fetch from API) ---------------- */
+async function screenOnboarding(){
+  return `${statusbar()}
+  <div class="onb-wrap">
+    <div class="brand-mark"><div class="sq"></div><div><div class="brand-name">스택핏</div><div class="brand-tag">STACKFIT · IT Matching</div></div></div>
+    <div class="onb-headline">기술 스택으로<br><em>가장 정확하게</em><br>연결합니다.</div>
+    <div style="display:flex; flex-direction:column; gap:12px;">
+      <div class="role-card" onclick="loginAs('freelancer')"><div class="ic">${I.user}</div><div><div class="tt">IT 프리랜서로 데모 로그인</div><div class="ds">lee@stackfit.dev 계정으로 접속해요</div></div></div>
+      <div class="role-card" onclick="loginAs('company')"><div class="ic">${I.building}</div><div><div class="tt">기업으로 데모 로그인</div><div class="ds">hr@hanbit.dev 계정으로 접속해요</div></div></div>
+    </div>
+    <div style="display:flex; gap:10px;">
+      <button class="btn btn-outline" onclick="go('signup')">회원가입</button>
+      <button class="btn btn-outline" onclick="go('login')">로그인</button>
+    </div>
+    <div class="server-line">서버 주소: ${esc(API_BASE)}<br><b onclick="go('serverSetup')">⚙ 서버 연결 설정 바꾸기</b></div>
+  </div>`;
+}
+
+function screenSignup(){
+  return `${statusbar()}
+  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('onboarding')">${I.back}</div><div class="page-title">회원가입</div></div></div>
+  <div class="content">
+    <div class="chip-row" id="signupRoleChips">
+      <div class="chip active" onclick="setSignupRole('freelancer', this)">프리랜서</div>
+      <div class="chip" onclick="setSignupRole('company', this)">기업</div>
+    </div>
+    <div class="form-field" style="margin-top:14px;" id="su-namefield"><label class="form-label">이름</label><input id="su-name" class="form-input" placeholder="예: 이승학"></div>
+    <div class="form-field"><label class="form-label">이메일</label><input id="su-email" class="form-input" type="email" placeholder="you@example.com"></div>
+    <div class="form-field"><label class="form-label">비밀번호</label><input id="su-password" class="form-input" type="password" placeholder="4자 이상"></div>
+    <button class="btn btn-primary" onclick="doSignup()">가입하고 시작하기</button>
+    <div class="server-line" style="margin-top:16px;">이미 계정이 있으신가요? <b onclick="go('login')">로그인</b></div>
+  </div>`;
+}
+
+function screenLogin(){
+  return `${statusbar()}
+  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('onboarding')">${I.back}</div><div class="page-title">로그인</div></div></div>
+  <div class="content">
+    <div class="form-field" style="margin-top:6px;"><label class="form-label">이메일</label><input id="li-email" class="form-input" type="email" placeholder="you@example.com"></div>
+    <div class="form-field"><label class="form-label">비밀번호</label><input id="li-password" class="form-input" type="password" placeholder="비밀번호" onkeydown="if(event.key==='Enter'){event.preventDefault();doLogin();}"></div>
+    <button class="btn btn-primary" onclick="doLogin()">로그인</button>
+    <div class="server-line" style="margin-top:16px;">계정이 없으신가요? <b onclick="go('signup')">회원가입</b></div>
+  </div>`;
+}
+
+function screenServerSetup(){
+  return `${statusbar()}
+  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('onboarding')">${I.back}</div><div class="page-title">서버 연결 설정</div></div></div>
+  <div class="content">
+    <div class="form-field"><label class="form-label">백엔드 서버 주소</label>
+      <input id="cfg-url" class="form-input" value="${esc(API_BASE)}" placeholder="http://192.168.0.5:4000/api"></div>
+    <div class="para" style="margin-top:0;">기본값은 이 앱과 함께 배포된 서버(같은 주소)라 대부분 그대로 두면 됩니다. 로컬 PC에서 직접 띄운 백엔드로 테스트하고 싶을 때만 <span style="font-family:var(--mono)">http://localhost:4000/api</span> 같은 주소로 바꿔주세요. 휴대폰에서 PC의 로컬 서버로 테스트하려면 PC 터미널에서 <span style="font-family:var(--mono)">ipconfig</span>로 확인한 IP를 사용하세요 (예: 192.168.0.5).</div>
+    <button class="btn btn-outline" style="margin-top:14px;" onclick="testConnection()">연결 테스트</button>
+    <button class="btn btn-primary" style="margin-top:10px;" onclick="saveServerUrl()">저장하고 돌아가기</button>
+  </div>`;
+}
+
+async function screenHome(){
+  const nc = await unreadCount();
+  if(state.role==="freelancer"){
+    const [profile, jobsData, projectsData] = await Promise.all([
+      apiFetch('/profile'), apiFetch('/jobs'), apiFetch('/projects').catch(()=>({projects:[]})),
+    ]);
+    const jobs = jobsData.jobs;
+    const appliedCount = jobs.filter(j=>j.applied).length;
+    const maxMatch = jobs.length ? Math.max(...jobs.map(j=>j.match)) : 0;
+    const activeProjects = projectsData.projects.filter(p=>p.status==='진행중').length;
+    return `${statusbar()}${header(`안녕하세요, ${esc(profile.name)}님`,"오늘도 좋은 매칭 찾아드릴게요",{roleChip:true}, nc)}
+    <div class="content">
+      <div class="stat-strip">
+        <div class="stat-box"><div class="stat-num">${appliedCount}</div><div class="stat-lbl">지원한 공고</div></div>
+        <div class="stat-box"><div class="stat-num">${maxMatch}%</div><div class="stat-lbl">최고 매칭률</div></div>
+        <div class="stat-box"><div class="stat-num">${activeProjects}</div><div class="stat-lbl">진행 프로젝트</div></div>
+      </div>
+      <div class="banner" onclick="go('profileEdit')">
+        <div class="banner-eyebrow">Profile</div><div class="banner-title">프로필 완성도 ${profile.completion}%</div>
+        <div class="profile-bar"><div class="profile-bar-fill" style="width:${profile.completion}%"></div></div>
+        <div class="banner-sub">경력기술서를 추가하면 매칭률이 더 올라가요</div>
+      </div>
+      <div class="section-label">추천 공고</div>
+      ${jobs.slice(0,3).map(jobCard).join('') || emptyHtml('등록된 공고가 없어요', I.jobs)}
+    </div>${tabbar('home')}`;
+  }
+  const [company, talentsData, jobsData] = await Promise.all([
+    apiFetch('/profile'), apiFetch('/talents'), apiFetch('/jobs'),
+  ]);
+  const jobs = jobsData.jobs;
+  const applicantSum = jobs.reduce((a,j)=>a+(j.applicantCount||0),0);
+  return `${statusbar()}${header("오늘의 인재 추천",`${esc(company.name)} · 채용 대시보드`,{roleChip:true}, nc)}
+  <div class="content">
+    <div class="stat-strip">
+      <div class="stat-box"><div class="stat-num">${jobs.length}</div><div class="stat-lbl">등록 공고</div></div>
+      <div class="stat-box"><div class="stat-num">${applicantSum}</div><div class="stat-lbl">지원자</div></div>
+      <div class="stat-box"><div class="stat-num">${talentsData.talents.length}</div><div class="stat-lbl">인재풀</div></div>
+    </div>
+    <div class="banner" onclick="go('jobPost')"><div class="banner-eyebrow">Job Posting</div><div class="banner-title">새 공고를 등록해보세요</div><div class="banner-sub">등록 즉시 인재풀과 매칭이 시작돼요</div></div>
+    <div class="section-label">매칭률 높은 인재</div>
+    ${talentsData.talents.slice(0,3).map(talentCard).join('') || emptyHtml('등록된 인재가 없어요', I.talent)}
+  </div>${tabbar('home')}`;
+}
+
+async function screenJobs(){
+  const nc = await unreadCount();
+  const isCompany = state.role==="company";
+  const data = await apiFetch('/jobs');
+  const cats = ["전체","인프라","클라우드"];
+  return `${statusbar()}${header(isCompany?"등록한 공고":"공고 탐색", `${data.jobs.length}개의 공고`,{}, nc)}
+  <div class="content">
+    <div class="search-box">${I.search}<input placeholder="제목, 기업명, 기술스택 검색" oninput="onJobSearch(this.value)"></div>
+    <div class="chip-row" id="jobChips">${cats.map((c,i)=>`<div class="chip ${i===0?'active':''}" onclick="setJobCat('${c}', this)">${c}</div>`).join('')}</div>
+    <div class="section-label">${isCompany?"등록 현황":"매칭률 순"}</div>
+    <div id="jobList">${data.jobs.map(jobCard).join('') || emptyHtml('등록된 공고가 없어요', I.jobs)}</div>
+  </div>
+  ${isCompany?`<button class="fab" onclick="go('jobPost')">${I.plus}</button>`:''}
+  ${tabbar('jobs')}`;
+}
+
+async function screenJobDetail(){
+  const j = await apiFetch('/jobs/' + state.param);
+  const isCompany = state.role==="company";
+  return `${statusbar()}
+  <div class="content" style="padding-top:14px;">
+    <div class="back-row" style="padding:0 0 10px;"><div class="back-btn" onclick="go('jobs')">${I.back}</div><div class="page-sub">공고 상세</div></div>
+    <div class="detail-hero"><div class="org">${esc(j.org)}</div><h2>${esc(j.title)}</h2>${gauge(j.match)}</div>
+    <div class="kv-grid">
+      <div class="kv-box"><div class="kv-lbl">단가</div><div class="kv-val">${esc(j.rate)}</div></div>
+      <div class="kv-box"><div class="kv-lbl">기간</div><div class="kv-val">${esc(j.period)}</div></div>
+      <div class="kv-box"><div class="kv-lbl">근무형태</div><div class="kv-val">${esc(j.work_type)}</div></div>
+      <div class="kv-box"><div class="kv-lbl">근무지</div><div class="kv-val">${esc(j.location)}</div></div>
+    </div>
+    <div class="section-label">요구 기술스택</div>
+    <div class="tag-row">${j.stack.map(s=>`<span class="tag on">${esc(s)}</span>`).join('')}</div>
+    <div class="section-label">상세 내용</div>
+    <div class="para">${esc(j.description) || "상세 설명이 아직 등록되지 않았어요."}</div>
+    <div style="height:90px;"></div>
+  </div>
+  <div style="position:absolute; left:0; right:0; bottom:0; padding:14px 20px 22px; background:var(--paper); border-top:1px solid var(--line); display:flex; gap:10px;">
+    ${isCompany? `<button class="btn btn-outline" onclick="go('jobs')">공고 목록으로</button><button class="btn btn-primary" onclick="go('applicants', ${j.id})">지원자 ${j.applicantCount||0}명 보기</button>`
+    : `<div class="star-btn ${j.saved?'filled':''}" style="width:52px;height:52px;border-radius:12px;" onclick="toggleSaveJob(${j.id}, event)">${I.star}</div>
+       <button class="btn btn-outline" style="flex:0 0 auto; width:auto; padding:13px 16px;" onclick="startChatWithCompany(${j.company_id})">채팅</button>
+       <button class="btn btn-primary" ${j.applied?'disabled':''} onclick="applyToJob(${j.id})">${j.applied?'지원 완료':'지원하기'}</button>`}
+  </div>`;
+}
+
+async function screenTalent(){
+  const nc = await unreadCount();
+  const data = await apiFetch('/talents');
+  const cats = ["전체","인프라","클라우드","DBA","보안"];
+  return `${statusbar()}${header("인재풀 검색","기술스택 · 경력으로 필터링",{}, nc)}
+  <div class="content">
+    <div class="search-box">${I.search}<input placeholder="이름, 직무, 기술스택 검색" oninput="onTalentSearch(this.value)"></div>
+    <div class="chip-row" id="talentChips">${cats.map((c,i)=>`<div class="chip ${i===0?'active':''}" onclick="setTalentCat('${c}', this)">${c}</div>`).join('')}</div>
+    <div class="section-label">매칭률 순</div>
+    <div id="talentList">${data.talents.map(talentCard).join('') || emptyHtml('등록된 인재가 없어요', I.talent)}</div>
+  </div>${tabbar('talent')}`;
+}
+
+async function screenTalentDetail(){
+  const t = await apiFetch('/talents/' + state.param);
+  return `${statusbar()}
+  <div class="content" style="padding-top:14px;">
+    <div class="back-row" style="padding:0 0 10px;"><div class="back-btn" onclick="go('talent')">${I.back}</div><div class="page-sub">프로필 상세</div></div>
+    <div class="detail-hero" style="display:flex; gap:14px; align-items:center;">
+      <div class="avatar lg">${esc(t.name[0])}</div>
+      <div><div class="org">${esc(t.role_title)} · ${esc(t.years)} ${t.verified?'· ✓ 인증':''}</div><h2 style="font-size:18px;">${esc(t.name)}</h2></div>
+    </div>
+    <div class="kv-grid">
+      <div class="kv-box"><div class="kv-lbl">희망단가</div><div class="kv-val">${esc(t.rate)}</div></div>
+      <div class="kv-box"><div class="kv-lbl">경력</div><div class="kv-val">${esc(t.years)}</div></div>
+    </div>
+    <div class="section-label">보유 기술스택</div>
+    <div class="tag-row">${t.stack.map(s=>`<span class="tag on">${esc(s)}</span>`).join('')}</div>
+    <div class="section-label">소개</div><div class="para">${esc(t.summary) || '소개가 아직 등록되지 않았어요.'}</div>
+    <div class="section-label">경력기술서</div>
+    ${t.resume_url ? `<a href="${fileUrl(t.resume_url)}" target="_blank" class="btn btn-outline">📄 경력기술서 PDF 열기</a>` : `<div class="page-sub">아직 첨부된 경력기술서가 없어요.</div>`}
+    <div style="height:90px;"></div>
+  </div>
+  <div style="position:absolute; left:0; right:0; bottom:0; padding:14px 20px 22px; background:var(--paper); border-top:1px solid var(--line); display:flex; gap:10px;">
+    <button class="btn btn-outline" onclick="startChatWithTalent(${t.user_id})">메시지 보내기</button>
+    <button class="btn btn-primary" ${t.proposed?'disabled':''} onclick="proposeTalent(${t.user_id})">${t.proposed?'제안 완료':'제안 보내기'}</button>
+  </div>`;
+}
+
+async function screenProjects(){
+  const nc = await unreadCount();
+  const data = await apiFetch('/projects');
+  const steps = ["계약 체결","계약금 정산","프로젝트 진행","최종 정산"];
+  return `${statusbar()}${header("프로젝트 관리","계약 · 정산 현황",{}, nc)}
+  <div class="content">
+    ${data.projects.map(p=>`
+      <div class="card">
+        <div class="card-top"><div><div class="card-title">${esc(p.title)}</div></div><span class="tag ${p.status==='진행중'?'on':''}" style="border-radius:999px;">${p.status}</span></div>
+        <div class="meta-row"><span>${I.clock}${esc(p.period)}</span><span class="rate">${esc(p.rate)}</span></div>
+        <div style="margin-top:16px;">
+          ${steps.map((step,i)=>`
+            <div class="tl-item"><div class="tl-dot ${i<p.stage?'done':''}"></div><div><div class="tl-tt">${step}</div>${i===p.stage-1?`<div class="tl-ds">현재 단계 진행 중</div>`:''}</div></div>`).join('')}
+        </div>
+        ${p.stage<4? `<button class="btn btn-outline" style="margin-top:10px;" onclick="advanceStage(${p.id}, ${p.stage+1})">다음 단계로 진행</button>`:''}
+      </div>`).join('') || emptyHtml('진행 중인 프로젝트가 없어요', I.proj)}
+  </div>${tabbar('projects')}`;
+}
+
+async function screenApplicants(){
+  const nc = await unreadCount();
+  const data = await apiFetch('/jobs/' + state.param + '/applicants');
+  const statusLabel = { submitted:'검토중', accepted:'수락됨', rejected:'거절됨' };
+  return `${statusbar()}
+  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('jobDetail', ${state.param})">${I.back}</div>
+    <div><div class="page-title" style="font-size:18px;">지원자 관리</div><div class="page-sub">${esc(data.job.title)}</div></div></div></div>
+  <div class="content">
+    ${data.applicants.map(a=>`
+      <div class="card">
+        <div class="card-top">
+          <div style="display:flex; gap:12px; align-items:center;">
+            <div class="avatar">${esc(a.name[0])}</div>
+            <div><div class="card-title">${esc(a.name)} <span style="font-family:var(--mono); font-weight:400; font-size:11px; color:var(--slate);">· ${esc(a.years)}</span></div>
+            <div class="card-org">${esc(a.role_title)}${a.verified?' · 인증됨':''}</div></div>
+          </div>
+          <span class="tag ${a.status==='accepted'?'on':''}" style="border-radius:999px; ${a.status==='rejected'?'opacity:.55;':''}">${statusLabel[a.status]||a.status}</span>
+        </div>
+        <div class="tag-row">${a.stack.map(s=>`<span class="tag">${esc(s)}</span>`).join('')}</div>
+        <div class="meta-row">
+          <span class="rate">${esc(a.rate)}</span>
+          ${a.resume_url? `<span><a href="${fileUrl(a.resume_url)}" target="_blank" style="color:var(--ink); font-weight:600;">📄 경력기술서 보기</a></span>` : `<span style="color:var(--slate-light);">경력기술서 미첨부</span>`}
+        </div>
+        ${a.status==='submitted'? `
+          <div style="display:flex; gap:8px; margin-top:12px;">
+            <button class="btn btn-outline" onclick="decideApplicant(${state.param}, ${a.application_id}, 'rejected')">거절</button>
+            <button class="btn btn-primary" onclick="decideApplicant(${state.param}, ${a.application_id}, 'accepted')">수락</button>
+          </div>` : ''}
+      </div>`).join('') || emptyHtml('아직 지원자가 없어요', I.talent)}
+  </div>`;
+}
+
+async function screenChatList(){
+  const data = await apiFetch('/conversations');
+  return `${statusbar()}${header("채팅","", {bell:false})}
+  <div class="content">
+    ${data.conversations.map(c=>`
+      <div class="chat-row" onclick="go('chatRoom', ${c.id})">
+        <div class="avatar">${esc((c.name||'?')[0])}</div>
+        <div class="chat-body"><div class="chat-name">${esc(c.name)}<span class="chat-time">${c.lastMessage? new Date(c.lastMessage.created_at).toLocaleString('ko-KR',{hour:'numeric',minute:'2-digit'}) : ''}</span></div>
+        <div class="chat-preview">${c.lastMessage? esc(c.lastMessage.body) : '대화를 시작해보세요'}</div></div>
+        ${c.unread? `<div class="unread">${c.unread}</div>`:''}
+      </div>`).join('') || emptyHtml('아직 채팅이 없어요', I.chat)}
+  </div>${tabbar('chatList')}`;
+}
+
+async function screenChatRoom(){
+  const data = await apiFetch('/conversations/' + state.param + '/messages');
+  return `${statusbar()}
+  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('chatList')">${I.back}</div><div class="page-title" style="font-size:15px;">대화</div></div></div>
+  <div class="content" id="chatScroll">
+    <div class="bubble-wrap">${data.messages.map(m=>`
+      <div class="bubble ${m.sender_id===state.userId?'me':'them'}">${esc(m.body)}<div class="bubble-time">${new Date(m.created_at).toLocaleString('ko-KR',{hour:'numeric',minute:'2-digit'})}</div></div>
+    `).join('') || `<div class="empty"><div class="ic">${I.chat}</div><div class="tt">첫 메시지를 보내보세요</div></div>`}</div>
+  </div>
+  <div class="chat-input-bar">
+    <input id="chatInputEl" class="chat-input" placeholder="메시지를 입력하세요" onkeydown="chatKeydown(event, ${state.param})">
+    <button class="send-btn" onclick="sendMessage(${state.param})">${I.send}</button>
+  </div>`;
+}
+
+async function screenMypage(){
+  const isCompany = state.role==='company';
+  const profile = await apiFetch('/profile');
+  return `${statusbar()}${header("마이페이지","",{bell:false})}
+  <div class="content">
+    <div class="mypage-head">
+      <div class="avatar lg">${esc((profile.name||'?')[0])}</div>
+      <div><div class="card-title">${esc(profile.name)}</div><div class="card-org">${isCompany?esc(profile.contact_person||''):esc(profile.role_title||'')+' · '+esc(profile.years||'')}</div></div>
+    </div>
+    ${!isCompany?`<div class="banner" onclick="go('profileEdit')"><div class="banner-eyebrow">Profile</div><div class="banner-title">프로필 완성도 ${profile.completion}%</div><div class="profile-bar"><div class="profile-bar-fill" style="width:${profile.completion}%"></div></div></div>`:''}
+    <div class="section-label">계정</div>
+    <div class="list-item" onclick="${isCompany?'':"go('profileEdit')"}"><div class="li-l"><div class="li-icon">${I.user}</div><div class="li-tt">프로필 ${isCompany?'/ 회사 정보':'수정'}</div></div>${I.back}</div>
+    <div class="list-item" onclick="go('projects')"><div class="li-l"><div class="li-icon">${I.proj}</div><div class="li-tt">계약 · 정산 내역</div></div>${I.back}</div>
+    <div class="section-label">설정</div>
+    <div class="list-item" onclick="go('serverSetup')"><div class="li-l"><div class="li-icon">${I.gear}</div><div class="li-tt">서버 연결 설정</div></div>${I.back}</div>
+    <div class="list-item" onclick="logout()"><div class="li-l"><div class="li-icon">${I.logout}</div><div class="li-tt">로그아웃</div></div></div>
+  </div>${tabbar('mypage')}`;
+}
+
+async function screenProfileEdit(){
+  const p = await apiFetch('/profile');
+  pendingStack = [...p.stack];
+  return `${statusbar()}
+  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('mypage')">${I.back}</div><div class="page-title">프로필 수정</div></div></div>
+  <div class="content">
+    <div class="form-field"><label class="form-label">이름</label><input id="pf-name" class="form-input" value="${esc(p.name)}"></div>
+    <div class="form-field"><label class="form-label">직무</label><input id="pf-role" class="form-input" value="${esc(p.role_title)}"></div>
+    <div class="form-field"><label class="form-label">희망 단가</label><input id="pf-rate" class="form-input" value="${esc(p.rate)}"></div>
+    <div class="form-field">
+      <label class="form-label">기술스택</label>
+      <div class="tag-row" id="pf-tags">${pendingStack.map((s,i)=>`<span class="tag on rm" onclick="removeProfileTag(${i})">${esc(s)} ${I.x}</span>`).join('')}</div>
+      <div class="add-tag-row"><input id="pf-newtag" class="form-input" placeholder="기술스택 추가 후 Enter" onkeydown="if(event.key==='Enter'){event.preventDefault();addProfileTag();}"><button class="btn btn-outline" style="width:auto; padding:12px 16px;" onclick="addProfileTag()">추가</button></div>
+    </div>
+    <div class="form-field">
+      <label class="form-label">경력기술서 (PDF)</label>
+      ${p.resume_url ? `
+        <div class="card" style="margin-bottom:0; display:flex; align-items:center; justify-content:space-between; gap:10px;">
+          <div style="min-width:0;"><div class="card-title" style="font-size:13px;">📄 ${esc(p.resume_original_name || '경력기술서.pdf')}</div><div class="card-org">업로드 완료</div></div>
+          <div style="display:flex; gap:6px; flex:0 0 auto;">
+            <a href="${fileUrl(p.resume_url)}" target="_blank" class="btn btn-outline" style="width:auto; padding:9px 12px; font-size:12px;">보기</a>
+            <button class="btn btn-outline" style="width:auto; padding:9px 12px; font-size:12px;" onclick="deleteResume()">삭제</button>
+          </div>
+        </div>
+        <div class="add-tag-row" style="margin-top:8px;"><label class="btn btn-ghost" style="width:auto; padding:10px 14px; font-size:12.5px;">다른 파일로 교체<input type="file" accept="application/pdf" style="display:none;" onchange="uploadResume(this)"></label></div>
+      ` : `
+        <label class="btn btn-outline" style="cursor:pointer;">PDF 파일 선택해서 업로드<input type="file" accept="application/pdf" style="display:none;" onchange="uploadResume(this)"></label>
+        <div class="page-sub" style="margin-top:6px;">PDF, 최대 8MB</div>
+      `}
+    </div>
+    <button class="btn btn-primary" onclick="saveProfile()">저장하기</button>
+    <div style="height:20px;"></div>
+  </div>`;
+}
+
+async function screenAlerts(){
+  const data = await apiFetch('/notifications');
+  return `${statusbar()}
+  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go(state.prevScreen||'home')">${I.back}</div><div class="page-title">알림</div></div></div>
+  <div class="content">
+    ${data.notifications.map(a=>`
+      <div class="card" style="cursor:pointer; ${a.is_read?'opacity:.6;':''}" onclick="markAlertRead(${a.id})">
+        <div class="card-top"><span class="tag on" style="border-radius:999px;">${esc(a.tag)}</span><span class="chat-time">${new Date(a.created_at).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'numeric',minute:'2-digit'})}</span></div>
+        <div class="card-title" style="margin-top:9px; font-size:13.5px;">${esc(a.title)}${!a.is_read?' <span style="color:var(--amber-deep)">●</span>':''}</div>
+        <div class="page-sub" style="font-family:var(--sans); color:var(--slate); margin-top:3px;">${esc(a.body)}</div>
+      </div>`).join('') || emptyHtml('아직 알림이 없어요', I.bell)}
+  </div>`;
+}
+
+function screenJobPost(){
+  return `${statusbar()}
+  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('jobs')">${I.back}</div><div class="page-title">새 공고 등록</div></div></div>
+  <div class="content">
+    <div class="form-field"><label class="form-label">공고 제목</label><input id="pj-title" class="form-input" placeholder="예: 클라우드 전환 인프라 아키텍트"></div>
+    <div class="form-field"><label class="form-label">필요 기술스택 (콤마로 구분)</label><input id="pj-stack" class="form-input" placeholder="예: AWS, Kubernetes, VMware"></div>
+    <div class="form-field"><label class="form-label">근무 기간</label><input id="pj-period" class="form-input" placeholder="예: 6개월"></div>
+    <div class="form-field"><label class="form-label">단가</label><input id="pj-rate" class="form-input" placeholder="예: 600만원/월"></div>
+    <div class="form-field"><label class="form-label">근무 형태</label><input id="pj-type" class="form-input" placeholder="예: 상주 · 주5일"></div>
+    <div class="form-field"><label class="form-label">상세 내용</label><textarea id="pj-desc" class="form-input" placeholder="업무 범위, 우대사항 등을 입력하세요"></textarea></div>
+    <button class="btn btn-primary" onclick="postJob()">공고 등록하기</button>
+    <div style="height:20px;"></div>
+  </div>`;
+}
+
+/* ---------------- Router ---------------- */
+async function render(){
+  const el = document.getElementById('screen');
+  const needsAuth = !["onboarding","serverSetup","signup","login"].includes(state.screen);
+  if(needsAuth && !state.token){ state.screen = "onboarding"; }
+
+  el.innerHTML = loadingShell();
+  try{
+    const map = {
+      onboarding: screenOnboarding, serverSetup: screenServerSetup,
+      signup: screenSignup, login: screenLogin,
+      home: screenHome, jobs: screenJobs, jobDetail: screenJobDetail,
+      talent: screenTalent, talentDetail: screenTalentDetail, projects: screenProjects, applicants: screenApplicants,
+      chatList: screenChatList, chatRoom: screenChatRoom, mypage: screenMypage,
+      profileEdit: screenProfileEdit, alerts: screenAlerts, jobPost: screenJobPost,
+    };
+    const fn = map[state.screen] || screenOnboarding;
+    const html = await fn();
+    el.innerHTML = html + `<div class="toast" id="toast"></div>`;
+    if(state.screen==='chatRoom'){
+      const box = document.getElementById('chatScroll');
+      if(box) box.scrollTop = box.scrollHeight;
+    }
+  }catch(e){
+    el.innerHTML = errorShell(e.message) + `<div class="toast" id="toast"></div>`;
+  }
+}
+render();
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/service-worker.js').catch(()=>{});
+  });
+}
+</script>
+</body>
+</html>

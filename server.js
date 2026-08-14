@@ -25,6 +25,7 @@ app.use((req, res, next) => {
 });
 
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'stackfit-backend' }));
 
