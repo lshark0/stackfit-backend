@@ -23,13 +23,21 @@ if (USE_POSTGRES) {
     return pool.query(toPgQuery(sql), params);
   }
 
+  // id 대신 user_id를 기본키로 쓰는 테이블은 RETURNING id를 붙이면 안 됩니다.
+  const NO_ID_TABLES = ['freelancer_profiles', 'companies'];
+  function targetTable(sql) {
+    const m = sql.match(/insert\s+into\s+([a-zA-Z_]+)/i);
+    return m ? m[1] : null;
+  }
+
   run = async (sql, params = []) => {
     const isInsert = /^\s*insert/i.test(sql);
     const hasReturning = /returning/i.test(sql);
-    const text = isInsert && !hasReturning ? `${sql} RETURNING id` : sql;
+    const skip = isInsert && NO_ID_TABLES.includes(targetTable(sql));
+    const text = isInsert && !hasReturning && !skip ? `${sql} RETURNING id` : sql;
     const res = await query(text, params);
     return {
-      lastInsertRowid: isInsert && res.rows[0] ? res.rows[0].id : undefined,
+      lastInsertRowid: isInsert && !skip && res.rows[0] ? res.rows[0].id : undefined,
       changes: res.rowCount,
     };
   };
@@ -81,8 +89,21 @@ if (USE_POSTGRES) {
 }
 
 async function seed() {
-  const already = (await get('SELECT COUNT(*) AS c FROM users')).c;
-  if (Number(already) > 0) return;
+  const demoUser = await get("SELECT id FROM users WHERE email = 'lee@stackfit.dev'");
+  if (demoUser) {
+    const hasProfile = await get('SELECT 1 AS ok FROM freelancer_profiles WHERE user_id = ?', [demoUser.id]);
+    if (hasProfile) return; // 이미 정상적으로 시드된 상태
+  }
+
+  // 이전 시도가 중간에 실패해 일부 데이터만 남아있을 수 있으므로, 재시드 전에 깨끗이 비웁니다.
+  const tablesInOrder = [
+    'messages', 'conversations', 'notifications', 'projects',
+    'proposals', 'saved_jobs', 'applications', 'jobs',
+    'freelancer_profiles', 'companies', 'users',
+  ];
+  for (const t of tablesInOrder) {
+    await run(`DELETE FROM ${t}`);
+  }
 
   const mkUser = async (email, password, role) => {
     const { hash, salt } = hashPassword(password);
