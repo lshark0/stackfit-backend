@@ -132,10 +132,26 @@ CORS는 모든 origin에 대해 열려 있어(`Access-Control-Allow-Origin: *`) 
 PC를 계속 켜둘 필요 없이 어디서나 접속하려면 [`DEPLOY.md`](./DEPLOY.md)를 참고하세요. Docker 이미지(`Dockerfile`)와
 Render.com용 `render.yaml`이 포함되어 있어 바로 배포할 수 있습니다.
 
-## 7. 알려진 제한사항 (다음 단계 후보)
+## 7. 데이터 영구 저장 (PostgreSQL)
+
+`DATABASE_URL` 환경변수가 설정되어 있으면 자동으로 PostgreSQL을 사용합니다 (설정 안 하면 로컬 SQLite로 동작 — 로컬 개발용).
+Render에 배포된 버전은 Render의 관리형 PostgreSQL(`stackfit-db`)에 연결되어 있어, 서버가 재배포/재시작되어도
+가입한 계정·공고·채팅 등 데이터가 사라지지 않습니다.
+
+⚠️ **Render 무료 PostgreSQL은 생성 후 30일이 지나면 만료되어 삭제됩니다.** 계속 쓰려면 만료 전에
+Render 대시보드에서 유료 플랜으로 업그레이드하거나, 새 무료 DB를 만들어 `DATABASE_URL`을 갱신해야 합니다.
+
+업로드된 이력서 PDF(`uploads/` 폴더)는 여전히 로컬 디스크에 저장되므로, 무료 플랜에서는 재배포 시 유실될 수 있습니다.
+완전한 영구 저장이 필요하면 S3 등 오브젝트 스토리지 연동을 다음 단계로 고려하세요.
+
+## 8. 콜드스타트 완화 (GitHub Actions)
+
+`.github/workflows/keep-alive.yml`이 10분마다 `/api/health`를 호출해서 Render 무료 플랜이 잠들지 않게 합니다.
+GitHub 저장소에 push되어 있기만 하면 별도 설정 없이 자동으로 동작합니다 (Actions 탭에서 실행 기록 확인 가능).
+그래도 완전히 잠드는 걸 막지는 못할 수 있어(예: GitHub Actions 자체 지연), 100% 확실한 해결책은 유료 플랜(Starter 이상, 상시 구동)입니다.
+
+## 9. 알려진 제한사항 (다음 단계 후보)
 
 - 토큰 구현이 경량 HMAC 방식입니다. 운영 배포 전 검증된 JWT 라이브러리 사용을 권장합니다.
-- `node:sqlite`는 Node 22 기준 아직 실험적(Experimental) 기능입니다. 운영 환경에서는 PostgreSQL 등으로
-  교체하는 것을 권장하며, `schema.sql`은 표준 SQL이라 대부분 그대로 이식 가능합니다.
-- 무료 클라우드 플랜은 대부분 디스크가 영구저장되지 않아 재배포/재시작 시 DB와 업로드 파일이 초기화될 수 있습니다 (`DEPLOY.md` 참고).
+- 업로드 파일(이력서 PDF)은 아직 오브젝트 스토리지로 옮기지 않았습니다 (위 7번 참고).
 - 결제/정산 연동, 실시간 채팅(WebSocket, 현재는 폴링 방식)은 아직 포함되어 있지 않습니다.

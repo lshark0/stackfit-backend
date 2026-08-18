@@ -5,9 +5,10 @@ const { computeMatch } = require('../match');
 
 const router = express.Router();
 
-router.get('/', requireAuth, requireRole('company'), (req, res) => {
+router.get('/', requireAuth, requireRole('company'), async (req, res) => {
   const { q, category, jobId } = req.query;
-  let talents = all('SELECT * FROM freelancer_profiles').map(t => ({ ...t, stack: JSON.parse(t.stack_json) }));
+  const rows = await all('SELECT * FROM freelancer_profiles');
+  let talents = rows.map(t => ({ ...t, stack: JSON.parse(t.stack_json) }));
 
   if (q) {
     const needle = String(q).toLowerCase();
@@ -23,12 +24,11 @@ router.get('/', requireAuth, requireRole('company'), (req, res) => {
 
   let jobStack = [];
   if (jobId) {
-    const job = get('SELECT stack_json FROM jobs WHERE id = ?', [jobId]);
+    const job = await get('SELECT stack_json FROM jobs WHERE id = ?', [jobId]);
     if (job) jobStack = JSON.parse(job.stack_json);
   }
-  const proposedIds = new Set(
-    all('SELECT freelancer_id FROM proposals WHERE company_id = ?', [req.user.id]).map(p => p.freelancer_id)
-  );
+  const proposalRows = await all('SELECT freelancer_id FROM proposals WHERE company_id = ?', [req.user.id]);
+  const proposedIds = new Set(proposalRows.map(p => p.freelancer_id));
 
   const result = talents.map(t => ({
     ...t,
@@ -39,10 +39,10 @@ router.get('/', requireAuth, requireRole('company'), (req, res) => {
   res.json({ talents: result });
 });
 
-router.get('/:userId', requireAuth, requireRole('company'), (req, res) => {
-  const t = get('SELECT * FROM freelancer_profiles WHERE user_id = ?', [req.params.userId]);
+router.get('/:userId', requireAuth, requireRole('company'), async (req, res) => {
+  const t = await get('SELECT * FROM freelancer_profiles WHERE user_id = ?', [req.params.userId]);
   if (!t) return res.status(404).json({ error: '프로필을 찾을 수 없습니다.' });
-  const proposed = !!get('SELECT id FROM proposals WHERE company_id=? AND freelancer_id=?', [req.user.id, req.params.userId]);
+  const proposed = !!(await get('SELECT id FROM proposals WHERE company_id=? AND freelancer_id=?', [req.user.id, req.params.userId]));
   res.json({
     ...t,
     stack: JSON.parse(t.stack_json),

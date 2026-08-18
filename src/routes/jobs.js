@@ -14,14 +14,15 @@ function optionalAuth(req, _res, next) {
   next();
 }
 
-function withCompanyAndStack(job) {
-  const company = get('SELECT name FROM companies WHERE user_id = ?', [job.company_id]);
+async function withCompanyAndStack(job) {
+  const company = await get('SELECT name FROM companies WHERE user_id = ?', [job.company_id]);
   return { ...job, org: company ? company.name : '알 수 없음', stack: JSON.parse(job.stack_json) };
 }
 
-router.get('/', optionalAuth, (req, res) => {
+router.get('/', optionalAuth, async (req, res) => {
   const { q, category } = req.query;
-  let jobs = all("SELECT * FROM jobs WHERE status = 'open' ORDER BY created_at DESC, id DESC").map(withCompanyAndStack);
+  const rows = await all("SELECT * FROM jobs WHERE status = 'open' ORDER BY created_at DESC, id DESC");
+  let jobs = await Promise.all(rows.map(withCompanyAndStack));
 
   if (q) {
     const needle = String(q).toLowerCase();
@@ -39,10 +40,12 @@ router.get('/', optionalAuth, (req, res) => {
   let appliedJobIds = new Set();
   let savedJobIds = new Set();
   if (req.user && req.user.role === 'freelancer') {
-    const p = get('SELECT stack_json FROM freelancer_profiles WHERE user_id = ?', [req.user.id]);
+    const p = await get('SELECT stack_json FROM freelancer_profiles WHERE user_id = ?', [req.user.id]);
     profileStack = p ? JSON.parse(p.stack_json) : [];
-    appliedJobIds = new Set(all('SELECT job_id FROM applications WHERE freelancer_id = ?', [req.user.id]).map(a => a.job_id));
-    savedJobIds = new Set(all('SELECT job_id FROM saved_jobs WHERE freelancer_id = ?', [req.user.id]).map(s => s.job_id));
+    const applied = await all('SELECT job_id FROM applications WHERE freelancer_id = ?', [req.user.id]);
+    const saved = await all('SELECT job_id FROM saved_jobs WHERE freelancer_id = ?', [req.user.id]);
+    appliedJobIds = new Set(applied.map(a => a.job_id));
+    savedJobIds = new Set(saved.map(s => s.job_id));
   }
 
   const result = jobs.map(j => ({
@@ -55,27 +58,27 @@ router.get('/', optionalAuth, (req, res) => {
   res.json({ jobs: result });
 });
 
-router.get('/:id', optionalAuth, (req, res) => {
-  const job = get('SELECT * FROM jobs WHERE id = ?', [req.params.id]);
+router.get('/:id', optionalAuth, async (req, res) => {
+  const job = await get('SELECT * FROM jobs WHERE id = ?', [req.params.id]);
   if (!job) return res.status(404).json({ error: '공고를 찾을 수 없습니다.' });
-  const full = withCompanyAndStack(job);
+  const full = await withCompanyAndStack(job);
 
   let match = 0, applied = false, saved = false;
   if (req.user && req.user.role === 'freelancer') {
-    const p = get('SELECT stack_json FROM freelancer_profiles WHERE user_id = ?', [req.user.id]);
+    const p = await get('SELECT stack_json FROM freelancer_profiles WHERE user_id = ?', [req.user.id]);
     match = computeMatch(full.stack, p ? JSON.parse(p.stack_json) : []);
-    applied = !!get('SELECT id FROM applications WHERE job_id=? AND freelancer_id=?', [job.id, req.user.id]);
-    saved = !!get('SELECT id FROM saved_jobs WHERE job_id=? AND freelancer_id=?', [job.id, req.user.id]);
+    applied = !!(await get('SELECT id FROM applications WHERE job_id=? AND freelancer_id=?', [job.id, req.user.id]));
+    saved = !!(await get('SELECT id FROM saved_jobs WHERE job_id=? AND freelancer_id=?', [job.id, req.user.id]));
   }
 
-  const applicantCount = get('SELECT COUNT(*) AS c FROM applications WHERE job_id = ?', [job.id]).c;
-  res.json({ ...full, match, applied, saved, applicantCount });
+  const applicantCount = (await get('SELECT COUNT(*) AS c FROM applications WHERE job_id = ?', [job.id])).c;
+  res.json({ ...full, match, applied, saved, applicantCount: Number(applicantCount) });
 });
 
-router.post('/', requireAuth, requireRole('company'), (req, res) => {
+router.post('/', requireAuth, requireRole('company'), async (req, res) => {
   const { title, stack, period, rate, work_type, location, category, description } = req.body || {};
   if (!title) return res.status(400).json({ error: '공고 제목은 필수입니다.' });
-  const r = run(
+  const r = await run(
     `INSERT INTO jobs (company_id, title, stack_json, period, rate, work_type, location, category, description)
      VALUES (?,?,?,?,?,?,?,?,?)`,
     [
@@ -83,19 +86,19 @@ router.post('/', requireAuth, requireRole('company'), (req, res) => {
       period || '협의', rate || '협의', work_type || '협의', location || '협의', category || '인프라', description || '',
     ]
   );
-  const job = get('SELECT * FROM jobs WHERE id = ?', [r.lastInsertRowid]);
-  res.status(201).json(withCompanyAndStack(job));
+  const job = await get('SELECT * FROM jobs WHERE id = ?', [r.lastInsertRowid]);
+  res.status(201).json(await withCompanyAndStack(job));
 });
 
 // 공고 저장(즐겨찾기) 토글
-router.post('/:id/save', requireAuth, requireRole('freelancer'), (req, res) => {
+router.post('/:id/save', requireAuth, requireRole('freelancer'), async (req, res) => {
   const jobId = Number(req.params.id);
-  const existing = get('SELECT id FROM saved_jobs WHERE job_id=? AND freelancer_id=?', [jobId, req.user.id]);
+  const existing = await get('SELECT id FROM saved_jobs WHERE job_id=? AND freelancer_id=?', [jobId, req.user.id]);
   if (existing) {
-    run('DELETE FROM saved_jobs WHERE id = ?', [existing.id]);
+    await run('DELETE FROM saved_jobs WHERE id = ?', [existing.id]);
     return res.json({ saved: false });
   }
-  run('INSERT INTO saved_jobs (freelancer_id, job_id) VALUES (?,?)', [req.user.id, jobId]);
+  await run('INSERT INTO saved_jobs (freelancer_id, job_id) VALUES (?,?)', [req.user.id, jobId]);
   res.json({ saved: true });
 });
 

@@ -1,6 +1,6 @@
 const express = require('express');
 const path = require('path');
-require('./src/db'); // DB 초기화 + 데모 시드 실행
+const { initDb, USE_POSTGRES } = require('./src/db');
 
 const authRoutes = require('./src/routes/auth');
 const profileRoutes = require('./src/routes/profile');
@@ -15,7 +15,7 @@ const notificationRoutes = require('./src/routes/notifications');
 const app = express();
 app.use(express.json());
 
-// 아주 단순한 CORS 허용 (프론트엔드 프로토타입이 file://나 다른 origin에서 호출할 수 있도록)
+// 아주 단순한 CORS 허용 (프론트엔드가 다른 origin에서 호출할 수 있도록)
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -27,7 +27,7 @@ app.use((req, res, next) => {
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use(express.static(path.join(__dirname, 'public')));
 
-app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'stackfit-backend' }));
+app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'stackfit-backend', db: USE_POSTGRES ? 'postgres' : 'sqlite' }));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);
@@ -47,6 +47,15 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => {
-  console.log(`[stackfit] API 서버 실행 중 → http://localhost:${PORT}`);
+
+async function main() {
+  await initDb(); // 스키마 준비 + (필요 시) 데모 데이터 시드까지 끝난 뒤에 요청을 받기 시작
+  app.listen(PORT, () => {
+    console.log(`[stackfit] API 서버 실행 중 → http://localhost:${PORT} (DB: ${USE_POSTGRES ? 'PostgreSQL' : 'SQLite'})`);
+  });
+}
+
+main().catch((err) => {
+  console.error('[stackfit] 서버 시작 실패:', err);
+  process.exit(1);
 });

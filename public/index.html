@@ -95,9 +95,10 @@
   .onb-wrap{flex:1; display:flex; flex-direction:column; justify-content:center; padding:0 26px 40px; gap:20px;}
   .brand-mark{display:flex; align-items:center; gap:10px;}
   .brand-mark .sq{width:34px; height:34px; border-radius:9px; background:var(--ink); position:relative;}
-  .brand-mark .sq::before,.brand-mark .sq::after{content:""; position:absolute; background:var(--amber); border-radius:2px;}
-  .brand-mark .sq::before{width:14px; height:3px; top:11px; left:10px;}
-  .brand-mark .sq::after{width:3px; height:14px; top:10px; left:15.5px;}
+  .brand-mark .sq::before,.brand-mark .sq::after,.brand-mark .sq .mid{content:""; position:absolute; left:9px; width:16px; height:3px; border-radius:1.5px; background:var(--amber);}
+  .brand-mark .sq::before{top:10px;}
+  .brand-mark .sq .mid{top:15.5px; background:var(--amber);}
+  .brand-mark .sq::after{top:21px; background:var(--cyan);}
   .brand-name{font-weight:700; font-size:18px; letter-spacing:-.01em; color:var(--ink);}
   .brand-tag{font-family:var(--mono); font-size:10.5px; color:var(--slate); letter-spacing:.08em; text-transform:uppercase;}
   .onb-headline{font-size:24px; font-weight:700; line-height:1.32; color:var(--ink); letter-spacing:-.015em;}
@@ -572,7 +573,7 @@ async function postJob(){
 async function screenOnboarding(){
   return `${statusbar()}
   <div class="onb-wrap">
-    <div class="brand-mark"><div class="sq"></div><div><div class="brand-name">스택핏</div><div class="brand-tag">STACKFIT · IT Matching</div></div></div>
+    <div class="brand-mark"><div class="sq"><span class="mid"></span></div><div><div class="brand-name">스택핏</div><div class="brand-tag">STACKFIT · IT Matching</div></div></div>
     <div class="onb-headline">기술 스택으로<br><em>가장 정확하게</em><br>연결합니다.</div>
     <div style="display:flex; flex-direction:column; gap:12px;">
       <div class="role-card" onclick="loginAs('freelancer')"><div class="ic">${I.user}</div><div><div class="tt">IT 프리랜서로 데모 로그인</div><div class="ds">lee@stackfit.dev 계정으로 접속해요</div></div></div>
