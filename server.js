@@ -1,6 +1,8 @@
 const express = require('express');
 const path = require('path');
-const { initDb, USE_POSTGRES } = require('./src/db');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const { initDb, get, USE_POSTGRES } = require('./src/db');
 
 const authRoutes = require('./src/routes/auth');
 const profileRoutes = require('./src/routes/profile');
@@ -13,21 +15,69 @@ const conversationRoutes = require('./src/routes/conversations');
 const notificationRoutes = require('./src/routes/notifications');
 
 const app = express();
-app.use(express.json());
+app.set('trust proxy', 1); // Render는 프록시 뒤에 있으므로 rate-limit이 실제 클라이언트 IP를 보게 함
 
-// 아주 단순한 CORS 허용 (프론트엔드가 다른 origin에서 호출할 수 있도록)
+// 보안 HTTP 헤더. CSP는 정적 프론트엔드가 인라인 스크립트/스타일을 쓰므로 완화해서 적용.
+app.use(
+  helmet({
+    contentSecurityPolicy: false, // 프론트엔드가 단일 HTML(인라인 script/style)이라 기본 CSP와 충돌함
+    crossOriginEmbedderPolicy: false,
+  })
+);
+
+app.use(express.json({ limit: '200kb' })); // 과도하게 큰 JSON payload로 인한 DoS 방지
+
+// CORS: 허용할 origin을 환경변수로 지정 가능 (콤마로 구분). 미지정 시 전체 허용(개발 편의).
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
+
 app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  const origin = req.headers.origin;
+  if (allowedOrigins.length === 0 || !origin || allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin || '*');
+  }
+  res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
   if (req.method === 'OPTIONS') return res.sendStatus(204);
   next();
 });
 
+// 로그인/회원가입 무차별 대입 공격 방어: 15분에 IP당 20회로 제한
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: '요청이 너무 많아요. 잠시 후 다시 시도해주세요.' },
+});
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/signup', authLimiter);
+
+// 그 외 전체 API에 대한 넉넉한 기본 레이트리밋 (남용/스크래핑 방지)
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use('/api', apiLimiter);
+
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use(express.static(path.join(__dirname, 'public')));
 
-app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'stackfit-backend', db: USE_POSTGRES ? 'postgres' : 'sqlite' }));
+// DB까지 실제로 쿼리해서 깨움 — Neon 같은 서버리스 DB는 유휴 상태에서 자동으로 잠들기 때문에,
+// 헬스체크가 서버만 깨우고 DB는 깨우지 않으면 로그인 시 DB 콜드스타트로 여전히 느려질 수 있음.
+app.get('/api/health', async (_req, res) => {
+  try {
+    await get('SELECT 1 AS ok');
+    res.json({ ok: true, service: 'stackfit-backend', db: USE_POSTGRES ? 'postgres' : 'sqlite' });
+  } catch (err) {
+    res.status(503).json({ ok: false, error: 'DB에 연결할 수 없어요.' });
+  }
+});
 
 app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);

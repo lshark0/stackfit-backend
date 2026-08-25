@@ -1,4 +1,5 @@
 {
+  "id": "/",
   "name": "스택핏 STACKFIT",
   "short_name": "스택핏",
   "description": "IT 프리랜서와 기업을 연결하는 매칭 플랫폼",
@@ -8,6 +9,7 @@
   "orientation": "portrait",
   "background_color": "#14171C",
   "theme_color": "#14171C",
+  "categories": ["business", "productivity"],
   "icons": [
     { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },

@@ -61,7 +61,8 @@ router.get('/:id/messages', requireAuth, async (req, res) => {
 
 router.post('/:id/messages', requireAuth, async (req, res) => {
   const { body } = req.body || {};
-  if (!body || !body.trim()) return res.status(400).json({ error: '메시지 내용을 입력해주세요.' });
+  if (!body || typeof body !== 'string' || !body.trim()) return res.status(400).json({ error: '메시지 내용을 입력해주세요.' });
+  if (body.trim().length > 2000) return res.status(400).json({ error: '메시지가 너무 길어요 (2000자 이내).' });
 
   const conv = await get('SELECT * FROM conversations WHERE id = ?', [req.params.id]);
   if (!conv || (conv.company_id !== req.user.id && conv.freelancer_id !== req.user.id)) {

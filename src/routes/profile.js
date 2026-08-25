@@ -26,6 +26,18 @@ const upload = multer({
   },
 });
 
+// multer는 Content-Type/확장자만 보고, 실제 파일 내용은 검사하지 않음.
+// 파일 앞부분이 실제 PDF 시그니처(%PDF-)로 시작하는지 확인해 위장 업로드를 막음.
+function isRealPdf(filePath) {
+  const fd = fs.openSync(filePath, 'r');
+  const buf = Buffer.alloc(5);
+  fs.readSync(fd, buf, 0, 5, 0);
+  fs.closeSync(fd);
+  return buf.toString('utf8') === '%PDF-';
+}
+
+const clamp = (v, max, fallback = '') => (typeof v === 'string' ? v.slice(0, max) : fallback);
+
 router.get('/', requireAuth, async (req, res) => {
   if (req.user.role === 'freelancer') {
     const p = await get('SELECT * FROM freelancer_profiles WHERE user_id = ?', [req.user.id]);
@@ -43,17 +55,23 @@ router.put('/', requireAuth, async (req, res) => {
   if (req.user.role === 'freelancer') {
     const { name, role_title, years, rate, stack, summary } = req.body || {};
     const current = await get('SELECT * FROM freelancer_profiles WHERE user_id = ?', [req.user.id]);
-    const nextStack = Array.isArray(stack) ? stack : JSON.parse(current.stack_json);
+
+    let nextStack = Array.isArray(stack) ? stack : JSON.parse(current.stack_json);
+    nextStack = nextStack
+      .filter((s) => typeof s === 'string' && s.trim())
+      .slice(0, 20)
+      .map((s) => s.trim().slice(0, 40));
+
     const completion = Math.min(100, 50 + nextStack.length * 5 + (summary ? 10 : 0) + (current.verified ? 10 : 0));
     await run(
       `UPDATE freelancer_profiles SET name=?, role_title=?, years=?, rate=?, stack_json=?, summary=?, completion=? WHERE user_id=?`,
       [
-        name ?? current.name,
-        role_title ?? current.role_title,
-        years ?? current.years,
-        rate ?? current.rate,
+        name !== undefined ? clamp(name, 60, current.name) : current.name,
+        role_title !== undefined ? clamp(role_title, 60, current.role_title) : current.role_title,
+        years !== undefined ? clamp(years, 20, current.years) : current.years,
+        rate !== undefined ? clamp(rate, 40, current.rate) : current.rate,
         JSON.stringify(nextStack),
-        summary ?? current.summary,
+        summary !== undefined ? clamp(summary, 2000, current.summary) : current.summary,
         completion,
         req.user.id,
       ]
@@ -65,9 +83,9 @@ router.put('/', requireAuth, async (req, res) => {
   const { name, contact_person, description } = req.body || {};
   const current = await get('SELECT * FROM companies WHERE user_id = ?', [req.user.id]);
   await run('UPDATE companies SET name=?, contact_person=?, description=? WHERE user_id=?', [
-    name ?? current.name,
-    contact_person ?? current.contact_person,
-    description ?? current.description,
+    name !== undefined ? clamp(name, 60, current.name) : current.name,
+    contact_person !== undefined ? clamp(contact_person, 60, current.contact_person) : current.contact_person,
+    description !== undefined ? clamp(description, 500, current.description) : current.description,
     req.user.id,
   ]);
   res.json(await get('SELECT * FROM companies WHERE user_id = ?', [req.user.id]));
@@ -80,6 +98,11 @@ router.post('/resume', requireAuth, requireRole('freelancer'), (req, res) => {
     if (err) return res.status(400).json({ error: err.message || '업로드에 실패했어요.' });
     if (!req.file) return res.status(400).json({ error: '파일이 첨부되지 않았어요.' });
 
+    if (!isRealPdf(req.file.path)) {
+      fs.unlink(req.file.path, () => {});
+      return res.status(400).json({ error: '올바른 PDF 파일이 아니에요.' });
+    }
+
     const current = await get('SELECT * FROM freelancer_profiles WHERE user_id = ?', [req.user.id]);
     if (current.resume_filename) {
       const oldPath = path.join(UPLOAD_DIR, current.resume_filename);
@@ -87,7 +110,7 @@ router.post('/resume', requireAuth, requireRole('freelancer'), (req, res) => {
     }
     const completion = Math.min(100, current.completion + (current.resume_filename ? 0 : 10));
     await run('UPDATE freelancer_profiles SET resume_filename=?, resume_original_name=?, completion=? WHERE user_id=?', [
-      req.file.filename, req.file.originalname, completion, req.user.id,
+      req.file.filename, clamp(req.file.originalname, 200, 'resume.pdf'), completion, req.user.id,
     ]);
     res.status(201).json({
       resume_url: `/uploads/${req.file.filename}`,

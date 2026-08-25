@@ -77,13 +77,28 @@ router.get('/:id', optionalAuth, async (req, res) => {
 
 router.post('/', requireAuth, requireRole('company'), async (req, res) => {
   const { title, stack, period, rate, work_type, location, category, description } = req.body || {};
-  if (!title) return res.status(400).json({ error: '공고 제목은 필수입니다.' });
+  if (!title || typeof title !== 'string' || !title.trim()) {
+    return res.status(400).json({ error: '공고 제목은 필수입니다.' });
+  }
+  const clamp = (v, max, fallback) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : fallback);
+  const safeStack = (Array.isArray(stack) ? stack : [])
+    .filter((s) => typeof s === 'string' && s.trim())
+    .slice(0, 20)
+    .map((s) => s.trim().slice(0, 40));
+
   const r = await run(
     `INSERT INTO jobs (company_id, title, stack_json, period, rate, work_type, location, category, description)
      VALUES (?,?,?,?,?,?,?,?,?)`,
     [
-      req.user.id, title, JSON.stringify(Array.isArray(stack) ? stack : []),
-      period || '협의', rate || '협의', work_type || '협의', location || '협의', category || '인프라', description || '',
+      req.user.id,
+      clamp(title, 120, title.trim()),
+      JSON.stringify(safeStack),
+      clamp(period, 40, '협의'),
+      clamp(rate, 40, '협의'),
+      clamp(work_type, 40, '협의'),
+      clamp(location, 40, '협의'),
+      clamp(category, 20, '인프라'),
+      clamp(description, 3000, ''),
     ]
   );
   const job = await get('SELECT * FROM jobs WHERE id = ?', [r.lastInsertRowid]);
