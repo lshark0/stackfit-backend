@@ -2,8 +2,10 @@ const express = require('express');
 const { run, get } = require('../db');
 const { hashPassword, verifyPassword, signToken } = require('../auth');
 const { requireAuth } = require('../middleware/requireAuth');
+const { wrapAllRoutes } = require('../middleware/asyncHandler');
 
 const router = express.Router();
+wrapAllRoutes(router);
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LEN = 8;

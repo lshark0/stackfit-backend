@@ -13,6 +13,7 @@ const proposalRoutes = require('./src/routes/proposals');
 const projectRoutes = require('./src/routes/projects');
 const conversationRoutes = require('./src/routes/conversations');
 const notificationRoutes = require('./src/routes/notifications');
+const companyRoutes = require('./src/routes/companies');
 
 const app = express();
 app.set('trust proxy', 1); // Render는 프록시 뒤에 있으므로 rate-limit이 실제 클라이언트 IP를 보게 함
@@ -88,6 +89,7 @@ app.use('/api', proposalRoutes);    // /api/talents/:userId/propose
 app.use('/api/projects', projectRoutes);
 app.use('/api/conversations', conversationRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/companies', companyRoutes);
 
 app.use((req, res) => res.status(404).json({ error: 'Not found' }));
 // eslint-disable-next-line no-unused-vars

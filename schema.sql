@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS jobs (
   category    TEXT NOT NULL DEFAULT '인프라',
   description TEXT NOT NULL DEFAULT '',
   status      TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','closed')),
+  deadline    TEXT,
   created_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -113,8 +114,27 @@ CREATE TABLE IF NOT EXISTS notifications (
   created_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- 잡코리아 스타일: 기업이 프리랜서 프로필을 열람한 기록 ("이력서 열람현황")
+CREATE TABLE IF NOT EXISTS profile_views (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  freelancer_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  company_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- 잡코리아 스타일: 프리랜서가 관심있는 기업을 즐겨찾기
+CREATE TABLE IF NOT EXISTS followed_companies (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  freelancer_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  company_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(freelancer_id, company_id)
+);
+
 CREATE INDEX IF NOT EXISTS idx_jobs_company ON jobs(company_id);
 CREATE INDEX IF NOT EXISTS idx_applications_job ON applications(job_id);
 CREATE INDEX IF NOT EXISTS idx_applications_freelancer ON applications(freelancer_id);
 CREATE INDEX IF NOT EXISTS idx_messages_conv ON messages(conversation_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_profile_views_freelancer ON profile_views(freelancer_id);
+CREATE INDEX IF NOT EXISTS idx_followed_companies_freelancer ON followed_companies(freelancer_id);

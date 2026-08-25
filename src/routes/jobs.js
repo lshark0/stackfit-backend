@@ -1,10 +1,12 @@
 const express = require('express');
 const { run, get, all } = require('../db');
 const { requireAuth, requireRole } = require('../middleware/requireAuth');
+const { wrapAllRoutes } = require('../middleware/asyncHandler');
 const { verifyToken } = require('../auth');
 const { computeMatch } = require('../match');
 
 const router = express.Router();
+wrapAllRoutes(router);
 
 // 토큰이 있으면 req.user를 채우되, 없어도 통과시킴 (공고 목록은 비로그인도 조회 가능)
 function optionalAuth(req, _res, next) {
@@ -16,7 +18,25 @@ function optionalAuth(req, _res, next) {
 
 async function withCompanyAndStack(job) {
   const company = await get('SELECT name FROM companies WHERE user_id = ?', [job.company_id]);
-  return { ...job, org: company ? company.name : '알 수 없음', stack: JSON.parse(job.stack_json) };
+  return {
+    ...job,
+    org: company ? company.name : '알 수 없음',
+    stack: JSON.parse(job.stack_json),
+    d_day: dDay(job.deadline),
+  };
+}
+
+// 마감일 문자열('YYYY-MM-DD')을 D-day 라벨로 변환 (잡코리아 스타일)
+function dDay(deadline) {
+  if (!deadline) return '상시채용';
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const target = new Date(deadline + 'T00:00:00');
+  if (Number.isNaN(target.getTime())) return '상시채용';
+  const diffDays = Math.round((target - today) / (1000 * 60 * 60 * 24));
+  if (diffDays < 0) return '마감';
+  if (diffDays === 0) return '오늘마감';
+  return `D-${diffDays}`;
 }
 
 router.get('/', optionalAuth, async (req, res) => {
@@ -63,20 +83,21 @@ router.get('/:id', optionalAuth, async (req, res) => {
   if (!job) return res.status(404).json({ error: '공고를 찾을 수 없습니다.' });
   const full = await withCompanyAndStack(job);
 
-  let match = 0, applied = false, saved = false;
+  let match = 0, applied = false, saved = false, following = false;
   if (req.user && req.user.role === 'freelancer') {
     const p = await get('SELECT stack_json FROM freelancer_profiles WHERE user_id = ?', [req.user.id]);
     match = computeMatch(full.stack, p ? JSON.parse(p.stack_json) : []);
     applied = !!(await get('SELECT id FROM applications WHERE job_id=? AND freelancer_id=?', [job.id, req.user.id]));
     saved = !!(await get('SELECT id FROM saved_jobs WHERE job_id=? AND freelancer_id=?', [job.id, req.user.id]));
+    following = !!(await get('SELECT id FROM followed_companies WHERE freelancer_id=? AND company_id=?', [req.user.id, job.company_id]));
   }
 
   const applicantCount = (await get('SELECT COUNT(*) AS c FROM applications WHERE job_id = ?', [job.id])).c;
-  res.json({ ...full, match, applied, saved, applicantCount: Number(applicantCount) });
+  res.json({ ...full, match, applied, saved, following, applicantCount: Number(applicantCount) });
 });
 
 router.post('/', requireAuth, requireRole('company'), async (req, res) => {
-  const { title, stack, period, rate, work_type, location, category, description } = req.body || {};
+  const { title, stack, period, rate, work_type, location, category, description, deadline } = req.body || {};
   if (!title || typeof title !== 'string' || !title.trim()) {
     return res.status(400).json({ error: '공고 제목은 필수입니다.' });
   }
@@ -85,10 +106,11 @@ router.post('/', requireAuth, requireRole('company'), async (req, res) => {
     .filter((s) => typeof s === 'string' && s.trim())
     .slice(0, 20)
     .map((s) => s.trim().slice(0, 40));
+  const safeDeadline = typeof deadline === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(deadline.trim()) ? deadline.trim() : null;
 
   const r = await run(
-    `INSERT INTO jobs (company_id, title, stack_json, period, rate, work_type, location, category, description)
-     VALUES (?,?,?,?,?,?,?,?,?)`,
+    `INSERT INTO jobs (company_id, title, stack_json, period, rate, work_type, location, category, description, deadline)
+     VALUES (?,?,?,?,?,?,?,?,?,?)`,
     [
       req.user.id,
       clamp(title, 120, title.trim()),
@@ -99,6 +121,7 @@ router.post('/', requireAuth, requireRole('company'), async (req, res) => {
       clamp(location, 40, '협의'),
       clamp(category, 20, '인프라'),
       clamp(description, 3000, ''),
+      safeDeadline,
     ]
   );
   const job = await get('SELECT * FROM jobs WHERE id = ?', [r.lastInsertRowid]);
@@ -108,6 +131,11 @@ router.post('/', requireAuth, requireRole('company'), async (req, res) => {
 // 공고 저장(즐겨찾기) 토글
 router.post('/:id/save', requireAuth, requireRole('freelancer'), async (req, res) => {
   const jobId = Number(req.params.id);
+  if (!Number.isInteger(jobId)) return res.status(400).json({ error: '올바르지 않은 공고 ID입니다.' });
+
+  const job = await get('SELECT id FROM jobs WHERE id = ?', [jobId]);
+  if (!job) return res.status(404).json({ error: '공고를 찾을 수 없습니다.' });
+
   const existing = await get('SELECT id FROM saved_jobs WHERE job_id=? AND freelancer_id=?', [jobId, req.user.id]);
   if (existing) {
     await run('DELETE FROM saved_jobs WHERE id = ?', [existing.id]);

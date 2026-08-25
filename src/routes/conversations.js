@@ -1,8 +1,10 @@
 const express = require('express');
 const { run, get, all } = require('../db');
 const { requireAuth } = require('../middleware/requireAuth');
+const { wrapAllRoutes } = require('../middleware/asyncHandler');
 
 const router = express.Router();
+wrapAllRoutes(router);
 
 async function counterpartName(conv, viewerRole) {
   if (viewerRole === 'freelancer') {

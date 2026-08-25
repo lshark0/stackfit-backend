@@ -1,8 +1,10 @@
 const express = require('express');
 const { run, get } = require('../db');
 const { requireAuth, requireRole } = require('../middleware/requireAuth');
+const { wrapAllRoutes } = require('../middleware/asyncHandler');
 
 const router = express.Router();
+wrapAllRoutes(router);
 
 router.post('/talents/:userId/propose', requireAuth, requireRole('company'), async (req, res) => {
   const freelancerId = Number(req.params.userId);

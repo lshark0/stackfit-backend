@@ -1,8 +1,10 @@
 const express = require('express');
 const { run, get, all } = require('../db');
 const { requireAuth, requireRole } = require('../middleware/requireAuth');
+const { wrapAllRoutes } = require('../middleware/asyncHandler');
 
 const router = express.Router();
+wrapAllRoutes(router);
 
 router.post('/jobs/:id/apply', requireAuth, requireRole('freelancer'), async (req, res) => {
   const jobId = Number(req.params.id);

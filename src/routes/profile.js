@@ -3,10 +3,12 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const multer = require('multer');
-const { run, get } = require('../db');
+const { run, get, all } = require('../db');
 const { requireAuth, requireRole } = require('../middleware/requireAuth');
+const { wrapAllRoutes } = require('../middleware/asyncHandler');
 
 const router = express.Router();
+wrapAllRoutes(router);
 
 const UPLOAD_DIR = path.join(__dirname, '..', '..', 'uploads');
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -37,6 +39,20 @@ function isRealPdf(filePath) {
 }
 
 const clamp = (v, max, fallback = '') => (typeof v === 'string' ? v.slice(0, max) : fallback);
+
+// 이력서(프로필) 열람현황 — 어떤 기업이 언제 내 프로필을 봤는지 (잡코리아 스타일)
+router.get('/views', requireAuth, requireRole('freelancer'), async (req, res) => {
+  const rows = await all(
+    `SELECT pv.created_at, c.name AS company_name, c.user_id AS company_id
+     FROM profile_views pv
+     JOIN companies c ON c.user_id = pv.company_id
+     WHERE pv.freelancer_id = ?
+     ORDER BY pv.created_at DESC, pv.id DESC
+     LIMIT 50`,
+    [req.user.id]
+  );
+  res.json({ views: rows });
+});
 
 router.get('/', requireAuth, async (req, res) => {
   if (req.user.role === 'freelancer') {

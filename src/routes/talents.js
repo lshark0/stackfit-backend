@@ -1,9 +1,11 @@
 const express = require('express');
-const { get, all } = require('../db');
+const { run, get, all } = require('../db');
 const { requireAuth, requireRole } = require('../middleware/requireAuth');
+const { wrapAllRoutes } = require('../middleware/asyncHandler');
 const { computeMatch } = require('../match');
 
 const router = express.Router();
+wrapAllRoutes(router);
 
 router.get('/', requireAuth, requireRole('company'), async (req, res) => {
   const { q, category, jobId } = req.query;
@@ -40,9 +42,29 @@ router.get('/', requireAuth, requireRole('company'), async (req, res) => {
 });
 
 router.get('/:userId', requireAuth, requireRole('company'), async (req, res) => {
-  const t = await get('SELECT * FROM freelancer_profiles WHERE user_id = ?', [req.params.userId]);
+  const freelancerId = Number(req.params.userId);
+  if (!Number.isInteger(freelancerId)) return res.status(400).json({ error: '올바르지 않은 사용자 ID입니다.' });
+
+  const t = await get('SELECT * FROM freelancer_profiles WHERE user_id = ?', [freelancerId]);
   if (!t) return res.status(404).json({ error: '프로필을 찾을 수 없습니다.' });
-  const proposed = !!(await get('SELECT id FROM proposals WHERE company_id=? AND freelancer_id=?', [req.user.id, req.params.userId]));
+  const proposed = !!(await get('SELECT id FROM proposals WHERE company_id=? AND freelancer_id=?', [req.user.id, freelancerId]));
+
+  // 열람 기록 남기기 + (같은 기업이 최근 6시간 내 이미 봤으면 중복 알림은 생략)
+  const lastView = await get(
+    'SELECT created_at FROM profile_views WHERE freelancer_id=? AND company_id=? ORDER BY created_at DESC, id DESC LIMIT 1',
+    [freelancerId, req.user.id]
+  );
+  const sixHoursMs = 6 * 60 * 60 * 1000;
+  const isRecent = lastView && (Date.now() - new Date(lastView.created_at).getTime()) < sixHoursMs;
+
+  await run('INSERT INTO profile_views (freelancer_id, company_id) VALUES (?,?)', [freelancerId, req.user.id]);
+  if (!isRecent) {
+    const company = await get('SELECT name FROM companies WHERE user_id = ?', [req.user.id]);
+    await run('INSERT INTO notifications (user_id, tag, title, body) VALUES (?,?,?,?)', [
+      freelancerId, '열람', '프로필을 열람했어요', `${company ? company.name : '한 기업'}에서 회원님의 프로필을 확인했습니다.`,
+    ]);
+  }
+
   res.json({
     ...t,
     stack: JSON.parse(t.stack_json),

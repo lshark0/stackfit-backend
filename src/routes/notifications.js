@@ -1,8 +1,10 @@
 const express = require('express');
 const { run, all } = require('../db');
 const { requireAuth } = require('../middleware/requireAuth');
+const { wrapAllRoutes } = require('../middleware/asyncHandler');
 
 const router = express.Router();
+wrapAllRoutes(router);
 
 router.get('/', requireAuth, async (req, res) => {
   const rows = await all('SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC, id DESC', [req.user.id]);
