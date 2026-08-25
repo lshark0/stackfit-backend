@@ -338,6 +338,10 @@ function ddayBadge(dday){
   const color = closed ? 'var(--slate-light)' : urgent ? 'var(--danger)' : 'var(--cyan)';
   return `<span style="font-family:var(--mono); font-size:10.5px; font-weight:700; color:${color};">${esc(dday)}</span>`;
 }
+function ratingBadge(avg, count){
+  if(!avg || !count) return `<span style="font-family:var(--mono); font-size:10.5px; color:var(--slate-light);">아직 리뷰 없음</span>`;
+  return `<span style="font-family:var(--mono); font-size:10.5px; color:var(--amber-deep); font-weight:700;">★ ${avg.toFixed(1)} <span style="color:var(--slate); font-weight:400;">(${count})</span></span>`;
+}
 function jobCard(j){
   return `<div class="card clickable" onclick="go('jobDetail', ${j.id})">
     <div class="card-top">
@@ -346,6 +350,7 @@ function jobCard(j){
     </div>
     <div class="tag-row">${j.stack.map(s=>`<span class="tag">${esc(s)}</span>`).join('')}</div>
     <div class="meta-row"><span>${I.pin}${esc(j.location)}</span><span class="rate">${esc(j.rate)}</span>${ddayBadge(j.d_day)}</div>
+    <div class="meta-row" style="margin-top:4px;">${ratingBadge(j.rating_avg, j.rating_count)}</div>
     ${gauge(j.match)}
   </div>`;
 }
@@ -359,7 +364,7 @@ function talentCard(t){
       </div>
     </div>
     <div class="tag-row">${t.stack.map(s=>`<span class="tag">${esc(s)}</span>`).join('')}</div>
-    <div class="meta-row"><span class="rate">${esc(t.rate)}</span></div>
+    <div class="meta-row"><span class="rate">${esc(t.rate)}</span>${ratingBadge(t.rating_avg, t.rating_count)}</div>
     ${gauge(t.match)}
   </div>`;
 }
@@ -611,14 +616,13 @@ async function screenOnboarding(){
     <div class="brand-mark"><div class="sq"><span class="mid"></span></div><div><div class="brand-name">스택핏</div><div class="brand-tag">STACKFIT · IT Matching</div></div></div>
     <div class="onb-headline">기술 스택으로<br><em>가장 정확하게</em><br>연결합니다.</div>
     <div style="display:flex; flex-direction:column; gap:12px;">
-      <div class="role-card" onclick="loginAs('freelancer')"><div class="ic">${I.user}</div><div><div class="tt">IT 프리랜서로 데모 로그인</div><div class="ds">lee@stackfit.dev 계정으로 접속해요</div></div></div>
-      <div class="role-card" onclick="loginAs('company')"><div class="ic">${I.building}</div><div><div class="tt">기업으로 데모 로그인</div><div class="ds">hr@hanbit.dev 계정으로 접속해요</div></div></div>
+      <div class="role-card" onclick="loginAs('freelancer')"><div class="ic">${I.user}</div><div><div class="tt">프리랜서로 로그인</div><div class="ds">lee@stackfit.dev 계정으로 접속해요</div></div></div>
+      <div class="role-card" onclick="loginAs('company')"><div class="ic">${I.building}</div><div><div class="tt">기업으로 로그인</div><div class="ds">hr@hanbit.dev 계정으로 접속해요</div></div></div>
     </div>
     <div style="display:flex; gap:10px;">
       <button class="btn btn-outline" onclick="go('signup')">회원가입</button>
       <button class="btn btn-outline" onclick="go('login')">로그인</button>
     </div>
-    <div class="server-line">서버 주소: ${esc(API_BASE)}<br><b onclick="go('serverSetup')">⚙ 서버 연결 설정 바꾸기</b></div>
   </div>`;
 }
 
@@ -736,6 +740,7 @@ async function screenJobDetail(){
         ${!isCompany? `<span onclick="toggleFollowCompany(${j.company_id}, event)" style="cursor:pointer; font-family:var(--mono); font-size:10.5px; padding:4px 9px; border-radius:999px; background:${j.following?'var(--amber)':'rgba(255,255,255,.12)'}; color:${j.following?'var(--ink)':'var(--amber-soft)'};">${j.following?'✓ 관심기업':'+ 관심기업'}</span>` : ''}
       </div>
       <h2>${esc(j.title)}</h2>${gauge(j.match)}
+      <div style="margin-top:8px;">${ratingBadge(j.rating_avg, j.rating_count)}</div>
     </div>
     <div class="kv-grid">
       <div class="kv-box"><div class="kv-lbl">단가</div><div class="kv-val">${esc(j.rate)}</div></div>
@@ -778,7 +783,8 @@ async function screenTalentDetail(){
     <div class="back-row" style="padding:0 0 10px;"><div class="back-btn" onclick="go('talent')">${I.back}</div><div class="page-sub">프로필 상세</div></div>
     <div class="detail-hero" style="display:flex; gap:14px; align-items:center;">
       <div class="avatar lg">${esc(t.name[0])}</div>
-      <div><div class="org">${esc(t.role_title)} · ${esc(t.years)} ${t.verified?'· ✓ 인증':''}</div><h2 style="font-size:18px;">${esc(t.name)}</h2></div>
+      <div><div class="org">${esc(t.role_title)} · ${esc(t.years)} ${t.verified?'· ✓ 인증':''}</div><h2 style="font-size:18px;">${esc(t.name)}</h2>
+      <div style="margin-top:6px;">${ratingBadge(t.rating_avg, t.rating_count)}</div></div>
     </div>
     <div class="kv-grid">
       <div class="kv-box"><div class="kv-lbl">희망단가</div><div class="kv-val">${esc(t.rate)}</div></div>
@@ -811,9 +817,44 @@ async function screenProjects(){
           ${steps.map((step,i)=>`
             <div class="tl-item"><div class="tl-dot ${i<p.stage?'done':''}"></div><div><div class="tl-tt">${step}</div>${i===p.stage-1?`<div class="tl-ds">현재 단계 진행 중</div>`:''}</div></div>`).join('')}
         </div>
-        ${p.stage<4? `<button class="btn btn-outline" style="margin-top:10px;" onclick="advanceStage(${p.id}, ${p.stage+1})">다음 단계로 진행</button>`:''}
+        ${p.stage<4? `<button class="btn btn-outline" style="margin-top:10px;" onclick="advanceStage(${p.id}, ${p.stage+1})">다음 단계로 진행</button>`
+        : p.myReview ? `<div class="page-sub" style="margin-top:10px;">내가 남긴 평점: ${'★'.repeat(p.myReview.rating)}${'☆'.repeat(5-p.myReview.rating)}</div>`
+        : `<button class="btn btn-primary" style="margin-top:10px;" onclick="go('reviewForm', ${p.id})">리뷰 남기기</button>`}
       </div>`).join('') || emptyHtml('진행 중인 프로젝트가 없어요', I.proj)}
   </div>${tabbar('projects')}`;
+}
+
+let pendingRating = 0;
+function setPendingRating(n){
+  pendingRating = n;
+  const el = document.getElementById('star-picker');
+  if(el) el.innerHTML = starPickerHtml();
+}
+function starPickerHtml(){
+  return [1,2,3,4,5].map(n=>`<span onclick="setPendingRating(${n})" style="cursor:pointer; font-size:34px; color:${n<=pendingRating?'var(--amber)':'var(--paper-dim)'};">★</span>`).join('');
+}
+async function screenReviewForm(){
+  pendingRating = 0;
+  return `${statusbar()}
+  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('projects')">${I.back}</div><div class="page-title" style="font-size:18px;">리뷰 남기기</div></div></div>
+  <div class="content">
+    <div class="page-sub" style="margin-bottom:16px;">함께한 프로젝트는 어떠셨나요? 평점과 후기는 상대방 프로필에 공개돼요.</div>
+    <div style="text-align:center; margin-bottom:20px;"><div id="star-picker">${starPickerHtml()}</div></div>
+    <div class="form-field"><label class="form-label">후기 (선택)</label><textarea id="review-comment" class="form-input" placeholder="함께 일한 경험을 남겨주세요"></textarea></div>
+    <button class="btn btn-primary" onclick="submitReview(${state.param})">리뷰 등록하기</button>
+    <div style="height:20px;"></div>
+  </div>`;
+}
+async function submitReview(projectId){
+  if(pendingRating<1){ toast('별점을 선택해주세요'); return; }
+  try{
+    await apiFetch(`/projects/${projectId}/review`, {method:'POST', body:{
+      rating: pendingRating,
+      comment: document.getElementById('review-comment').value.trim(),
+    }});
+    toast('리뷰가 등록됐어요');
+    go('projects');
+  }catch(e){ toast(e.message); }
 }
 
 async function screenApplicants(){
@@ -889,7 +930,6 @@ async function screenMypage(){
     ${!isCompany?`<div class="banner" onclick="go('profileEdit')"><div class="banner-eyebrow">Profile</div><div class="banner-title">프로필 완성도 ${profile.completion}%</div><div class="profile-bar"><div class="profile-bar-fill" style="width:${profile.completion}%"></div></div></div>`:''}
     <div class="section-label">계정</div>
     <div class="list-item" onclick="${isCompany?'':"go('profileEdit')"}"><div class="li-l"><div class="li-icon">${I.user}</div><div class="li-tt">프로필 ${isCompany?'/ 회사 정보':'수정'}</div></div>${I.back}</div>
-    <div class="list-item" onclick="go('projects')"><div class="li-l"><div class="li-icon">${I.proj}</div><div class="li-tt">계약 · 정산 내역</div></div>${I.back}</div>
     ${!isCompany?`
     <div class="list-item" onclick="go('followedCompanies')"><div class="li-l"><div class="li-icon">${I.building}</div><div class="li-tt">관심기업</div></div>${I.back}</div>
     <div class="list-item" onclick="go('profileViews')"><div class="li-l"><div class="li-icon">${I.eye}</div><div class="li-tt">내 프로필 열람현황</div></div>${I.back}</div>` : ''}
@@ -1012,6 +1052,7 @@ async function render(){
       chatList: screenChatList, chatRoom: screenChatRoom, mypage: screenMypage,
       profileEdit: screenProfileEdit, alerts: screenAlerts, jobPost: screenJobPost,
       followedCompanies: screenFollowedCompanies, profileViews: screenProfileViews,
+      reviewForm: screenReviewForm,
     };
     const fn = map[state.screen] || screenOnboarding;
     const html = await fn();

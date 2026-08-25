@@ -104,6 +104,18 @@ CREATE TABLE IF NOT EXISTS messages (
   created_at      TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- 프로젝트 완료 후 기업↔프리랜서 상호 리뷰/평점 ("찾아줘 세무사" 스타일 신뢰도 지표)
+CREATE TABLE IF NOT EXISTS reviews (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  project_id    INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  reviewer_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  reviewee_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  rating        INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
+  comment       TEXT NOT NULL DEFAULT '',
+  created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(project_id, reviewer_id)
+);
+
 CREATE TABLE IF NOT EXISTS notifications (
   id          INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -136,5 +148,6 @@ CREATE INDEX IF NOT EXISTS idx_applications_job ON applications(job_id);
 CREATE INDEX IF NOT EXISTS idx_applications_freelancer ON applications(freelancer_id);
 CREATE INDEX IF NOT EXISTS idx_messages_conv ON messages(conversation_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_reviews_reviewee ON reviews(reviewee_id);
 CREATE INDEX IF NOT EXISTS idx_profile_views_freelancer ON profile_views(freelancer_id);
 CREATE INDEX IF NOT EXISTS idx_followed_companies_freelancer ON followed_companies(freelancer_id);

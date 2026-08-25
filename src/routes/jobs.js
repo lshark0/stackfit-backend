@@ -4,6 +4,7 @@ const { requireAuth, requireRole } = require('../middleware/requireAuth');
 const { wrapAllRoutes } = require('../middleware/asyncHandler');
 const { verifyToken } = require('../auth');
 const { computeMatch } = require('../match');
+const { getRatingSummary } = require('../ratings');
 
 const router = express.Router();
 wrapAllRoutes(router);
@@ -18,11 +19,13 @@ function optionalAuth(req, _res, next) {
 
 async function withCompanyAndStack(job) {
   const company = await get('SELECT name FROM companies WHERE user_id = ?', [job.company_id]);
+  const rating = await getRatingSummary(job.company_id);
   return {
     ...job,
     org: company ? company.name : '알 수 없음',
     stack: JSON.parse(job.stack_json),
     d_day: dDay(job.deadline),
+    ...rating,
   };
 }
 

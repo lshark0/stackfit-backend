@@ -3,6 +3,7 @@ const { run, get, all } = require('../db');
 const { requireAuth, requireRole } = require('../middleware/requireAuth');
 const { wrapAllRoutes } = require('../middleware/asyncHandler');
 const { computeMatch } = require('../match');
+const { getRatingSummary } = require('../ratings');
 
 const router = express.Router();
 wrapAllRoutes(router);
@@ -32,11 +33,16 @@ router.get('/', requireAuth, requireRole('company'), async (req, res) => {
   const proposalRows = await all('SELECT freelancer_id FROM proposals WHERE company_id = ?', [req.user.id]);
   const proposedIds = new Set(proposalRows.map(p => p.freelancer_id));
 
-  const result = talents.map(t => ({
-    ...t,
-    match: jobStack.length ? computeMatch(jobStack, t.stack) : Math.round(55 + t.stack.length * 6),
-    proposed: proposedIds.has(t.user_id),
-  }));
+  const result = [];
+  for (const t of talents) {
+    const rating = await getRatingSummary(t.user_id);
+    result.push({
+      ...t,
+      match: jobStack.length ? computeMatch(jobStack, t.stack) : Math.round(55 + t.stack.length * 6),
+      proposed: proposedIds.has(t.user_id),
+      ...rating,
+    });
+  }
 
   res.json({ talents: result });
 });
@@ -65,11 +71,14 @@ router.get('/:userId', requireAuth, requireRole('company'), async (req, res) => 
     ]);
   }
 
+  const rating = await getRatingSummary(freelancerId);
+
   res.json({
     ...t,
     stack: JSON.parse(t.stack_json),
     proposed,
     resume_url: t.resume_filename ? `/uploads/${t.resume_filename}` : null,
+    ...rating,
   });
 });
 
