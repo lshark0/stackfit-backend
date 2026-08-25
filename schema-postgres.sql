@@ -12,8 +12,6 @@ CREATE TABLE IF NOT EXISTS users (
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_users_oauth ON users(oauth_provider, oauth_id) WHERE oauth_provider IS NOT NULL;
-
 CREATE TABLE IF NOT EXISTS freelancer_profiles (
   user_id     INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
   name        TEXT NOT NULL,

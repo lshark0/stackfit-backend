@@ -58,6 +58,9 @@ if (USE_POSTGRES) {
     await ensureColumnPg('jobs', 'deadline', 'TEXT');
     await ensureColumnPg('users', 'oauth_provider', 'TEXT');
     await ensureColumnPg('users', 'oauth_id', 'TEXT');
+    await pool.query(
+      'CREATE UNIQUE INDEX IF NOT EXISTS idx_users_oauth ON users(oauth_provider, oauth_id) WHERE oauth_provider IS NOT NULL'
+    );
     await seed();
     console.log('[stackfit] PostgreSQL 연결 및 스키마 준비 완료 (영구 저장)');
   };
@@ -89,6 +92,9 @@ if (USE_POSTGRES) {
     try { db.exec('ALTER TABLE jobs ADD COLUMN deadline TEXT'); } catch (e) {}
     try { db.exec('ALTER TABLE users ADD COLUMN oauth_provider TEXT'); } catch (e) {}
     try { db.exec('ALTER TABLE users ADD COLUMN oauth_id TEXT'); } catch (e) {}
+    try {
+      db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_oauth ON users(oauth_provider, oauth_id) WHERE oauth_provider IS NOT NULL');
+    } catch (e) {}
     if (isNew) await seed();
     console.log('[stackfit] SQLite 로컬 DB 준비 완료 (data/stackfit.db, 로컬 개발 전용)');
   };
