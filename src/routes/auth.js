@@ -9,6 +9,7 @@ wrapAllRoutes(router);
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LEN = 8;
+const PASSWORD_RE = /^(?=.*[A-Za-z])(?=.*\d).+$/; // 영문 1자 이상 + 숫자 1자 이상
 
 router.post('/signup', async (req, res) => {
   let { email, password, role, name, companyName } = req.body || {};
@@ -20,8 +21,8 @@ router.post('/signup', async (req, res) => {
   if (!EMAIL_RE.test(email)) {
     return res.status(400).json({ error: '올바른 이메일 형식이 아니에요.' });
   }
-  if (typeof password !== 'string' || password.length < MIN_PASSWORD_LEN) {
-    return res.status(400).json({ error: `비밀번호는 ${MIN_PASSWORD_LEN}자 이상이어야 해요.` });
+  if (typeof password !== 'string' || password.length < MIN_PASSWORD_LEN || !PASSWORD_RE.test(password)) {
+    return res.status(400).json({ error: `비밀번호는 영문과 숫자를 포함해 ${MIN_PASSWORD_LEN}자 이상이어야 해요.` });
   }
   if (!['freelancer', 'company'].includes(role)) {
     return res.status(400).json({ error: "role은 'freelancer' 또는 'company'여야 합니다." });

@@ -56,6 +56,8 @@ if (USE_POSTGRES) {
     await ensureColumnPg('freelancer_profiles', 'resume_filename', 'TEXT');
     await ensureColumnPg('freelancer_profiles', 'resume_original_name', 'TEXT');
     await ensureColumnPg('jobs', 'deadline', 'TEXT');
+    await ensureColumnPg('users', 'oauth_provider', 'TEXT');
+    await ensureColumnPg('users', 'oauth_id', 'TEXT');
     await seed();
     console.log('[stackfit] PostgreSQL 연결 및 스키마 준비 완료 (영구 저장)');
   };
@@ -85,6 +87,8 @@ if (USE_POSTGRES) {
     try { db.exec('ALTER TABLE freelancer_profiles ADD COLUMN resume_filename TEXT'); } catch (e) {}
     try { db.exec('ALTER TABLE freelancer_profiles ADD COLUMN resume_original_name TEXT'); } catch (e) {}
     try { db.exec('ALTER TABLE jobs ADD COLUMN deadline TEXT'); } catch (e) {}
+    try { db.exec('ALTER TABLE users ADD COLUMN oauth_provider TEXT'); } catch (e) {}
+    try { db.exec('ALTER TABLE users ADD COLUMN oauth_id TEXT'); } catch (e) {}
     if (isNew) await seed();
     console.log('[stackfit] SQLite 로컬 DB 준비 완료 (data/stackfit.db, 로컬 개발 전용)');
   };

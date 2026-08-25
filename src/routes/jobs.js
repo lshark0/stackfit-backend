@@ -148,4 +148,16 @@ router.post('/:id/save', requireAuth, requireRole('freelancer'), async (req, res
   res.json({ saved: true });
 });
 
+// 공고 삭제 (기업 전용, 본인이 등록한 공고만)
+router.delete('/:id', requireAuth, requireRole('company'), async (req, res) => {
+  const jobId = Number(req.params.id);
+  if (!Number.isInteger(jobId)) return res.status(400).json({ error: '올바르지 않은 공고 ID입니다.' });
+
+  const job = await get('SELECT id FROM jobs WHERE id = ? AND company_id = ?', [jobId, req.user.id]);
+  if (!job) return res.status(404).json({ error: '공고를 찾을 수 없거나 삭제 권한이 없어요.' });
+
+  await run('DELETE FROM jobs WHERE id = ?', [jobId]);
+  res.json({ deleted: true });
+});
+
 module.exports = router;

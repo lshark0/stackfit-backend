@@ -14,6 +14,7 @@ const projectRoutes = require('./src/routes/projects');
 const conversationRoutes = require('./src/routes/conversations');
 const notificationRoutes = require('./src/routes/notifications');
 const companyRoutes = require('./src/routes/companies');
+const oauthRoutes = require('./src/routes/oauth');
 
 const app = express();
 app.set('trust proxy', 1); // Render는 프록시 뒤에 있으므로 rate-limit이 실제 클라이언트 IP를 보게 함
@@ -81,6 +82,7 @@ app.get('/api/health', async (_req, res) => {
 });
 
 app.use('/api/auth', authRoutes);
+app.use('/api/auth/oauth', oauthRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/jobs', jobRoutes);
 app.use('/api', applicationRoutes); // /api/jobs/:id/apply, /api/me/applications, /api/jobs/:id/applicants

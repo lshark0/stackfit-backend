@@ -8,8 +8,12 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash TEXT NOT NULL,
   password_salt TEXT NOT NULL,
   role          TEXT NOT NULL CHECK (role IN ('freelancer','company')),
+  oauth_provider TEXT,
+  oauth_id       TEXT,
   created_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_oauth ON users(oauth_provider, oauth_id) WHERE oauth_provider IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS freelancer_profiles (
   user_id     INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,

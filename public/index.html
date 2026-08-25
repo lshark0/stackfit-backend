@@ -238,6 +238,7 @@ async function unreadCount(){
 
 /* ---------------- Icons ---------------- */
 const I = {
+  trash:`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 11v6M14 11v6" stroke-linecap="round"/></svg>`,
   eye:`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="2.8"/></svg>`,
   home:`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 12 L12 5 L20 12" stroke-linecap="round" stroke-linejoin="round"/><path d="M6.5 10.5V19H17.5V10.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="15.2" r="1.1" fill="currentColor" stroke="none"/></svg>`,
   jobs:`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="8" width="16" height="11" rx="2"/><path d="M9 8V6.5A2.5 2.5 0 0 1 11.5 4h1A2.5 2.5 0 0 1 15 6.5V8"/><path d="M4 12.5H20"/></svg>`,
@@ -398,7 +399,8 @@ async function doSignup(){
   const password = document.getElementById('su-password').value;
   const nameVal = document.getElementById('su-name').value.trim();
   if(!email || !password){ toast('이메일과 비밀번호를 입력해주세요'); return; }
-  if(password.length < 4){ toast('비밀번호는 4자 이상으로 입력해주세요'); return; }
+  const pwOk = password.length>=8 && /[A-Za-z]/.test(password) && /\d/.test(password);
+  if(!pwOk){ toast('비밀번호는 영문+숫자 포함 8자 이상이어야 해요'); return; }
   try{
     const body = { email, password, role: signupRole };
     if(signupRole==='freelancer') body.name = nameVal || '이름 미입력';
@@ -419,6 +421,72 @@ async function doLogin(){
     toast('로그인 성공');
     go('home');
   }catch(e){ toast(e.message); }
+}
+
+function oauthStart(provider){
+  window.location.href = API_BASE + '/auth/oauth/' + provider + '/start';
+}
+
+let oauthPending = null;
+let oauthRoleChoice = 'freelancer';
+function setOauthRole(role, el){
+  oauthRoleChoice = role;
+  document.querySelectorAll('#oauthRoleChips .chip').forEach(c=>c.classList.remove('active'));
+  el.classList.add('active');
+}
+function screenOauthRole(){
+  const p = oauthPending || {name:'', email:''};
+  return `${statusbar()}
+  <div class="app-header"><div class="page-title">몇 가지만 더 알려주세요</div></div>
+  <div class="content">
+    <div class="page-sub" style="margin-bottom:16px;">${p.email?esc(p.email)+' 계정으로 가입해요':'소셜 계정으로 가입해요'}</div>
+    <div class="chip-row" id="oauthRoleChips">
+      <div class="chip active" onclick="setOauthRole('freelancer', this)">프리랜서</div>
+      <div class="chip" onclick="setOauthRole('company', this)">기업</div>
+    </div>
+    <div class="form-field" style="margin-top:14px;"><label class="form-label">이름 / 회사명</label><input id="or-name" class="form-input" value="${esc(p.name||'')}"></div>
+    <button class="btn btn-primary" onclick="finishOAuthSignup()">가입 완료하기</button>
+  </div>`;
+}
+async function finishOAuthSignup(){
+  if(!oauthPending){ toast('인증 정보가 없어요. 다시 시도해주세요.'); go('onboarding'); return; }
+  const name = document.getElementById('or-name').value.trim();
+  try{
+    const data = await apiFetch('/auth/oauth/finish', {method:'POST', body:{
+      pendingToken: oauthPending.token, role: oauthRoleChoice, name,
+    }});
+    state.token = data.token; state.role = data.user.role; state.userId = data.user.id;
+    oauthPending = null;
+    toast('가입이 완료됐어요');
+    go('home');
+  }catch(e){ toast(e.message); }
+}
+async function consumeOAuthHash(){
+  const hash = window.location.hash;
+  if(!hash || hash.length<2) return false;
+  const params = new URLSearchParams(hash.slice(1));
+  history.replaceState(null, '', window.location.pathname);
+
+  if(params.get('oauth_error')){
+    toast('소셜 로그인에 실패했어요. 다시 시도해주세요.');
+    return false;
+  }
+  if(params.get('token')){
+    state.token = params.get('token');
+    try{
+      const me = await apiFetch('/auth/me');
+      state.role = me.user.role; state.userId = me.user.id;
+      toast('로그인 성공');
+      go('home');
+    }catch(e){ toast('로그인에 실패했어요'); go('onboarding'); }
+    return true;
+  }
+  if(params.get('oauth_pending')){
+    oauthPending = { token: params.get('oauth_pending'), email: params.get('email')||'', name: params.get('name')||'' };
+    go('oauthRole');
+    return true;
+  }
+  return false;
 }
 
 async function testConnection(){
@@ -445,6 +513,14 @@ async function toggleSaveJob(id, ev){
     const r = await apiFetch(`/jobs/${id}/save`, {method:'POST'});
     toast(r.saved ? '공고를 저장했어요' : '저장을 취소했어요');
     if(state.screen==='jobs') refreshJobList(); else render();
+  }catch(e){ toast(e.message); }
+}
+async function deleteJob(id){
+  if(!confirm('이 공고를 삭제할까요? 삭제하면 되돌릴 수 없어요.')) return;
+  try{
+    await apiFetch(`/jobs/${id}`, {method:'DELETE'});
+    toast('공고가 삭제됐어요');
+    go('jobs');
   }catch(e){ toast(e.message); }
 }
 async function proposeTalent(userId){
@@ -626,6 +702,18 @@ async function screenOnboarding(){
   </div>`;
 }
 
+function socialLoginButtons(){
+  return `<div style="display:flex; align-items:center; gap:10px; margin:18px 0;">
+    <div style="flex:1; height:1px; background:var(--line);"></div>
+    <span class="page-sub">또는</span>
+    <div style="flex:1; height:1px; background:var(--line);"></div>
+  </div>
+  <div style="display:flex; flex-direction:column; gap:10px;">
+    <button class="btn btn-outline" style="background:#fff;" onclick="oauthStart('google')">구글로 계속하기</button>
+    <button class="btn btn-outline" style="background:#03C75A; color:#fff; border-color:#03C75A;" onclick="oauthStart('naver')">네이버로 계속하기</button>
+    <button class="btn btn-outline" style="background:#FEE500; color:#191600; border-color:#FEE500;" onclick="oauthStart('kakao')">카카오로 계속하기</button>
+  </div>`;
+}
 function screenSignup(){
   return `${statusbar()}
   <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('onboarding')">${I.back}</div><div class="page-title">회원가입</div></div></div>
@@ -636,8 +724,9 @@ function screenSignup(){
     </div>
     <div class="form-field" style="margin-top:14px;" id="su-namefield"><label class="form-label">이름</label><input id="su-name" class="form-input" placeholder="예: 이승학"></div>
     <div class="form-field"><label class="form-label">이메일</label><input id="su-email" class="form-input" type="email" placeholder="you@example.com"></div>
-    <div class="form-field"><label class="form-label">비밀번호</label><input id="su-password" class="form-input" type="password" placeholder="4자 이상"></div>
+    <div class="form-field"><label class="form-label">비밀번호</label><input id="su-password" class="form-input" type="password" placeholder="영문+숫자 포함 8자 이상"><div class="page-sub" style="margin-top:5px;">영문과 숫자를 각각 1자 이상 포함해 8자 이상으로 입력해주세요</div></div>
     <button class="btn btn-primary" onclick="doSignup()">가입하고 시작하기</button>
+    ${socialLoginButtons()}
     <div class="server-line" style="margin-top:16px;">이미 계정이 있으신가요? <b onclick="go('login')">로그인</b></div>
   </div>`;
 }
@@ -649,6 +738,7 @@ function screenLogin(){
     <div class="form-field" style="margin-top:6px;"><label class="form-label">이메일</label><input id="li-email" class="form-input" type="email" placeholder="you@example.com"></div>
     <div class="form-field"><label class="form-label">비밀번호</label><input id="li-password" class="form-input" type="password" placeholder="비밀번호" onkeydown="if(event.key==='Enter'){event.preventDefault();doLogin();}"></div>
     <button class="btn btn-primary" onclick="doLogin()">로그인</button>
+    ${socialLoginButtons()}
     <div class="server-line" style="margin-top:16px;">계정이 없으신가요? <b onclick="go('signup')">회원가입</b></div>
   </div>`;
 }
@@ -756,7 +846,7 @@ async function screenJobDetail(){
     <div style="height:90px;"></div>
   </div>
   <div style="position:absolute; left:0; right:0; bottom:0; padding:14px 20px 22px; background:var(--paper); border-top:1px solid var(--line); display:flex; gap:10px;">
-    ${isCompany? `<button class="btn btn-outline" onclick="go('jobs')">공고 목록으로</button><button class="btn btn-primary" onclick="go('applicants', ${j.id})">지원자 ${j.applicantCount||0}명 보기</button>`
+    ${isCompany? `<div class="star-btn" style="width:52px;height:52px;border-radius:12px; color:var(--danger); border-color:#F3D6D2;" onclick="deleteJob(${j.id})">${I.trash}</div><button class="btn btn-outline" onclick="go('jobs')">목록으로</button><button class="btn btn-primary" onclick="go('applicants', ${j.id})">지원자 ${j.applicantCount||0}명</button>`
     : `<div class="star-btn ${j.saved?'filled':''}" style="width:52px;height:52px;border-radius:12px;" onclick="toggleSaveJob(${j.id}, event)">${I.star}</div>
        <button class="btn btn-outline" style="flex:0 0 auto; width:auto; padding:13px 16px;" onclick="startChatWithCompany(${j.company_id})">채팅</button>
        <button class="btn btn-primary" ${j.applied?'disabled':''} onclick="applyToJob(${j.id})">${j.applied?'지원 완료':'지원하기'}</button>`}
@@ -929,7 +1019,7 @@ async function screenMypage(){
     </div>
     ${!isCompany?`<div class="banner" onclick="go('profileEdit')"><div class="banner-eyebrow">Profile</div><div class="banner-title">프로필 완성도 ${profile.completion}%</div><div class="profile-bar"><div class="profile-bar-fill" style="width:${profile.completion}%"></div></div></div>`:''}
     <div class="section-label">계정</div>
-    <div class="list-item" onclick="${isCompany?'':"go('profileEdit')"}"><div class="li-l"><div class="li-icon">${I.user}</div><div class="li-tt">프로필 ${isCompany?'/ 회사 정보':'수정'}</div></div>${I.back}</div>
+    <div class="list-item" onclick="go('${isCompany?'companyProfileEdit':'profileEdit'}')"><div class="li-l"><div class="li-icon">${I.user}</div><div class="li-tt">프로필 ${isCompany?'/ 회사 정보':'수정'}</div></div>${I.back}</div>
     ${!isCompany?`
     <div class="list-item" onclick="go('followedCompanies')"><div class="li-l"><div class="li-icon">${I.building}</div><div class="li-tt">관심기업</div></div>${I.back}</div>
     <div class="list-item" onclick="go('profileViews')"><div class="li-l"><div class="li-icon">${I.eye}</div><div class="li-tt">내 프로필 열람현황</div></div>${I.back}</div>` : ''}
@@ -1006,6 +1096,30 @@ async function screenProfileEdit(){
   </div>`;
 }
 
+async function screenCompanyProfileEdit(){
+  const c = await apiFetch('/profile');
+  return `${statusbar()}
+  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('mypage')">${I.back}</div><div class="page-title">회사 정보 수정</div></div></div>
+  <div class="content">
+    <div class="form-field"><label class="form-label">회사명</label><input id="cf-name" class="form-input" value="${esc(c.name)}"></div>
+    <div class="form-field"><label class="form-label">담당자명</label><input id="cf-person" class="form-input" value="${esc(c.contact_person||'')}"></div>
+    <div class="form-field"><label class="form-label">회사 소개</label><textarea id="cf-desc" class="form-input" placeholder="회사를 간단히 소개해주세요">${esc(c.description||'')}</textarea></div>
+    <button class="btn btn-primary" onclick="saveCompanyProfile()">저장하기</button>
+    <div style="height:20px;"></div>
+  </div>`;
+}
+async function saveCompanyProfile(){
+  try{
+    await apiFetch('/profile', {method:'PUT', body:{
+      name: document.getElementById('cf-name').value.trim(),
+      contact_person: document.getElementById('cf-person').value.trim(),
+      description: document.getElementById('cf-desc').value.trim(),
+    }});
+    toast('회사 정보가 저장됐어요');
+    go('mypage');
+  }catch(e){ toast(e.message); }
+}
+
 async function screenAlerts(){
   const data = await apiFetch('/notifications');
   return `${statusbar()}
@@ -1051,6 +1165,8 @@ async function render(){
       talent: screenTalent, talentDetail: screenTalentDetail, projects: screenProjects, applicants: screenApplicants,
       chatList: screenChatList, chatRoom: screenChatRoom, mypage: screenMypage,
       profileEdit: screenProfileEdit, alerts: screenAlerts, jobPost: screenJobPost,
+      companyProfileEdit: screenCompanyProfileEdit,
+      oauthRole: screenOauthRole,
       followedCompanies: screenFollowedCompanies, profileViews: screenProfileViews,
       reviewForm: screenReviewForm,
     };
@@ -1065,7 +1181,10 @@ async function render(){
     el.innerHTML = errorShell(e.message) + `<div class="toast" id="toast"></div>`;
   }
 }
-render();
+(async () => {
+  const handled = await consumeOAuthHash();
+  if(!handled) render();
+})();
 
 if('serviceWorker' in navigator){
   window.addEventListener('load', () => {
