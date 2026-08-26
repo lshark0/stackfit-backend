@@ -429,6 +429,7 @@ function oauthStart(provider){
 }
 
 let oauthPending = null;
+let lastAuthError = null;
 let oauthRoleChoice = 'freelancer';
 function setOauthRole(role, el){
   oauthRoleChoice = role;
@@ -469,7 +470,7 @@ async function consumeOAuthHash(){
   history.replaceState(null, '', window.location.pathname);
 
   if(params.get('oauth_error')){
-    toast('소셜 로그인 실패: ' + params.get('oauth_error'));
+    lastAuthError = '소셜 로그인 실패 (코드: ' + params.get('oauth_error') + ')';
     return false;
   }
   if(params.get('token')){
@@ -479,7 +480,7 @@ async function consumeOAuthHash(){
       state.role = me.user.role; state.userId = me.user.id;
       toast('로그인 성공');
       go('home');
-    }catch(e){ toast('로그인 확인 실패: ' + e.message); go('onboarding'); }
+    }catch(e){ lastAuthError = '로그인 확인 실패: ' + e.message; go('onboarding'); }
     return true;
   }
   if(params.get('oauth_pending')){
@@ -688,10 +689,17 @@ async function postJob(){
 
 /* ---------------- Screens (async, fetch from API) ---------------- */
 async function screenOnboarding(){
+  const errorBanner = lastAuthError ? `
+    <div style="background:#FDEDEA; border:1px solid #F3D6D2; border-radius:12px; padding:14px; display:flex; flex-direction:column; gap:6px;">
+      <div style="font-weight:700; font-size:13.5px; color:var(--danger);">로그인에 문제가 있었어요</div>
+      <div style="font-size:12.5px; color:var(--ink); line-height:1.6; word-break:break-all;">${esc(lastAuthError)}</div>
+      <div onclick="lastAuthError=null; render();" style="font-family:var(--mono); font-size:11px; color:var(--slate); text-decoration:underline; cursor:pointer; align-self:flex-end;">닫기</div>
+    </div>` : '';
   return `${statusbar()}
   <div class="onb-wrap">
     <div class="brand-mark"><div class="sq"><span class="mid"></span></div><div><div class="brand-name">스택핏</div><div class="brand-tag">STACKFIT · IT Matching</div></div></div>
     <div class="onb-headline">기술 스택으로<br><em>가장 정확하게</em><br>연결합니다.</div>
+    ${errorBanner}
     <div style="display:flex; flex-direction:column; gap:12px;">
       <button class="btn btn-primary" onclick="go('signup')">회원가입</button>
       <button class="btn btn-outline" onclick="go('login','freelancer')">프리랜서로 로그인</button>
