@@ -202,6 +202,7 @@
     <div class="safe-top"></div>
     <div class="screen" id="screen"></div>
     <div class="safe-bottom-spacer"></div>
+    <div class="toast" id="toast"></div>
   </div>
 
 <script>
@@ -274,7 +275,7 @@ function toast(msg){
   if(!t) return;
   t.textContent = msg; t.classList.add('show');
   clearTimeout(window.__toastTimer);
-  window.__toastTimer = setTimeout(()=>t.classList.remove('show'), 2000);
+  window.__toastTimer = setTimeout(()=>t.classList.remove('show'), 3000);
 }
 
 function gauge(pct){
@@ -468,7 +469,7 @@ async function consumeOAuthHash(){
   history.replaceState(null, '', window.location.pathname);
 
   if(params.get('oauth_error')){
-    toast('소셜 로그인에 실패했어요. 다시 시도해주세요.');
+    toast('소셜 로그인 실패: ' + params.get('oauth_error'));
     return false;
   }
   if(params.get('token')){
@@ -478,7 +479,7 @@ async function consumeOAuthHash(){
       state.role = me.user.role; state.userId = me.user.id;
       toast('로그인 성공');
       go('home');
-    }catch(e){ toast('로그인에 실패했어요'); go('onboarding'); }
+    }catch(e){ toast('로그인 확인 실패: ' + e.message); go('onboarding'); }
     return true;
   }
   if(params.get('oauth_pending')){
@@ -1171,13 +1172,13 @@ async function render(){
     };
     const fn = map[state.screen] || screenOnboarding;
     const html = await fn();
-    el.innerHTML = html + `<div class="toast" id="toast"></div>`;
+    el.innerHTML = html;
     if(state.screen==='chatRoom'){
       const box = document.getElementById('chatScroll');
       if(box) box.scrollTop = box.scrollHeight;
     }
   }catch(e){
-    el.innerHTML = errorShell(e.message) + `<div class="toast" id="toast"></div>`;
+    el.innerHTML = errorShell(e.message);
   }
 }
 (async () => {
