@@ -423,8 +423,19 @@ async function doLogin(){
   }catch(e){ toast(e.message); }
 }
 
+function isStandaloneApp(){
+  return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+}
 function oauthStart(provider){
-  window.location.href = API_BASE + '/auth/oauth/' + provider + '/start';
+  const url = API_BASE + '/auth/oauth/' + provider + '/start';
+  if(isStandaloneApp()){
+    // 설치된 앱(홈화면 아이콘)에서는 일부 소셜 로그인(특히 구글)이 내장 웹뷰를 차단하므로
+    // 별도 브라우저 창을 띄워 로그인시키고, 결과만 postMessage로 앱에 전달받습니다.
+    toast('브라우저 창에서 로그인을 진행해주세요');
+    window.open(url, 'stackfitOAuth');
+  } else {
+    window.location.href = url;
+  }
 }
 
 let oauthPending = null;
@@ -466,6 +477,24 @@ async function consumeOAuthHash(){
   if(!hash || hash.length<2) return false;
   const params = new URLSearchParams(hash.slice(1));
   history.replaceState(null, '', window.location.pathname);
+
+  // 팝업 창(설치된 앱에서 window.open으로 띄운 로그인 창)이라면,
+  // 결과를 postMessage로 원래 앱 창에 전달하고 이 창은 닫습니다.
+  if(window.opener && !window.opener.closed){
+    if(params.get('oauth_error')){
+      window.opener.postMessage({ source:'stackfit-oauth', error: params.get('oauth_error') }, window.location.origin);
+    } else if(params.get('token')){
+      window.opener.postMessage({ source:'stackfit-oauth', token: params.get('token') }, window.location.origin);
+    } else if(params.get('oauth_pending')){
+      window.opener.postMessage({
+        source:'stackfit-oauth',
+        pending: { token: params.get('oauth_pending'), email: params.get('email')||'', name: params.get('name')||'' },
+      }, window.location.origin);
+    }
+    document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;color:#5B6472;font-size:14px;">로그인 처리 중이에요. 이 창은 자동으로 닫혀요...</div>';
+    setTimeout(()=>window.close(), 700);
+    return true;
+  }
 
   if(params.get('oauth_error')){
     toast('소셜 로그인에 실패했어요. 다시 시도해주세요.');
@@ -1181,6 +1210,29 @@ async function render(){
     el.innerHTML = errorShell(e.message) + `<div class="toast" id="toast"></div>`;
   }
 }
+window.addEventListener('message', async (ev) => {
+  if(ev.origin !== window.location.origin) return;
+  const data = ev.data;
+  if(!data || data.source !== 'stackfit-oauth') return;
+
+  if(data.error){ toast('소셜 로그인에 실패했어요. 다시 시도해주세요.'); return; }
+
+  if(data.token){
+    state.token = data.token;
+    try{
+      const me = await apiFetch('/auth/me');
+      state.role = me.user.role; state.userId = me.user.id;
+      toast('로그인 성공');
+      go('home');
+    }catch(e){ toast('로그인에 실패했어요'); go('onboarding'); }
+    return;
+  }
+  if(data.pending){
+    oauthPending = data.pending;
+    go('oauthRole');
+  }
+});
+
 (async () => {
   const handled = await consumeOAuthHash();
   if(!handled) render();
