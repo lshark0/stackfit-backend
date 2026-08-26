@@ -721,12 +721,9 @@ async function screenOnboarding(){
     <div class="brand-mark"><div class="sq"><span class="mid"></span></div><div><div class="brand-name">스택핏</div><div class="brand-tag">STACKFIT · IT Matching</div></div></div>
     <div class="onb-headline">기술 스택으로<br><em>가장 정확하게</em><br>연결합니다.</div>
     <div style="display:flex; flex-direction:column; gap:12px;">
-      <div class="role-card" onclick="loginAs('freelancer')"><div class="ic">${I.user}</div><div><div class="tt">프리랜서로 로그인</div><div class="ds">lee@stackfit.dev 계정으로 접속해요</div></div></div>
-      <div class="role-card" onclick="loginAs('company')"><div class="ic">${I.building}</div><div><div class="tt">기업으로 로그인</div><div class="ds">hr@hanbit.dev 계정으로 접속해요</div></div></div>
-    </div>
-    <div style="display:flex; gap:10px;">
-      <button class="btn btn-outline" onclick="go('signup')">회원가입</button>
-      <button class="btn btn-outline" onclick="go('login')">로그인</button>
+      <button class="btn btn-primary" onclick="go('signup')">회원가입</button>
+      <button class="btn btn-outline" onclick="go('login','freelancer')">프리랜서로 로그인</button>
+      <button class="btn btn-outline" onclick="go('login','company')">기업으로 로그인</button>
     </div>
   </div>`;
 }
@@ -761,8 +758,10 @@ function screenSignup(){
 }
 
 function screenLogin(){
+  const roleHint = state.param;
+  const heading = roleHint==='company' ? '기업 회원 로그인' : roleHint==='freelancer' ? '프리랜서 회원 로그인' : '로그인';
   return `${statusbar()}
-  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('onboarding')">${I.back}</div><div class="page-title">로그인</div></div></div>
+  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('onboarding')">${I.back}</div><div class="page-title">${heading}</div></div></div>
   <div class="content">
     <div class="form-field" style="margin-top:6px;"><label class="form-label">이메일</label><input id="li-email" class="form-input" type="email" placeholder="you@example.com"></div>
     <div class="form-field"><label class="form-label">비밀번호</label><input id="li-password" class="form-input" type="password" placeholder="비밀번호" onkeydown="if(event.key==='Enter'){event.preventDefault();doLogin();}"></div>
