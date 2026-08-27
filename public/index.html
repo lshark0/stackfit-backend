@@ -266,9 +266,21 @@ const I = {
 function go(screen, param){
   if(state.screen!=='alerts') state.prevScreen = state.screen;
   state.screen = screen; state.param = param ?? null;
+  history.pushState({screen: state.screen, param: state.param}, '', location.pathname);
   render();
 }
 window.go = go;
+
+// 휴대폰의 '뒤로가기' 버튼/제스처를 앱 내 화면 이동과 연결합니다.
+window.addEventListener('popstate', (ev) => {
+  const s = ev.state;
+  if(s && s.screen){
+    state.screen = s.screen; state.param = s.param ?? null;
+  } else {
+    state.screen = 'onboarding'; state.param = null;
+  }
+  render();
+});
 
 function toast(msg){
   const t = document.getElementById('toast');
@@ -1298,6 +1310,7 @@ async function render(){
 (async () => {
   const handled = await consumeOAuthHash();
   if(!handled) render();
+  history.replaceState({screen: state.screen, param: state.param}, '', location.pathname);
 })();
 
 if('serviceWorker' in navigator){
