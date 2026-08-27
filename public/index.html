@@ -210,6 +210,16 @@
 let API_BASE = "/api";
 let state = { role:null, screen:"onboarding", param:null, prevScreen:"onboarding", token:null, userId:null };
 
+const TOKEN_KEY = 'stackfit_token';
+function saveToken(token){
+  state.token = token;
+  try{ localStorage.setItem(TOKEN_KEY, token); }catch(e){}
+}
+function clearToken(){
+  state.token = null;
+  try{ localStorage.removeItem(TOKEN_KEY); }catch(e){}
+}
+
 function debounce(fn, ms){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms); }; }
 function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
@@ -389,7 +399,7 @@ async function loginAs(role){
     toast('로그인 중...');
     const email = role==='freelancer' ? 'lee@stackfit.dev' : 'hr@hanbit.dev';
     const data = await apiFetch('/auth/login', {method:'POST', body:{email, password:'demo1234'}});
-    state.token = data.token; state.role = role; state.userId = data.user.id;
+    saveToken(data.token); state.role = role; state.userId = data.user.id;
     toast('로그인 성공');
     go('home');
   }catch(e){
@@ -397,7 +407,7 @@ async function loginAs(role){
     go('serverSetup');
   }
 }
-function logout(){ state.token=null; state.role=null; state.userId=null; go('onboarding'); }
+function logout(){ clearToken(); state.role=null; state.userId=null; go('onboarding'); }
 
 let signupRole = 'freelancer';
 function setSignupRole(role, el){
@@ -430,7 +440,7 @@ async function doSignup(){
     if(signupRole==='freelancer') body.name = nameVal || '이름 미입력';
     else body.companyName = nameVal || '회사명 미입력';
     const data = await apiFetch('/auth/signup', {method:'POST', body});
-    state.token = data.token; state.role = data.user.role; state.userId = data.user.id;
+    saveToken(data.token); state.role = data.user.role; state.userId = data.user.id;
     toast('가입이 완료됐어요');
     go('home');
   }catch(e){ toast(e.message); }
@@ -441,7 +451,7 @@ async function doLogin(){
   if(!email || !password){ toast('이메일과 비밀번호를 입력해주세요'); return; }
   try{
     const data = await apiFetch('/auth/login', {method:'POST', body:{email, password}});
-    state.token = data.token; state.role = data.user.role; state.userId = data.user.id;
+    saveToken(data.token); state.role = data.user.role; state.userId = data.user.id;
     toast('로그인 성공');
     go('home');
   }catch(e){ toast(e.message); }
@@ -484,11 +494,26 @@ async function finishOAuthSignup(){
     const data = await apiFetch('/auth/oauth/finish', {method:'POST', body:{
       pendingToken: oauthPending.token, role: oauthRoleChoice, name,
     }});
-    state.token = data.token; state.role = data.user.role; state.userId = data.user.id;
+    saveToken(data.token); state.role = data.user.role; state.userId = data.user.id;
     oauthPending = null;
     toast('가입이 완료됐어요');
     go('home');
   }catch(e){ toast(e.message); }
+}
+async function restoreSession(){
+  let saved;
+  try{ saved = localStorage.getItem(TOKEN_KEY); }catch(e){ saved = null; }
+  if(!saved) return false;
+  state.token = saved;
+  try{
+    const me = await apiFetch('/auth/me');
+    state.role = me.user.role; state.userId = me.user.id;
+    go('home');
+    return true;
+  }catch(e){
+    clearToken();
+    return false;
+  }
 }
 async function consumeOAuthHash(){
   const search = window.location.search;
@@ -502,7 +527,7 @@ async function consumeOAuthHash(){
       return false;
     }
     if(params.get('token')){
-      state.token = params.get('token');
+      saveToken(params.get('token'));
       try{
         const me = await apiFetch('/auth/me');
         state.role = me.user.role; state.userId = me.user.id;
@@ -1308,8 +1333,11 @@ async function render(){
   }
 }
 (async () => {
-  const handled = await consumeOAuthHash();
-  if(!handled) render();
+  const handledOAuth = await consumeOAuthHash();
+  if(!handledOAuth){
+    const restored = await restoreSession();
+    if(!restored) render();
+  }
   history.replaceState({screen: state.screen, param: state.param}, '', location.pathname);
 })();
 
