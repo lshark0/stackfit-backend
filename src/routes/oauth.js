@@ -14,7 +14,8 @@ router.get('/:provider/start', (req, res) => {
   if (!isConfigured(provider)) {
     return res.redirect(`/?oauth_error=${provider}_not_configured`);
   }
-  const state = signToken({ purpose: 'oauth_state', provider }, 600);
+  const intent = ['freelancer', 'company'].includes(req.query.intent) ? req.query.intent : null;
+  const state = signToken({ purpose: 'oauth_state', provider, intent }, 600);
   res.redirect(buildAuthorizeUrl(provider, state, req));
 });
 
@@ -64,7 +65,12 @@ router.get('/:provider/callback', async (req, res) => {
     { pending: true, provider, oauthId: profile.id, email: profile.email || '', name: profile.name || '' },
     600
   );
-  const qs = new URLSearchParams({ oauth_pending: pendingToken, name: profile.name || '', email: profile.email || '' });
+  const qs = new URLSearchParams({
+    oauth_pending: pendingToken,
+    name: profile.name || '',
+    email: profile.email || '',
+    role_hint: statePayload.intent || '',
+  });
   res.redirect(`/?${qs.toString()}`);
 });
 

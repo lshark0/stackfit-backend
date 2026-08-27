@@ -425,7 +425,9 @@ async function doLogin(){
 }
 
 function oauthStart(provider){
-  window.location.href = API_BASE + '/auth/oauth/' + provider + '/start';
+  const hint = (state.screen==='login' || state.screen==='signup') ? state.param : null;
+  const qs = hint ? ('?intent=' + encodeURIComponent(hint)) : '';
+  window.location.href = API_BASE + '/auth/oauth/' + provider + '/start' + qs;
 }
 
 let oauthPending = null;
@@ -438,13 +440,15 @@ function setOauthRole(role, el){
 }
 function screenOauthRole(){
   const p = oauthPending || {name:'', email:''};
+  if(p.roleHint==='company' || p.roleHint==='freelancer') oauthRoleChoice = p.roleHint;
+  const isCompany = oauthRoleChoice==='company';
   return `${statusbar()}
   <div class="app-header"><div class="page-title">몇 가지만 더 알려주세요</div></div>
   <div class="content">
     <div class="page-sub" style="margin-bottom:16px;">${p.email?esc(p.email)+' 계정으로 가입해요':'소셜 계정으로 가입해요'}</div>
     <div class="chip-row" id="oauthRoleChips">
-      <div class="chip active" onclick="setOauthRole('freelancer', this)">프리랜서</div>
-      <div class="chip" onclick="setOauthRole('company', this)">기업</div>
+      <div class="chip ${isCompany?'':'active'}" onclick="setOauthRole('freelancer', this)">프리랜서</div>
+      <div class="chip ${isCompany?'active':''}" onclick="setOauthRole('company', this)">기업</div>
     </div>
     <div class="form-field" style="margin-top:14px;"><label class="form-label">이름 / 회사명</label><input id="or-name" class="form-input" value="${esc(p.name||'')}"></div>
     <button class="btn btn-primary" onclick="finishOAuthSignup()">가입 완료하기</button>
@@ -485,7 +489,7 @@ async function consumeOAuthHash(){
       return true;
     }
     if(params.get('oauth_pending')){
-      oauthPending = { token: params.get('oauth_pending'), email: params.get('email')||'', name: params.get('name')||'' };
+      oauthPending = { token: params.get('oauth_pending'), email: params.get('email')||'', name: params.get('name')||'', roleHint: params.get('role_hint')||'' };
       go('oauthRole');
       return true;
     }
