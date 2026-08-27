@@ -12,7 +12,7 @@ router.get('/:provider/start', (req, res) => {
   const { provider } = req.params;
   if (!PROVIDERS[provider]) return res.status(404).send('지원하지 않는 로그인 방식이에요.');
   if (!isConfigured(provider)) {
-    return res.redirect(`/#oauth_error=${provider}_not_configured`);
+    return res.redirect(`/?oauth_error=${provider}_not_configured`);
   }
   const state = signToken({ purpose: 'oauth_state', provider }, 600);
   res.redirect(buildAuthorizeUrl(provider, state, req));
@@ -23,23 +23,23 @@ router.get('/:provider/callback', async (req, res) => {
   const { code, state } = req.query;
 
   if (!PROVIDERS[provider] || !isConfigured(provider)) {
-    return res.redirect(`/#oauth_error=${provider}_not_configured`);
+    return res.redirect(`/?oauth_error=${provider}_not_configured`);
   }
   const statePayload = verifyToken(state);
   if (!statePayload || statePayload.purpose !== 'oauth_state' || statePayload.provider !== provider) {
-    return res.redirect(`/#oauth_error=invalid_state`);
+    return res.redirect(`/?oauth_error=invalid_state`);
   }
-  if (!code) return res.redirect(`/#oauth_error=no_code`);
+  if (!code) return res.redirect(`/?oauth_error=no_code`);
 
   let accessToken, profile;
   try {
     accessToken = await exchangeCode(provider, code, state, req);
     profile = await PROVIDERS[provider].getProfile(accessToken);
   } catch (e) {
-    return res.redirect(`/#oauth_error=exchange_failed`);
+    return res.redirect(`/?oauth_error=exchange_failed`);
   }
   if (!profile || !profile.id) {
-    return res.redirect(`/#oauth_error=no_profile`);
+    return res.redirect(`/?oauth_error=no_profile`);
   }
 
   // 1) 이미 이 소셜 계정으로 가입된 사용자가 있으면 바로 로그인
@@ -56,7 +56,7 @@ router.get('/:provider/callback', async (req, res) => {
 
   if (user) {
     const token = signToken({ id: user.id, role: user.role, email: user.email });
-    return res.redirect(`/#token=${token}`);
+    return res.redirect(`/?token=${encodeURIComponent(token)}`);
   }
 
   // 3) 신규 사용자 — 역할(프리랜서/기업) 선택이 필요하므로 임시 토큰으로 프론트에 전달
@@ -65,7 +65,7 @@ router.get('/:provider/callback', async (req, res) => {
     600
   );
   const qs = new URLSearchParams({ oauth_pending: pendingToken, name: profile.name || '', email: profile.email || '' });
-  res.redirect(`/#${qs.toString()}`);
+  res.redirect(`/?${qs.toString()}`);
 });
 
 router.post('/finish', async (req, res) => {
