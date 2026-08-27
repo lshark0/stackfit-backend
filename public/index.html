@@ -1167,7 +1167,7 @@ function screenJobPost(){
 /* ---------------- Router ---------------- */
 async function render(){
   const el = document.getElementById('screen');
-  const needsAuth = !["onboarding","serverSetup","signup","login"].includes(state.screen);
+  const needsAuth = !["onboarding","serverSetup","signup","login","oauthRole"].includes(state.screen);
   if(needsAuth && !state.token){ state.screen = "onboarding"; }
 
   el.innerHTML = loadingShell();
