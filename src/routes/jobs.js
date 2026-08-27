@@ -78,7 +78,8 @@ router.get('/', optionalAuth, async (req, res) => {
     saved: savedJobIds.has(j.id),
   }));
 
-  res.json({ jobs: result });
+  const finalResult = req.query.saved === 'true' ? result.filter(j => j.saved) : result;
+  res.json({ jobs: finalResult });
 });
 
 router.get('/:id', optionalAuth, async (req, res) => {

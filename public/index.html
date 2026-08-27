@@ -168,6 +168,22 @@
   .add-tag-row input{flex:1;}
   .fab{position:absolute; right:20px; bottom:96px; width:52px; height:52px; border-radius:16px; background:var(--amber); color:var(--ink); display:flex; align-items:center; justify-content:center; box-shadow:0 10px 20px -6px rgba(232,163,61,.55); z-index:12; cursor:pointer; border:none;}
   .toast{position:absolute; bottom:96px; left:50%; transform:translateX(-50%); background:var(--ink); color:#F5EFE4; font-size:12.5px; font-weight:600; padding:11px 18px; border-radius:999px; z-index:30; box-shadow:0 10px 24px rgba(0,0,0,.3); white-space:nowrap; opacity:0; pointer-events:none; transition:opacity .2s, transform .2s; max-width:80%; overflow:hidden; text-overflow:ellipsis;}
+  .drawer-overlay{position:absolute; inset:0; background:rgba(20,23,28,.45); opacity:0; pointer-events:none; transition:opacity .22s; z-index:48;}
+  .drawer-overlay.open{opacity:1; pointer-events:auto;}
+  .drawer{position:absolute; top:0; left:0; bottom:0; width:80%; max-width:320px; background:var(--paper); z-index:49; transform:translateX(-100%); transition:transform .25s cubic-bezier(.4,0,.2,1); box-shadow:10px 0 30px rgba(0,0,0,.18); overflow-y:auto; display:flex; flex-direction:column;}
+  .drawer.open{transform:translateX(0);}
+  .drawer-head{background:var(--ink); color:#fff; padding:24px 20px 20px; flex:0 0 auto;}
+  .drawer-head .nm{font-size:17px; font-weight:700; margin-top:10px;}
+  .drawer-head .rl{font-family:var(--mono); font-size:11px; color:var(--amber-soft); margin-top:3px; text-transform:uppercase; letter-spacing:.06em;}
+  .drawer-sec{padding:14px 20px 4px;}
+  .drawer-sec-label{font-family:var(--mono); font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--slate-light); margin-bottom:4px;}
+  .drawer-item{display:flex; align-items:center; gap:12px; padding:11px 4px; cursor:pointer; color:var(--ink); font-size:13.5px; font-weight:600;}
+  .drawer-item.danger{color:var(--danger);}
+  .drawer-item .ic{width:20px; flex:0 0 auto; color:var(--slate);}
+  .quick-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:14px 6px; margin:14px 0 4px;}
+  .quick-item{display:flex; flex-direction:column; align-items:center; gap:7px; cursor:pointer;}
+  .quick-item .qi-ic{width:46px; height:46px; border-radius:14px; background:var(--card); border:1px solid var(--line); display:flex; align-items:center; justify-content:center; color:var(--ink);}
+  .quick-item .qi-lbl{font-size:10.5px; color:var(--slate); text-align:center; line-height:1.3;}
   .toast.show{opacity:1; transform:translateX(-50%) translateY(-6px);}
   .empty{display:flex; flex-direction:column; align-items:center; text-align:center; gap:6px; padding:50px 20px; color:var(--slate);}
   .empty .ic{width:52px; height:52px; border-radius:16px; background:var(--paper-dim); display:flex; align-items:center; justify-content:center; color:var(--slate); margin-bottom:6px;}
@@ -203,6 +219,8 @@
     <div class="screen" id="screen"></div>
     <div class="safe-bottom-spacer"></div>
     <div class="toast" id="toast"></div>
+    <div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
+    <div class="drawer" id="drawer"></div>
   </div>
 
 <script>
@@ -249,6 +267,8 @@ async function unreadCount(){
 
 /* ---------------- Icons ---------------- */
 const I = {
+  menu:`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M4 6.5H20M4 12H20M4 17.5H20" stroke-linecap="round"/></svg>`,
+  checklist:`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 9l1.5 1.5L12.5 7.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 15h8" stroke-linecap="round"/></svg>`,
   trash:`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 11v6M14 11v6" stroke-linecap="round"/></svg>`,
   eye:`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="2.8"/></svg>`,
   home:`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 12 L12 5 L20 12" stroke-linecap="round" stroke-linejoin="round"/><path d="M6.5 10.5V19H17.5V10.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="15.2" r="1.1" fill="currentColor" stroke="none"/></svg>`,
@@ -291,6 +311,59 @@ window.addEventListener('popstate', (ev) => {
   }
   render();
 });
+
+function drawerMenuContent(){
+  const isCompany = state.role==='company';
+  const roleLabel = isCompany ? '기업 회원' : '프리랜서 회원';
+  const item = (icon, label, screen, danger) => `<div class="drawer-item ${danger?'danger':''}" onclick="closeDrawer(); go('${screen}');"><span class="ic">${icon}</span>${label}</div>`;
+
+  const exploreItems = isCompany ? `
+    ${item(I.home,'홈','home')}
+    ${item(I.talent,'인재풀 검색','talent')}
+    ${item(I.jobs,'공고 관리','jobs')}
+  ` : `
+    ${item(I.home,'홈','home')}
+    ${item(I.jobs,'공고 탐색','jobs')}
+    ${item(I.building,'관심기업','followedCompanies')}
+    ${item(I.eye,'프로필 열람현황','profileViews')}
+  `;
+
+  const activityItems = isCompany ? `
+    ${item(I.chat,'채팅','chatList')}
+    ${item(I.user,'회사 정보 수정','companyProfileEdit')}
+  ` : `
+    ${item(I.proj,'프로젝트 관리','projects')}
+    ${item(I.chat,'채팅','chatList')}
+    ${item(I.user,'프로필 수정','profileEdit')}
+  `;
+
+  return `
+    <div class="drawer-head">
+      <div class="brand-mark"><div class="sq"><span class="mid"></span></div></div>
+      <div class="nm">스택핏</div>
+      <div class="rl">${roleLabel}</div>
+    </div>
+    <div class="drawer-sec"><div class="drawer-sec-label">탐색</div>${exploreItems}</div>
+    <div class="drawer-sec"><div class="drawer-sec-label">내 활동</div>${activityItems}${item(I.bell,'알림','alerts')}${item(I.user,'마이페이지','mypage')}</div>
+    <div class="drawer-sec"><div class="drawer-sec-label">설정 및 정책</div>
+      ${item(I.gear,'서버 연결 설정','serverSetup')}
+      <div class="drawer-item" onclick="closeDrawer(); window.open('/terms.html','_blank');"><span class="ic">${I.building}</span>이용약관</div>
+      <div class="drawer-item" onclick="closeDrawer(); window.open('/privacy.html','_blank');"><span class="ic">${I.eye}</span>개인정보처리방침</div>
+      <div class="drawer-item" onclick="closeDrawer(); logout();"><span class="ic">${I.logout}</span>로그아웃</div>
+      ${item(I.trash,'회원탈퇴','deleteAccount', true)}
+    </div>
+    <div style="height:20px;"></div>
+  `;
+}
+function openDrawer(){
+  document.getElementById('drawer').innerHTML = drawerMenuContent();
+  document.getElementById('drawerOverlay').classList.add('open');
+  document.getElementById('drawer').classList.add('open');
+}
+function closeDrawer(){
+  document.getElementById('drawerOverlay').classList.remove('open');
+  document.getElementById('drawer').classList.remove('open');
+}
 
 function toast(msg){
   const t = document.getElementById('toast');
@@ -346,7 +419,7 @@ function tabbar(active){
 function header(title, sub, opts={}, nc=0){
   return `<div class="app-header"><div class="row">
     ${opts.back?`<div class="back-row"><div class="back-btn" onclick="go('${opts.back}')">${I.back}</div><div class="page-title">${title}</div></div>`
-    : `<div><div class="page-title">${title}</div>${sub?`<div class="page-sub">${sub}</div>`:''}</div>`}
+    : `<div class="back-row"><div class="back-btn" onclick="openDrawer()">${I.menu}</div><div><div class="page-title">${title}</div>${sub?`<div class="page-sub">${sub}</div>`:''}</div></div>`}
     <div style="display:flex; gap:8px; align-items:center;">
       ${opts.roleChip? `<div class="role-chip"><span class="dot"></span>${state.role==='freelancer'?'프리랜서':'기업'}</div>`:''}
       ${opts.bell!==false ? `<div class="icon-btn" onclick="go('alerts')">${I.bell}${nc>0?`<span class="badge">${nc}</span>`:''}</div>`:''}
@@ -869,6 +942,13 @@ async function screenHome(){
         <div class="profile-bar"><div class="profile-bar-fill" style="width:${profile.completion}%"></div></div>
         <div class="banner-sub">경력기술서를 추가하면 매칭률이 더 올라가요</div>
       </div>
+      <div class="section-label">바로가기</div>
+      <div class="quick-grid">
+        <div class="quick-item" onclick="go('jobs')"><div class="qi-ic">${I.jobs}</div><div class="qi-lbl">공고 탐색</div></div>
+        <div class="quick-item" onclick="go('projects')"><div class="qi-ic">${I.proj}</div><div class="qi-lbl">프로젝트</div></div>
+        <div class="quick-item" onclick="go('followedCompanies')"><div class="qi-ic">${I.building}</div><div class="qi-lbl">관심기업</div></div>
+        <div class="quick-item" onclick="go('profileViews')"><div class="qi-ic">${I.eye}</div><div class="qi-lbl">열람현황</div></div>
+      </div>
       <div class="section-label">추천 공고</div>
       ${jobs.slice(0,3).map(jobCard).join('') || emptyHtml('등록된 공고가 없어요', I.jobs)}
     </div>${tabbar('home')}`;
@@ -886,6 +966,13 @@ async function screenHome(){
       <div class="stat-box"><div class="stat-num">${talentsData.talents.length}</div><div class="stat-lbl">인재풀</div></div>
     </div>
     <div class="banner" onclick="go('jobPost')"><div class="banner-eyebrow">Job Posting</div><div class="banner-title">새 공고를 등록해보세요</div><div class="banner-sub">등록 즉시 인재풀과 매칭이 시작돼요</div></div>
+    <div class="section-label">바로가기</div>
+    <div class="quick-grid">
+      <div class="quick-item" onclick="go('jobPost')"><div class="qi-ic">${I.plus}</div><div class="qi-lbl">공고 등록</div></div>
+      <div class="quick-item" onclick="go('talent')"><div class="qi-ic">${I.talent}</div><div class="qi-lbl">인재풀 검색</div></div>
+      <div class="quick-item" onclick="go('jobs')"><div class="qi-ic">${I.jobs}</div><div class="qi-lbl">공고 관리</div></div>
+      <div class="quick-item" onclick="go('chatList')"><div class="qi-ic">${I.chat}</div><div class="qi-lbl">채팅</div></div>
+    </div>
     <div class="section-label">매칭률 높은 인재</div>
     ${talentsData.talents.slice(0,3).map(talentCard).join('') || emptyHtml('등록된 인재가 없어요', I.talent)}
   </div>${tabbar('home')}`;
