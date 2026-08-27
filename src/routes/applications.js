@@ -11,6 +11,14 @@ router.post('/jobs/:id/apply', requireAuth, requireRole('freelancer'), async (re
   const job = await get('SELECT * FROM jobs WHERE id = ?', [jobId]);
   if (!job) return res.status(404).json({ error: '공고를 찾을 수 없습니다.' });
 
+  if (job.deadline) {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const deadlineDate = new Date(job.deadline + 'T00:00:00');
+    if (!Number.isNaN(deadlineDate.getTime()) && deadlineDate < today) {
+      return res.status(400).json({ error: '마감된 공고에는 지원할 수 없어요.' });
+    }
+  }
+
   const existing = await get('SELECT id FROM applications WHERE job_id=? AND freelancer_id=?', [jobId, req.user.id]);
   if (existing) return res.status(409).json({ error: '이미 지원한 공고입니다.' });
 
@@ -25,6 +33,18 @@ router.post('/jobs/:id/apply', requireAuth, requireRole('freelancer'), async (re
   ]);
 
   res.status(201).json({ applied: true });
+});
+
+// 지원 취소 (검토중 상태일 때만 가능 — 이미 합격/불합격 처리된 지원은 취소 불가)
+router.delete('/jobs/:id/apply', requireAuth, requireRole('freelancer'), async (req, res) => {
+  const jobId = Number(req.params.id);
+  const application = await get('SELECT * FROM applications WHERE job_id=? AND freelancer_id=?', [jobId, req.user.id]);
+  if (!application) return res.status(404).json({ error: '지원 내역을 찾을 수 없습니다.' });
+  if (application.status !== 'submitted') {
+    return res.status(400).json({ error: '이미 처리된 지원은 취소할 수 없어요.' });
+  }
+  await run('DELETE FROM applications WHERE id = ?', [application.id]);
+  res.json({ applied: false });
 });
 
 router.get('/me/applications', requireAuth, requireRole('freelancer'), async (req, res) => {

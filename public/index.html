@@ -411,6 +411,8 @@ async function doSignup(){
   const pwOk = password.length>=8 && /[A-Za-z]/.test(password) && /\d/.test(password);
   if(!pwOk){ toast('비밀번호는 영문+숫자 포함 8자 이상이어야 해요'); return; }
   if(password !== passwordConfirm){ toast('비밀번호가 일치하지 않아요'); return; }
+  const agreed = document.getElementById('su-agree').checked;
+  if(!agreed){ toast('이용약관 및 개인정보처리방침에 동의해주세요'); return; }
   try{
     const body = { email, password, role: signupRole };
     if(signupRole==='freelancer') body.name = nameVal || '이름 미입력';
@@ -526,6 +528,11 @@ function saveServerUrl(){
 
 async function applyToJob(id){
   try{ await apiFetch(`/jobs/${id}/apply`, {method:'POST'}); toast('지원이 완료됐어요'); go('jobDetail', id); }
+  catch(e){ toast(e.message); }
+}
+async function cancelApplication(id){
+  if(!confirm('지원을 취소하시겠어요?')) return;
+  try{ await apiFetch(`/jobs/${id}/apply`, {method:'DELETE'}); toast('지원을 취소했어요'); go('jobDetail', id); }
   catch(e){ toast(e.message); }
 }
 async function toggleSaveJob(id, ev){
@@ -764,6 +771,13 @@ function screenSignup(){
         <div onclick="togglePasswordVisibility('su-password-confirm', this)" style="position:absolute; right:12px; top:50%; transform:translateY(-50%); cursor:pointer; color:var(--slate-light);">${I.eye}</div>
       </div>
     </div>
+    <div class="form-field" style="display:flex; align-items:flex-start; gap:8px;">
+      <input type="checkbox" id="su-agree" style="margin-top:3px; width:16px; height:16px; flex:0 0 auto;">
+      <label for="su-agree" style="font-size:12.5px; color:var(--slate); line-height:1.6;">
+        <a href="/terms.html" target="_blank" style="color:var(--ink); text-decoration:underline;">이용약관</a> 및
+        <a href="/privacy.html" target="_blank" style="color:var(--ink); text-decoration:underline;">개인정보처리방침</a>에 동의합니다
+      </label>
+    </div>
     <button class="btn btn-primary" onclick="doSignup()">가입하고 시작하기</button>
     ${socialLoginButtons()}
     <div class="server-line" style="margin-top:16px;">이미 계정이 있으신가요? <b onclick="go('login')">로그인</b></div>
@@ -890,7 +904,7 @@ async function screenJobDetail(){
     ${isCompany? `<div class="star-btn" style="width:52px;height:52px;border-radius:12px; color:var(--danger); border-color:#F3D6D2;" onclick="deleteJob(${j.id})">${I.trash}</div><button class="btn btn-outline" onclick="go('jobs')">목록으로</button><button class="btn btn-primary" onclick="go('applicants', ${j.id})">지원자 ${j.applicantCount||0}명</button>`
     : `<div class="star-btn ${j.saved?'filled':''}" style="width:52px;height:52px;border-radius:12px;" onclick="toggleSaveJob(${j.id}, event)">${I.star}</div>
        <button class="btn btn-outline" style="flex:0 0 auto; width:auto; padding:13px 16px;" onclick="startChatWithCompany(${j.company_id})">채팅</button>
-       <button class="btn btn-primary" ${j.applied?'disabled':''} onclick="applyToJob(${j.id})">${j.applied?'지원 완료':'지원하기'}</button>`}
+       <button class="btn ${j.applied?'btn-outline':'btn-primary'}" onclick="${j.applied?`cancelApplication(${j.id})`:`applyToJob(${j.id})`}">${j.applied?'지원 취소':'지원하기'}</button>`}
   </div>`;
 }
 
@@ -1051,7 +1065,7 @@ async function screenChatRoom(){
 
 async function screenMypage(){
   const isCompany = state.role==='company';
-  const profile = await apiFetch('/profile');
+  const [profile, me] = await Promise.all([apiFetch('/profile'), apiFetch('/auth/me')]);
   return `${statusbar()}${header("마이페이지","",{bell:false})}
   <div class="content">
     <div class="mypage-head">
@@ -1064,11 +1078,69 @@ async function screenMypage(){
     ${!isCompany?`
     <div class="list-item" onclick="go('followedCompanies')"><div class="li-l"><div class="li-icon">${I.building}</div><div class="li-tt">관심기업</div></div>${I.back}</div>
     <div class="list-item" onclick="go('profileViews')"><div class="li-l"><div class="li-icon">${I.eye}</div><div class="li-tt">내 프로필 열람현황</div></div>${I.back}</div>` : ''}
+    ${me.user.hasPassword ? `<div class="list-item" onclick="go('changePassword')"><div class="li-l"><div class="li-icon">${I.gear}</div><div class="li-tt">비밀번호 변경</div></div>${I.back}</div>` : ''}
+    <div class="section-label">약관 및 정책</div>
+    <div class="list-item" onclick="window.open('/terms.html','_blank')"><div class="li-l"><div class="li-icon">${I.building}</div><div class="li-tt">이용약관</div></div>${I.back}</div>
+    <div class="list-item" onclick="window.open('/privacy.html','_blank')"><div class="li-l"><div class="li-icon">${I.eye}</div><div class="li-tt">개인정보처리방침</div></div>${I.back}</div>
     <div class="section-label">설정</div>
     <div class="list-item" onclick="go('serverSetup')"><div class="li-l"><div class="li-icon">${I.gear}</div><div class="li-tt">서버 연결 설정</div></div>${I.back}</div>
     <div class="list-item" onclick="logout()"><div class="li-l"><div class="li-icon">${I.logout}</div><div class="li-tt">로그아웃</div></div></div>
+    <div class="list-item" onclick="go('deleteAccount')"><div class="li-l"><div class="li-icon" style="color:var(--danger);">${I.trash}</div><div class="li-tt" style="color:var(--danger);">회원탈퇴</div></div>${I.back}</div>
   </div>${tabbar('mypage')}`;
 }
+
+async function screenChangePassword(){
+  return `${statusbar()}
+  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('mypage')">${I.back}</div><div class="page-title">비밀번호 변경</div></div></div>
+  <div class="content">
+    <div class="form-field"><label class="form-label">현재 비밀번호</label><input id="cp-current" class="form-input" type="password"></div>
+    <div class="form-field"><label class="form-label">새 비밀번호</label><input id="cp-new" class="form-input" type="password" placeholder="영문+숫자 포함 8자 이상"></div>
+    <div class="form-field"><label class="form-label">새 비밀번호 확인</label><input id="cp-new-confirm" class="form-input" type="password"></div>
+    <button class="btn btn-primary" onclick="submitChangePassword()">변경하기</button>
+  </div>`;
+}
+async function submitChangePassword(){
+  const currentPassword = document.getElementById('cp-current').value;
+  const newPassword = document.getElementById('cp-new').value;
+  const confirmPw = document.getElementById('cp-new-confirm').value;
+  if(!currentPassword || !newPassword){ toast('모든 항목을 입력해주세요'); return; }
+  if(newPassword !== confirmPw){ toast('새 비밀번호가 일치하지 않아요'); return; }
+  try{
+    await apiFetch('/auth/change-password', {method:'POST', body:{currentPassword, newPassword}});
+    toast('비밀번호가 변경됐어요');
+    go('mypage');
+  }catch(e){ toast(e.message); }
+}
+
+async function screenDeleteAccount(){
+  const me = await apiFetch('/auth/me');
+  return `${statusbar()}
+  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('mypage')">${I.back}</div><div class="page-title">회원탈퇴</div></div></div>
+  <div class="content">
+    <div class="empty" style="padding:24px 12px;">
+      <div class="ic" style="color:var(--danger); background:#FDEDEA;">${I.trash}</div>
+      <div class="tt">정말 탈퇴하시겠어요?</div>
+      <div class="ds">탈퇴하면 프로필, 공고, 채팅, 리뷰 등 모든 데이터가 즉시 삭제되고 복구할 수 없어요.</div>
+    </div>
+    ${me.user.hasPassword ? `<div class="form-field"><label class="form-label">비밀번호 확인</label><input id="da-password" class="form-input" type="password" placeholder="본인 확인을 위해 입력해주세요"></div>` : ''}
+    <button class="btn btn-outline" style="border-color:var(--danger); color:var(--danger);" onclick="submitDeleteAccount(${me.user.hasPassword})">탈퇴하기</button>
+  </div>`;
+}
+async function submitDeleteAccount(hasPassword){
+  if(!confirm('정말로 탈퇴하시겠어요? 이 작업은 되돌릴 수 없어요.')) return;
+  const body = {};
+  if(hasPassword){
+    const password = document.getElementById('da-password').value;
+    if(!password){ toast('비밀번호를 입력해주세요'); return; }
+    body.password = password;
+  }
+  try{
+    await apiFetch('/auth/me', {method:'DELETE', body});
+    toast('탈퇴가 완료됐어요');
+    logout();
+  }catch(e){ toast(e.message); }
+}
+
 
 async function screenFollowedCompanies(){
   const data = await apiFetch('/companies/followed');
@@ -1208,6 +1280,7 @@ async function render(){
       profileEdit: screenProfileEdit, alerts: screenAlerts, jobPost: screenJobPost,
       companyProfileEdit: screenCompanyProfileEdit,
       oauthRole: screenOauthRole,
+      changePassword: screenChangePassword, deleteAccount: screenDeleteAccount,
       followedCompanies: screenFollowedCompanies, profileViews: screenProfileViews,
       reviewForm: screenReviewForm,
     };

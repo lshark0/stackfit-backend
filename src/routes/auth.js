@@ -68,8 +68,43 @@ router.post('/login', async (req, res) => {
   res.json({ token, user: { id: user.id, email: user.email, role: user.role } });
 });
 
-router.get('/me', requireAuth, (req, res) => {
-  res.json({ user: req.user });
+router.get('/me', requireAuth, async (req, res) => {
+  const user = await get('SELECT id, email, role, oauth_provider FROM users WHERE id = ?', [req.user.id]);
+  if (!user) return res.status(404).json({ error: '계정을 찾을 수 없습니다.' });
+  res.json({ user: { id: user.id, email: user.email, role: user.role, hasPassword: !user.oauth_provider } });
+});
+
+// 비밀번호 변경 (이메일/비밀번호로 가입한 계정만 — 소셜 전용 계정은 대상 아님)
+router.post('/change-password', requireAuth, async (req, res) => {
+  const { currentPassword, newPassword } = req.body || {};
+  const user = await get('SELECT * FROM users WHERE id = ?', [req.user.id]);
+  if (!user) return res.status(404).json({ error: '계정을 찾을 수 없습니다.' });
+  if (user.oauth_provider) {
+    return res.status(400).json({ error: '소셜 로그인 계정은 비밀번호 변경이 필요 없어요.' });
+  }
+  if (!currentPassword || !verifyPassword(currentPassword, user.password_hash, user.password_salt)) {
+    return res.status(401).json({ error: '현재 비밀번호가 올바르지 않아요.' });
+  }
+  if (typeof newPassword !== 'string' || newPassword.length < MIN_PASSWORD_LEN || !PASSWORD_RE.test(newPassword)) {
+    return res.status(400).json({ error: `새 비밀번호는 영문과 숫자를 포함해 ${MIN_PASSWORD_LEN}자 이상이어야 해요.` });
+  }
+  const { hash, salt } = hashPassword(newPassword);
+  await run('UPDATE users SET password_hash=?, password_salt=? WHERE id=?', [hash, salt, user.id]);
+  res.json({ ok: true });
+});
+
+// 회원탈퇴 — 이메일 계정은 비밀번호 확인, 소셜 계정은 확인 없이 즉시 삭제 (연관 데이터는 CASCADE로 함께 삭제됨)
+router.delete('/me', requireAuth, async (req, res) => {
+  const { password } = req.body || {};
+  const user = await get('SELECT * FROM users WHERE id = ?', [req.user.id]);
+  if (!user) return res.status(404).json({ error: '계정을 찾을 수 없습니다.' });
+  if (!user.oauth_provider) {
+    if (!password || !verifyPassword(password, user.password_hash, user.password_salt)) {
+      return res.status(401).json({ error: '비밀번호가 올바르지 않아요.' });
+    }
+  }
+  await run('DELETE FROM users WHERE id = ?', [user.id]);
+  res.json({ ok: true });
 });
 
 module.exports = router;
