@@ -395,13 +395,22 @@ function setSignupRole(role, el){
   const nameField = document.getElementById('su-namefield');
   if(nameField) nameField.querySelector('.form-label').textContent = role==='freelancer' ? '이름' : '회사명';
 }
+function togglePasswordVisibility(inputId, iconEl){
+  const input = document.getElementById(inputId);
+  if(!input) return;
+  const showing = input.type === 'text';
+  input.type = showing ? 'password' : 'text';
+  iconEl.style.color = showing ? 'var(--slate-light)' : 'var(--ink)';
+}
 async function doSignup(){
   const email = document.getElementById('su-email').value.trim();
   const password = document.getElementById('su-password').value;
+  const passwordConfirm = document.getElementById('su-password-confirm').value;
   const nameVal = document.getElementById('su-name').value.trim();
   if(!email || !password){ toast('이메일과 비밀번호를 입력해주세요'); return; }
   const pwOk = password.length>=8 && /[A-Za-z]/.test(password) && /\d/.test(password);
   if(!pwOk){ toast('비밀번호는 영문+숫자 포함 8자 이상이어야 해요'); return; }
+  if(password !== passwordConfirm){ toast('비밀번호가 일치하지 않아요'); return; }
   try{
     const body = { email, password, role: signupRole };
     if(signupRole==='freelancer') body.name = nameVal || '이름 미입력';
@@ -740,7 +749,21 @@ function screenSignup(){
     </div>
     <div class="form-field" style="margin-top:14px;" id="su-namefield"><label class="form-label">이름</label><input id="su-name" class="form-input" placeholder="예: 이승학"></div>
     <div class="form-field"><label class="form-label">이메일</label><input id="su-email" class="form-input" type="email" placeholder="you@example.com"></div>
-    <div class="form-field"><label class="form-label">비밀번호</label><input id="su-password" class="form-input" type="password" placeholder="영문+숫자 포함 8자 이상"><div class="page-sub" style="margin-top:5px;">영문과 숫자를 각각 1자 이상 포함해 8자 이상으로 입력해주세요</div></div>
+    <div class="form-field">
+      <label class="form-label">비밀번호</label>
+      <div style="position:relative;">
+        <input id="su-password" class="form-input" type="password" placeholder="영문+숫자 포함 8자 이상" style="padding-right:44px;">
+        <div onclick="togglePasswordVisibility('su-password', this)" style="position:absolute; right:12px; top:50%; transform:translateY(-50%); cursor:pointer; color:var(--slate-light);">${I.eye}</div>
+      </div>
+      <div class="page-sub" style="margin-top:5px;">영문과 숫자를 각각 1자 이상 포함해 8자 이상으로 입력해주세요</div>
+    </div>
+    <div class="form-field">
+      <label class="form-label">비밀번호 확인</label>
+      <div style="position:relative;">
+        <input id="su-password-confirm" class="form-input" type="password" placeholder="비밀번호를 다시 입력해주세요" style="padding-right:44px;" onkeydown="if(event.key==='Enter'){event.preventDefault();doSignup();}">
+        <div onclick="togglePasswordVisibility('su-password-confirm', this)" style="position:absolute; right:12px; top:50%; transform:translateY(-50%); cursor:pointer; color:var(--slate-light);">${I.eye}</div>
+      </div>
+    </div>
     <button class="btn btn-primary" onclick="doSignup()">가입하고 시작하기</button>
     ${socialLoginButtons()}
     <div class="server-line" style="margin-top:16px;">이미 계정이 있으신가요? <b onclick="go('login')">로그인</b></div>
