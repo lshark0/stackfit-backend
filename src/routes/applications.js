@@ -49,12 +49,16 @@ router.delete('/jobs/:id/apply', requireAuth, requireRole('freelancer'), async (
 
 router.get('/me/applications', requireAuth, requireRole('freelancer'), async (req, res) => {
   const rows = await all(
-    `SELECT a.id AS application_id, a.status, a.created_at, j.*
-     FROM applications a JOIN jobs j ON j.id = a.job_id
-     WHERE a.freelancer_id = ? ORDER BY a.created_at DESC`,
+    `SELECT a.id AS application_id, a.status AS application_status, a.created_at, j.*, c.name AS org
+     FROM applications a
+     JOIN jobs j ON j.id = a.job_id
+     LEFT JOIN companies c ON c.user_id = j.company_id
+     WHERE a.freelancer_id = ? ORDER BY a.created_at DESC, a.id DESC`,
     [req.user.id]
   );
-  res.json({ applications: rows.map(r => ({ ...r, stack: JSON.parse(r.stack_json) })) });
+  res.json({
+    applications: rows.map(r => ({ ...r, status: r.application_status, stack: JSON.parse(r.stack_json) })),
+  });
 });
 
 router.get('/jobs/:id/applicants', requireAuth, requireRole('company'), async (req, res) => {

@@ -111,7 +111,8 @@
   .server-line{font-family:var(--mono); font-size:10.5px; color:var(--slate); text-align:center; line-height:1.6;}
   .server-line b{color:var(--ink); cursor:pointer; text-decoration:underline;}
   .stat-strip{display:flex; gap:8px; margin-top:4px;}
-  .stat-box{flex:1; background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px;}
+  .stat-box{flex:1; background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px; cursor:pointer; transition:.12s;}
+  .stat-box:active{transform:scale(.96); background:var(--paper-dim);}
   .stat-num{font-family:var(--mono); font-weight:700; font-size:19px; color:var(--ink);}
   .stat-lbl{font-size:10.5px; color:var(--slate); margin-top:3px;}
   .banner{background:linear-gradient(135deg, var(--ink) 0%, var(--ink-soft) 100%); border-radius:18px; padding:18px; color:#fff; position:relative; overflow:hidden; margin-top:16px; cursor:pointer;}
@@ -324,6 +325,7 @@ function drawerMenuContent(){
   ` : `
     ${item(I.home,'홈','home')}
     ${item(I.jobs,'공고 탐색','jobs')}
+    ${item(I.checklist,'내 지원 현황','myApplications')}
     ${item(I.building,'관심기업','followedCompanies')}
     ${item(I.eye,'프로필 열람현황','profileViews')}
   `;
@@ -933,9 +935,9 @@ async function screenHome(){
     return `${statusbar()}${header(`안녕하세요, ${esc(profile.name)}님`,"오늘도 좋은 매칭 찾아드릴게요",{roleChip:true}, nc)}
     <div class="content">
       <div class="stat-strip">
-        <div class="stat-box"><div class="stat-num">${appliedCount}</div><div class="stat-lbl">지원한 공고</div></div>
-        <div class="stat-box"><div class="stat-num">${maxMatch}%</div><div class="stat-lbl">최고 매칭률</div></div>
-        <div class="stat-box"><div class="stat-num">${activeProjects}</div><div class="stat-lbl">진행 프로젝트</div></div>
+        <div class="stat-box" onclick="go('myApplications')"><div class="stat-num">${appliedCount}</div><div class="stat-lbl">지원한 공고</div></div>
+        <div class="stat-box" onclick="go('jobs')"><div class="stat-num">${maxMatch}%</div><div class="stat-lbl">최고 매칭률</div></div>
+        <div class="stat-box" onclick="go('projects')"><div class="stat-num">${activeProjects}</div><div class="stat-lbl">진행 프로젝트</div></div>
       </div>
       <div class="banner" onclick="go('profileEdit')">
         <div class="banner-eyebrow">Profile</div><div class="banner-title">프로필 완성도 ${profile.completion}%</div>
@@ -961,9 +963,9 @@ async function screenHome(){
   return `${statusbar()}${header("오늘의 인재 추천",`${esc(company.name)} · 채용 대시보드`,{roleChip:true}, nc)}
   <div class="content">
     <div class="stat-strip">
-      <div class="stat-box"><div class="stat-num">${jobs.length}</div><div class="stat-lbl">등록 공고</div></div>
-      <div class="stat-box"><div class="stat-num">${applicantSum}</div><div class="stat-lbl">지원자</div></div>
-      <div class="stat-box"><div class="stat-num">${talentsData.talents.length}</div><div class="stat-lbl">인재풀</div></div>
+      <div class="stat-box" onclick="go('jobs')"><div class="stat-num">${jobs.length}</div><div class="stat-lbl">등록 공고</div></div>
+      <div class="stat-box" onclick="go('jobs')"><div class="stat-num">${applicantSum}</div><div class="stat-lbl">지원자</div></div>
+      <div class="stat-box" onclick="go('talent')"><div class="stat-num">${talentsData.talents.length}</div><div class="stat-lbl">인재풀</div></div>
     </div>
     <div class="banner" onclick="go('jobPost')"><div class="banner-eyebrow">Job Posting</div><div class="banner-title">새 공고를 등록해보세요</div><div class="banner-sub">등록 즉시 인재풀과 매칭이 시작돼요</div></div>
     <div class="section-label">바로가기</div>
@@ -1124,6 +1126,26 @@ async function submitReview(projectId){
     toast('리뷰가 등록됐어요');
     go('projects');
   }catch(e){ toast(e.message); }
+}
+
+async function screenMyApplications(){
+  const nc = await unreadCount();
+  const data = await apiFetch('/me/applications');
+  const statusLabel = { submitted:'검토중', accepted:'합격', rejected:'불합격' };
+  const statusColor = { submitted:'var(--cyan)', accepted:'var(--amber-deep)', rejected:'var(--slate-light)' };
+  return `${statusbar()}${header("내 지원 현황", `${data.applications.length}건 지원`, {back:'home'}, nc)}
+  <div class="content">
+    ${data.applications.map(a=>`
+      <div class="card clickable" onclick="go('jobDetail', ${a.id})">
+        <div class="card-top">
+          <div><div class="card-title">${esc(a.title)}</div><div class="card-org">${esc(a.org||'')}</div></div>
+          <span class="tag" style="border-radius:999px; color:${statusColor[a.status]||'var(--slate)'}; border-color:${statusColor[a.status]||'var(--line)'};">${statusLabel[a.status]||a.status}</span>
+        </div>
+        <div class="tag-row">${a.stack.map(s=>`<span class="tag">${esc(s)}</span>`).join('')}</div>
+        <div class="meta-row"><span>${I.pin}${esc(a.location)}</span><span class="rate">${esc(a.rate)}</span></div>
+        <div class="page-sub" style="margin-top:8px;">${new Date(a.created_at).toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric'})} 지원</div>
+      </div>`).join('') || emptyHtml('아직 지원한 공고가 없어요', I.jobs)}
+  </div>${tabbar('home')}`;
 }
 
 async function screenApplicants(){
@@ -1405,6 +1427,7 @@ async function render(){
       companyProfileEdit: screenCompanyProfileEdit,
       oauthRole: screenOauthRole,
       changePassword: screenChangePassword, deleteAccount: screenDeleteAccount,
+      myApplications: screenMyApplications,
       followedCompanies: screenFollowedCompanies, profileViews: screenProfileViews,
       reviewForm: screenReviewForm,
     };
