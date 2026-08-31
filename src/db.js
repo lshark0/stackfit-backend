@@ -57,6 +57,7 @@ if (USE_POSTGRES) {
     await ensureColumnPg('jobs', 'deadline', 'TEXT');
     await ensureColumnPg('jobs', 'duty', 'TEXT');
     await ensureColumnPg('jobs', 'grade', 'TEXT');
+    await ensureColumnPg('freelancer_profiles', 'grade', 'TEXT');
     await ensureColumnPg('users', 'oauth_provider', 'TEXT');
     await ensureColumnPg('users', 'oauth_id', 'TEXT');
     await pool.query(
@@ -94,6 +95,7 @@ if (USE_POSTGRES) {
     try { db.exec('ALTER TABLE jobs ADD COLUMN deadline TEXT'); } catch (e) {}
     try { db.exec('ALTER TABLE jobs ADD COLUMN duty TEXT'); } catch (e) {}
     try { db.exec('ALTER TABLE jobs ADD COLUMN grade TEXT'); } catch (e) {}
+    try { db.exec('ALTER TABLE freelancer_profiles ADD COLUMN grade TEXT'); } catch (e) {}
     try { db.exec('ALTER TABLE users ADD COLUMN oauth_provider TEXT'); } catch (e) {}
     try { db.exec('ALTER TABLE users ADD COLUMN oauth_id TEXT'); } catch (e) {}
     try {

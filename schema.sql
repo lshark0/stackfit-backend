@@ -24,7 +24,8 @@ CREATE TABLE IF NOT EXISTS freelancer_profiles (
   verified    INTEGER NOT NULL DEFAULT 0,
   completion  INTEGER NOT NULL DEFAULT 50,
   resume_filename TEXT,
-  resume_original_name TEXT
+  resume_original_name TEXT,
+  grade       TEXT
 );
 
 CREATE TABLE IF NOT EXISTS companies (

@@ -458,7 +458,7 @@ function talentCard(t){
     <div class="card-top">
       <div style="display:flex; gap:12px; align-items:center;">
         <div class="avatar">${esc(t.name[0])}</div>
-        <div><div class="card-title">${esc(t.name)} <span style="font-family:var(--mono); font-weight:400; font-size:11px; color:var(--slate);">· ${esc(t.years)}</span></div>
+        <div><div class="card-title">${esc(t.name)} <span style="font-family:var(--mono); font-weight:400; font-size:11px; color:var(--slate);">· ${esc(t.years)}</span>${t.grade?` <span style="font-family:var(--mono); font-size:10.5px; font-weight:700; color:var(--amber-deep);">${esc(t.grade)}</span>`:''}</div>
         <div class="card-org">${esc(t.role_title)}${t.verified?' · 인증됨':''}${t.proposed?' · <span style="color:var(--cyan)">제안완료</span>':''}</div></div>
       </div>
     </div>
@@ -723,12 +723,17 @@ async function uploadResume(input){
     const data = await res.json();
     if(!res.ok) throw new Error(data.error || '업로드 실패');
     toast('경력기술서가 업로드됐어요');
-    go('profileEdit');
+    const section = document.getElementById('pf-resume-section');
+    if(section) section.innerHTML = resumeSectionHtml(data.resume_url, data.resume_original_name);
   }catch(e){ toast(e.message); }
 }
 async function deleteResume(){
-  try{ await apiFetch('/profile/resume', {method:'DELETE'}); toast('삭제했어요'); go('profileEdit'); }
-  catch(e){ toast(e.message); }
+  try{
+    const data = await apiFetch('/profile/resume', {method:'DELETE'});
+    toast('삭제했어요');
+    const section = document.getElementById('pf-resume-section');
+    if(section) section.innerHTML = resumeSectionHtml(data.resume_url, null);
+  }catch(e){ toast(e.message); }
 }
 
 async function advanceStage(id, nextStage){
@@ -798,6 +803,7 @@ async function saveProfile(){
     await apiFetch('/profile', {method:'PUT', body:{
       name: document.getElementById('pf-name').value.trim(),
       role_title: document.getElementById('pf-role').value.trim(),
+      grade: document.getElementById('pf-grade').value,
       rate: document.getElementById('pf-rate').value.trim(),
       stack: pendingStack,
     }});
@@ -1089,6 +1095,7 @@ async function screenTalentDetail(){
     <div class="kv-grid">
       <div class="kv-box"><div class="kv-lbl">희망단가</div><div class="kv-val">${esc(t.rate)}</div></div>
       <div class="kv-box"><div class="kv-lbl">경력</div><div class="kv-val">${esc(t.years)}</div></div>
+      ${t.grade?`<div class="kv-box"><div class="kv-lbl">등급</div><div class="kv-val">${esc(t.grade)}</div></div>`:''}
     </div>
     <div class="section-label">보유 기술스택</div>
     <div class="tag-row">${t.stack.map(s=>`<span class="tag on">${esc(s)}</span>`).join('')}</div>
@@ -1356,7 +1363,11 @@ async function screenProfileEdit(){
   <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('mypage')">${I.back}</div><div class="page-title">프로필 수정</div></div></div>
   <div class="content">
     <div class="form-field"><label class="form-label">이름</label><input id="pf-name" class="form-input" value="${esc(p.name)}"></div>
-    <div class="form-field"><label class="form-label">직무</label><input id="pf-role" class="form-input" value="${esc(p.role_title)}"></div>
+    <div class="form-field"><label class="form-label">업무</label><input id="pf-role" class="form-input" value="${esc(p.role_title)}"></div>
+    <div class="form-field"><label class="form-label">등급</label><select id="pf-grade" class="form-input">
+      <option value="">선택 안 함</option>
+      ${['초급','중급','고급','특급'].map(g=>`<option value="${g}" ${p.grade===g?'selected':''}>${g}</option>`).join('')}
+    </select></div>
     <div class="form-field"><label class="form-label">희망 단가</label><input id="pf-rate" class="form-input" value="${esc(p.rate)}"></div>
     <div class="form-field">
       <label class="form-label">기술스택</label>
@@ -1365,23 +1376,26 @@ async function screenProfileEdit(){
     </div>
     <div class="form-field">
       <label class="form-label">경력기술서</label>
-      ${p.resume_url ? `
-        <div class="card" style="margin-bottom:0; display:flex; align-items:center; justify-content:space-between; gap:10px;">
-          <div style="min-width:0;"><div class="card-title" style="font-size:13px;">📄 ${esc(p.resume_original_name || '경력기술서')}</div><div class="card-org">업로드 완료</div></div>
-          <div style="display:flex; gap:6px; flex:0 0 auto;">
-            <a href="${fileUrl(p.resume_url)}" target="_blank" class="btn btn-outline" style="width:auto; padding:9px 12px; font-size:12px;">보기</a>
-            <button class="btn btn-outline" style="width:auto; padding:9px 12px; font-size:12px;" onclick="deleteResume()">삭제</button>
-          </div>
-        </div>
-        <div class="add-tag-row" style="margin-top:8px;"><label class="btn btn-ghost" style="width:auto; padding:10px 14px; font-size:12.5px;">다른 파일로 교체<input type="file" accept="application/pdf" style="display:none;" onchange="uploadResume(this)"></label></div>
-      ` : `
-        <label class="btn btn-outline" style="cursor:pointer;">파일 선택해서 업로드<input type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.hwp" style="display:none;" onchange="uploadResume(this)"></label>
-        <div class="page-sub" style="margin-top:6px;">PDF, Word, PPT, 한글(HWP) · 최대 15MB</div>
-      `}
+      <div id="pf-resume-section">${resumeSectionHtml(p.resume_url, p.resume_original_name)}</div>
     </div>
     <button class="btn btn-primary" onclick="saveProfile()">저장하기</button>
     <div style="height:20px;"></div>
   </div>`;
+}
+function resumeSectionHtml(resumeUrl, resumeName){
+  return resumeUrl ? `
+    <div class="card" style="margin-bottom:0; display:flex; align-items:center; justify-content:space-between; gap:10px;">
+      <div style="min-width:0;"><div class="card-title" style="font-size:13px;">📄 ${esc(resumeName || '경력기술서')}</div><div class="card-org">업로드 완료</div></div>
+      <div style="display:flex; gap:6px; flex:0 0 auto;">
+        <a href="${fileUrl(resumeUrl)}" target="_blank" class="btn btn-outline" style="width:auto; padding:9px 12px; font-size:12px;">보기</a>
+        <button class="btn btn-outline" style="width:auto; padding:9px 12px; font-size:12px;" onclick="deleteResume()">삭제</button>
+      </div>
+    </div>
+    <div class="add-tag-row" style="margin-top:8px;"><label class="btn btn-ghost" style="width:auto; padding:10px 14px; font-size:12.5px;">다른 파일로 교체<input type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.hwp" style="display:none;" onchange="uploadResume(this)"></label></div>
+  ` : `
+    <label class="btn btn-outline" style="cursor:pointer;">파일 선택해서 업로드<input type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.hwp" style="display:none;" onchange="uploadResume(this)"></label>
+    <div class="page-sub" style="margin-top:6px;">PDF, Word, PPT, 한글(HWP) · 최대 15MB</div>
+  `;
 }
 
 async function screenCompanyProfileEdit(){

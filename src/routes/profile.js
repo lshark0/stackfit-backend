@@ -60,6 +60,12 @@ function isValidDocument(filePath, ext) {
 
 const clamp = (v, max, fallback = '') => (typeof v === 'string' ? v.slice(0, max) : fallback);
 
+// multer/busboy가 multipart 파일명을 기본적으로 latin1로 잘못 해석해서, 한글 등
+// 비-ASCII 파일명이 깨지는 문제(글자 깨짐)를 바로잡습니다. (Node.js/multer의 잘 알려진 이슈)
+function fixFilenameEncoding(name) {
+  try { return Buffer.from(name, 'latin1').toString('utf8'); } catch (e) { return name; }
+}
+
 // 이력서(프로필) 열람현황 — 어떤 기업이 언제 내 프로필을 봤는지 (잡코리아 스타일)
 router.get('/views', requireAuth, requireRole('freelancer'), async (req, res) => {
   const rows = await all(
@@ -89,7 +95,7 @@ router.get('/', requireAuth, async (req, res) => {
 
 router.put('/', requireAuth, async (req, res) => {
   if (req.user.role === 'freelancer') {
-    const { name, role_title, years, rate, stack, summary } = req.body || {};
+    const { name, role_title, years, rate, stack, summary, grade } = req.body || {};
     const current = await get('SELECT * FROM freelancer_profiles WHERE user_id = ?', [req.user.id]);
 
     let nextStack = Array.isArray(stack) ? stack : JSON.parse(current.stack_json);
@@ -98,9 +104,12 @@ router.put('/', requireAuth, async (req, res) => {
       .slice(0, 20)
       .map((s) => s.trim().slice(0, 40));
 
+    const GRADE_OPTIONS = ['초급', '중급', '고급', '특급'];
+    const nextGrade = grade === undefined ? current.grade : (GRADE_OPTIONS.includes(grade) ? grade : null);
+
     const completion = Math.min(100, 50 + nextStack.length * 5 + (summary ? 10 : 0) + (current.verified ? 10 : 0));
     await run(
-      `UPDATE freelancer_profiles SET name=?, role_title=?, years=?, rate=?, stack_json=?, summary=?, completion=? WHERE user_id=?`,
+      `UPDATE freelancer_profiles SET name=?, role_title=?, years=?, rate=?, stack_json=?, summary=?, grade=?, completion=? WHERE user_id=?`,
       [
         name !== undefined ? clamp(name, 60, current.name) : current.name,
         role_title !== undefined ? clamp(role_title, 60, current.role_title) : current.role_title,
@@ -108,6 +117,7 @@ router.put('/', requireAuth, async (req, res) => {
         rate !== undefined ? clamp(rate, 40, current.rate) : current.rate,
         JSON.stringify(nextStack),
         summary !== undefined ? clamp(summary, 2000, current.summary) : current.summary,
+        nextGrade,
         completion,
         req.user.id,
       ]
@@ -145,13 +155,14 @@ router.post('/resume', requireAuth, requireRole('freelancer'), (req, res) => {
       const oldPath = path.join(UPLOAD_DIR, current.resume_filename);
       fs.unlink(oldPath, () => {});
     }
+    const originalName = fixFilenameEncoding(req.file.originalname);
     const completion = Math.min(100, current.completion + (current.resume_filename ? 0 : 10));
     await run('UPDATE freelancer_profiles SET resume_filename=?, resume_original_name=?, completion=? WHERE user_id=?', [
-      req.file.filename, clamp(req.file.originalname, 200, 'resume.pdf'), completion, req.user.id,
+      req.file.filename, clamp(originalName, 200, 'resume.pdf'), completion, req.user.id,
     ]);
     res.status(201).json({
       resume_url: signedFileUrl(req.file.filename),
-      resume_original_name: req.file.originalname,
+      resume_original_name: originalName,
       completion,
     });
   });
