@@ -444,7 +444,7 @@ function ratingBadge(avg, count){
 function jobCard(j){
   return `<div class="card clickable" onclick="go('jobDetail', ${j.id})">
     <div class="card-top">
-      <div><div class="card-title">${esc(j.title)}</div><div class="card-org">${esc(j.org)}${j.applied?' · <span style="color:var(--cyan)">지원완료</span>':''}</div></div>
+      <div><div class="card-title">${esc(j.title)}${j.duty?` <span style="font-family:var(--mono); font-size:10.5px; font-weight:700; color:var(--cyan);">${esc(j.duty)}</span>`:''}${j.grade?` <span style="font-family:var(--mono); font-size:10.5px; font-weight:700; color:var(--amber-deep);">${esc(j.grade)}</span>`:''}</div><div class="card-org">${esc(j.org)}${j.applied?' · <span style="color:var(--cyan)">지원완료</span>':''}</div></div>
       <div class="star-btn ${j.saved?'filled':''}" onclick="toggleSaveJob(${j.id}, event)">${I.star}</div>
     </div>
     <div class="tag-row">${j.stack.map(s=>`<span class="tag">${esc(s)}</span>`).join('')}</div>
@@ -819,6 +819,8 @@ async function postJob(){
       rate: document.getElementById('pj-rate').value.trim(),
       work_type: document.getElementById('pj-type').value.trim(),
       location: document.getElementById('pj-location').value.trim(),
+      duty: document.getElementById('pj-duty').value,
+      grade: document.getElementById('pj-grade').value,
       deadline: document.getElementById('pj-deadline').value.trim(),
       description: document.getElementById('pj-desc').value.trim(),
     }});
@@ -840,6 +842,8 @@ async function updateJob(id){
       rate: document.getElementById('pj-rate').value.trim(),
       work_type: document.getElementById('pj-type').value.trim(),
       location: document.getElementById('pj-location').value.trim(),
+      duty: document.getElementById('pj-duty').value,
+      grade: document.getElementById('pj-grade').value,
       deadline: document.getElementById('pj-deadline').value.trim(),
       description: document.getElementById('pj-desc').value.trim(),
     }});
@@ -1041,6 +1045,8 @@ async function screenJobDetail(){
       <div class="kv-box"><div class="kv-lbl">기간</div><div class="kv-val">${esc(j.period)}</div></div>
       <div class="kv-box"><div class="kv-lbl">근무형태</div><div class="kv-val">${esc(j.work_type)}</div></div>
       <div class="kv-box"><div class="kv-lbl">근무지</div><div class="kv-val">${esc(j.location)}</div></div>
+      ${j.duty?`<div class="kv-box"><div class="kv-lbl">업무</div><div class="kv-val">${esc(j.duty)}</div></div>`:''}
+      ${j.grade?`<div class="kv-box"><div class="kv-lbl">등급</div><div class="kv-val">${esc(j.grade)}</div></div>`:''}
       <div class="kv-box"><div class="kv-lbl">지원마감</div><div class="kv-val">${ddayBadge(j.d_day) || esc(j.d_day)}</div></div>
     </div>
     <div class="section-label">요구 기술스택</div>
@@ -1428,6 +1434,14 @@ async function screenJobPost(){
     <div class="form-field"><label class="form-label">단가</label><input id="pj-rate" class="form-input" placeholder="예: 600만원/월" value="${job?esc(job.rate):''}"></div>
     <div class="form-field"><label class="form-label">근무 형태</label><input id="pj-type" class="form-input" placeholder="예: 상주 · 주5일" value="${job?esc(job.work_type):''}"></div>
     <div class="form-field"><label class="form-label">근무지</label><input id="pj-location" class="form-input" placeholder="예: 서울 종로, 원격 가능" value="${job?esc(job.location):''}"></div>
+    <div class="form-field"><label class="form-label">업무</label><select id="pj-duty" class="form-input">
+      <option value="">선택 안 함</option>
+      ${['PM','PL','TA','SA','DBA','개발자','QA','보안','감리','기타'].map(d=>`<option value="${d}" ${job&&job.duty===d?'selected':''}>${d}</option>`).join('')}
+    </select></div>
+    <div class="form-field"><label class="form-label">등급</label><select id="pj-grade" class="form-input">
+      <option value="">선택 안 함</option>
+      ${['초급','중급','고급','특급'].map(g=>`<option value="${g}" ${job&&job.grade===g?'selected':''}>${g}</option>`).join('')}
+    </select></div>
     <div class="form-field"><label class="form-label">지원 마감일 (선택)</label><input id="pj-deadline" class="form-input" type="date" value="${job&&job.deadline?job.deadline:''}"></div>
     <div class="form-field"><label class="form-label">상세 내용</label><textarea id="pj-desc" class="form-input" placeholder="업무 범위, 우대사항 등을 입력하세요">${job?esc(job.description):''}</textarea></div>
     <button class="btn btn-primary" onclick="${isEdit?`updateJob(${state.param})`:'postJob()'}">${isEdit?'수정 완료':'공고 등록하기'}</button>

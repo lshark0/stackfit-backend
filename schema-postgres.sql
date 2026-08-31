@@ -46,6 +46,8 @@ CREATE TABLE IF NOT EXISTS jobs (
   description TEXT NOT NULL DEFAULT '',
   status      TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','closed')),
   deadline    TEXT,
+  duty        TEXT,
+  grade       TEXT,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

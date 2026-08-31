@@ -6,6 +6,11 @@ const { verifyToken } = require('../auth');
 const { computeMatch } = require('../match');
 const { getRatingSummary } = require('../ratings');
 
+// SI/공공 프로젝트에서 흔히 쓰는 업무 구분과 기술등급
+const DUTY_OPTIONS = ['PM', 'PL', 'TA', 'SA', 'DBA', '개발자', 'QA', '보안', '감리', '기타'];
+const GRADE_OPTIONS = ['초급', '중급', '고급', '특급'];
+const pickFrom = (value, options, fallback) => (options.includes(value) ? value : fallback);
+
 const router = express.Router();
 wrapAllRoutes(router);
 
@@ -101,7 +106,7 @@ router.get('/:id', optionalAuth, async (req, res) => {
 });
 
 router.post('/', requireAuth, requireRole('company'), async (req, res) => {
-  const { title, stack, period, rate, work_type, location, category, description, deadline } = req.body || {};
+  const { title, stack, period, rate, work_type, location, category, description, deadline, duty, grade } = req.body || {};
   if (!title || typeof title !== 'string' || !title.trim()) {
     return res.status(400).json({ error: '공고 제목은 필수입니다.' });
   }
@@ -113,8 +118,8 @@ router.post('/', requireAuth, requireRole('company'), async (req, res) => {
   const safeDeadline = typeof deadline === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(deadline.trim()) ? deadline.trim() : null;
 
   const r = await run(
-    `INSERT INTO jobs (company_id, title, stack_json, period, rate, work_type, location, category, description, deadline)
-     VALUES (?,?,?,?,?,?,?,?,?,?)`,
+    `INSERT INTO jobs (company_id, title, stack_json, period, rate, work_type, location, category, description, deadline, duty, grade)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
     [
       req.user.id,
       clamp(title, 120, title.trim()),
@@ -126,6 +131,8 @@ router.post('/', requireAuth, requireRole('company'), async (req, res) => {
       clamp(category, 20, '인프라'),
       clamp(description, 3000, ''),
       safeDeadline,
+      pickFrom(duty, DUTY_OPTIONS, null),
+      pickFrom(grade, GRADE_OPTIONS, null),
     ]
   );
   const job = await get('SELECT * FROM jobs WHERE id = ?', [r.lastInsertRowid]);
@@ -140,7 +147,7 @@ router.put('/:id', requireAuth, requireRole('company'), async (req, res) => {
   const job = await get('SELECT * FROM jobs WHERE id = ? AND company_id = ?', [jobId, req.user.id]);
   if (!job) return res.status(404).json({ error: '공고를 찾을 수 없거나 수정 권한이 없어요.' });
 
-  const { title, stack, period, rate, work_type, location, category, description, deadline } = req.body || {};
+  const { title, stack, period, rate, work_type, location, category, description, deadline, duty, grade } = req.body || {};
   if (!title || typeof title !== 'string' || !title.trim()) {
     return res.status(400).json({ error: '공고 제목은 필수입니다.' });
   }
@@ -152,9 +159,11 @@ router.put('/:id', requireAuth, requireRole('company'), async (req, res) => {
   const safeDeadline =
     deadline === undefined ? job.deadline
       : (typeof deadline === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(deadline.trim()) ? deadline.trim() : null);
+  const safeDuty = duty === undefined ? job.duty : pickFrom(duty, DUTY_OPTIONS, null);
+  const safeGrade = grade === undefined ? job.grade : pickFrom(grade, GRADE_OPTIONS, null);
 
   await run(
-    `UPDATE jobs SET title=?, stack_json=?, period=?, rate=?, work_type=?, location=?, category=?, description=?, deadline=? WHERE id=?`,
+    `UPDATE jobs SET title=?, stack_json=?, period=?, rate=?, work_type=?, location=?, category=?, description=?, deadline=?, duty=?, grade=? WHERE id=?`,
     [
       clamp(title, 120, job.title),
       JSON.stringify(safeStack),
@@ -165,6 +174,8 @@ router.put('/:id', requireAuth, requireRole('company'), async (req, res) => {
       clamp(category, 20, job.category),
       clamp(description, 3000, job.description),
       safeDeadline,
+      safeDuty,
+      safeGrade,
       jobId,
     ]
   );
