@@ -818,12 +818,33 @@ async function postJob(){
       period: document.getElementById('pj-period').value.trim(),
       rate: document.getElementById('pj-rate').value.trim(),
       work_type: document.getElementById('pj-type').value.trim(),
+      location: document.getElementById('pj-location').value.trim(),
       deadline: document.getElementById('pj-deadline').value.trim(),
       description: document.getElementById('pj-desc').value.trim(),
     }});
     toast('공고가 등록됐어요');
     jobQuery=''; jobCat='전체';
     go('jobs');
+  }catch(e){ toast(e.message); }
+}
+async function updateJob(id){
+  const title = document.getElementById('pj-title').value.trim();
+  if(!title){ toast('공고 제목을 입력해주세요'); return; }
+  const stackRaw = document.getElementById('pj-stack').value.trim();
+  const stack = stackRaw ? stackRaw.split(',').map(s=>s.trim()).filter(Boolean) : [];
+  try{
+    await apiFetch('/jobs/'+id, {method:'PUT', body:{
+      title,
+      stack,
+      period: document.getElementById('pj-period').value.trim(),
+      rate: document.getElementById('pj-rate').value.trim(),
+      work_type: document.getElementById('pj-type').value.trim(),
+      location: document.getElementById('pj-location').value.trim(),
+      deadline: document.getElementById('pj-deadline').value.trim(),
+      description: document.getElementById('pj-desc').value.trim(),
+    }});
+    toast('공고가 수정됐어요');
+    go('jobDetail', id);
   }catch(e){ toast(e.message); }
 }
 
@@ -1029,7 +1050,7 @@ async function screenJobDetail(){
     <div style="height:90px;"></div>
   </div>
   <div style="position:absolute; left:0; right:0; bottom:0; padding:14px 20px 22px; background:var(--paper); border-top:1px solid var(--line); display:flex; gap:10px;">
-    ${isCompany? `<div class="star-btn" style="width:52px;height:52px;border-radius:12px; color:var(--danger); border-color:#F3D6D2;" onclick="deleteJob(${j.id})">${I.trash}</div><button class="btn btn-outline" onclick="go('jobs')">목록으로</button><button class="btn btn-primary" onclick="go('applicants', ${j.id})">지원자 ${j.applicantCount||0}명</button>`
+    ${isCompany? `<div class="star-btn" style="width:52px;height:52px;border-radius:12px; color:var(--danger); border-color:#F3D6D2;" onclick="deleteJob(${j.id})">${I.trash}</div><button class="btn btn-outline" onclick="go('jobPost', ${j.id})">수정</button><button class="btn btn-primary" onclick="go('applicants', ${j.id})">지원자 ${j.applicantCount||0}명</button>`
     : `<div class="star-btn ${j.saved?'filled':''}" style="width:52px;height:52px;border-radius:12px;" onclick="toggleSaveJob(${j.id}, event)">${I.star}</div>
        <button class="btn btn-outline" style="flex:0 0 auto; width:auto; padding:13px 16px;" onclick="startChatWithCompany(${j.company_id})">채팅</button>
        <button class="btn ${j.applied?'btn-outline':'btn-primary'}" onclick="${j.applied?`cancelApplication(${j.id})`:`applyToJob(${j.id})`}">${j.applied?'지원 취소':'지원하기'}</button>`}
@@ -1395,18 +1416,21 @@ async function screenAlerts(){
   </div>`;
 }
 
-function screenJobPost(){
+async function screenJobPost(){
+  const isEdit = !!state.param;
+  const job = isEdit ? await apiFetch('/jobs/' + state.param) : null;
   return `${statusbar()}
-  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('jobs')">${I.back}</div><div class="page-title">새 공고 등록</div></div></div>
+  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('${isEdit?'jobDetail':'jobs'}'${isEdit?`, ${state.param}`:''})">${I.back}</div><div class="page-title">${isEdit?'공고 수정':'새 공고 등록'}</div></div></div>
   <div class="content">
-    <div class="form-field"><label class="form-label">공고 제목</label><input id="pj-title" class="form-input" placeholder="예: 클라우드 전환 인프라 아키텍트"></div>
-    <div class="form-field"><label class="form-label">필요 기술스택 (콤마로 구분)</label><input id="pj-stack" class="form-input" placeholder="예: AWS, Kubernetes, VMware"></div>
-    <div class="form-field"><label class="form-label">근무 기간</label><input id="pj-period" class="form-input" placeholder="예: 6개월"></div>
-    <div class="form-field"><label class="form-label">단가</label><input id="pj-rate" class="form-input" placeholder="예: 600만원/월"></div>
-    <div class="form-field"><label class="form-label">근무 형태</label><input id="pj-type" class="form-input" placeholder="예: 상주 · 주5일"></div>
-    <div class="form-field"><label class="form-label">지원 마감일 (선택)</label><input id="pj-deadline" class="form-input" type="date"></div>
-    <div class="form-field"><label class="form-label">상세 내용</label><textarea id="pj-desc" class="form-input" placeholder="업무 범위, 우대사항 등을 입력하세요"></textarea></div>
-    <button class="btn btn-primary" onclick="postJob()">공고 등록하기</button>
+    <div class="form-field"><label class="form-label">공고 제목</label><input id="pj-title" class="form-input" placeholder="예: 클라우드 전환 인프라 아키텍트" value="${job?esc(job.title):''}"></div>
+    <div class="form-field"><label class="form-label">필요 기술스택 (콤마로 구분)</label><input id="pj-stack" class="form-input" placeholder="예: AWS, Kubernetes, VMware" value="${job?esc(job.stack.join(', ')):''}"></div>
+    <div class="form-field"><label class="form-label">근무 기간</label><input id="pj-period" class="form-input" placeholder="예: 6개월" value="${job?esc(job.period):''}"></div>
+    <div class="form-field"><label class="form-label">단가</label><input id="pj-rate" class="form-input" placeholder="예: 600만원/월" value="${job?esc(job.rate):''}"></div>
+    <div class="form-field"><label class="form-label">근무 형태</label><input id="pj-type" class="form-input" placeholder="예: 상주 · 주5일" value="${job?esc(job.work_type):''}"></div>
+    <div class="form-field"><label class="form-label">근무지</label><input id="pj-location" class="form-input" placeholder="예: 서울 종로, 원격 가능" value="${job?esc(job.location):''}"></div>
+    <div class="form-field"><label class="form-label">지원 마감일 (선택)</label><input id="pj-deadline" class="form-input" type="date" value="${job&&job.deadline?job.deadline:''}"></div>
+    <div class="form-field"><label class="form-label">상세 내용</label><textarea id="pj-desc" class="form-input" placeholder="업무 범위, 우대사항 등을 입력하세요">${job?esc(job.description):''}</textarea></div>
+    <button class="btn btn-primary" onclick="${isEdit?`updateJob(${state.param})`:'postJob()'}">${isEdit?'수정 완료':'공고 등록하기'}</button>
     <div style="height:20px;"></div>
   </div>`;
 }

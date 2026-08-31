@@ -132,6 +132,46 @@ router.post('/', requireAuth, requireRole('company'), async (req, res) => {
   res.status(201).json(await withCompanyAndStack(job));
 });
 
+// 공고 수정 (기업 전용, 본인이 등록한 공고만)
+router.put('/:id', requireAuth, requireRole('company'), async (req, res) => {
+  const jobId = Number(req.params.id);
+  if (!Number.isInteger(jobId)) return res.status(400).json({ error: '올바르지 않은 공고 ID입니다.' });
+
+  const job = await get('SELECT * FROM jobs WHERE id = ? AND company_id = ?', [jobId, req.user.id]);
+  if (!job) return res.status(404).json({ error: '공고를 찾을 수 없거나 수정 권한이 없어요.' });
+
+  const { title, stack, period, rate, work_type, location, category, description, deadline } = req.body || {};
+  if (!title || typeof title !== 'string' || !title.trim()) {
+    return res.status(400).json({ error: '공고 제목은 필수입니다.' });
+  }
+  const clamp = (v, max, fallback) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : fallback);
+  const safeStack = Array.isArray(stack)
+    ? stack.filter((s) => typeof s === 'string' && s.trim()).slice(0, 20).map((s) => s.trim().slice(0, 40))
+    : JSON.parse(job.stack_json);
+  // 마감일: 빈 문자열이면 '상시채용'으로 되돌림(null), 유효한 날짜면 반영, 값이 아예 없으면 기존 값 유지
+  const safeDeadline =
+    deadline === undefined ? job.deadline
+      : (typeof deadline === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(deadline.trim()) ? deadline.trim() : null);
+
+  await run(
+    `UPDATE jobs SET title=?, stack_json=?, period=?, rate=?, work_type=?, location=?, category=?, description=?, deadline=? WHERE id=?`,
+    [
+      clamp(title, 120, job.title),
+      JSON.stringify(safeStack),
+      clamp(period, 40, job.period),
+      clamp(rate, 40, job.rate),
+      clamp(work_type, 40, job.work_type),
+      clamp(location, 40, job.location),
+      clamp(category, 20, job.category),
+      clamp(description, 3000, job.description),
+      safeDeadline,
+      jobId,
+    ]
+  );
+  const updated = await get('SELECT * FROM jobs WHERE id = ?', [jobId]);
+  res.json(await withCompanyAndStack(updated));
+});
+
 // 공고 저장(즐겨찾기) 토글
 router.post('/:id/save', requireAuth, requireRole('freelancer'), async (req, res) => {
   const jobId = Number(req.params.id);
