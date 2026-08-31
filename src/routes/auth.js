@@ -36,7 +36,7 @@ router.post('/signup', async (req, res) => {
   const userId = Number(r.lastInsertRowid);
 
   if (role === 'freelancer') {
-    await run('INSERT INTO freelancer_profiles (user_id, name) VALUES (?,?)', [userId, (name || '이름 미입력').slice(0, 60)]);
+    await run('INSERT INTO freelancer_profiles (user_id, name, completion) VALUES (?,?,20)', [userId, (name || '이름 미입력').slice(0, 60)]);
   } else {
     await run('INSERT INTO companies (user_id, name) VALUES (?,?)', [userId, (companyName || '회사명 미입력').slice(0, 60)]);
   }

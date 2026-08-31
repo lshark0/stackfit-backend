@@ -100,7 +100,7 @@ router.post('/finish', async (req, res) => {
   const safeName = (name || payload.name || '이름 미입력').toString().trim().slice(0, 60) || '이름 미입력';
 
   if (role === 'freelancer') {
-    await run('INSERT INTO freelancer_profiles (user_id, name) VALUES (?,?)', [userId, safeName]);
+    await run('INSERT INTO freelancer_profiles (user_id, name, completion) VALUES (?,?,20)', [userId, safeName]);
   } else {
     await run('INSERT INTO companies (user_id, name) VALUES (?,?)', [userId, safeName]);
   }

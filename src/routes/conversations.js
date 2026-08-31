@@ -28,7 +28,14 @@ router.get('/', requireAuth, async (req, res) => {
        AND created_at > COALESCE((SELECT MAX(created_at) FROM messages WHERE conversation_id=? AND sender_id=?), '1970-01-01')`,
       [c.id, req.user.id, c.id, req.user.id]
     );
-    result.push({ ...c, name: await counterpartName(c, req.user.role), lastMessage: last, unread: Number(unreadRow.n) });
+    const jobTitle = c.job_id ? (await get('SELECT title FROM jobs WHERE id = ?', [c.job_id])) : null;
+    result.push({
+      ...c,
+      name: await counterpartName(c, req.user.role),
+      jobTitle: jobTitle ? jobTitle.title : null,
+      lastMessage: last,
+      unread: Number(unreadRow.n),
+    });
   }
 
   res.json({ conversations: result });

@@ -682,8 +682,8 @@ async function startChatWithTalent(freelancerId){
   try{ const conv = await apiFetch('/conversations', {method:'POST', body:{freelancerId}}); go('chatRoom', conv.id); }
   catch(e){ toast(e.message); }
 }
-async function startChatWithCompany(companyId){
-  try{ const conv = await apiFetch('/conversations', {method:'POST', body:{companyId}}); go('chatRoom', conv.id); }
+async function startChatWithCompany(companyId, jobId){
+  try{ const conv = await apiFetch('/conversations', {method:'POST', body:{companyId, jobId: jobId||null}}); go('chatRoom', conv.id); }
   catch(e){ toast(e.message); }
 }
 async function sendMessage(convId){
@@ -805,6 +805,7 @@ async function saveProfile(){
       role_title: document.getElementById('pf-role').value.trim(),
       grade: document.getElementById('pf-grade').value,
       rate: document.getElementById('pf-rate').value.trim(),
+      summary: document.getElementById('pf-summary').value.trim(),
       stack: pendingStack,
     }});
     toast('프로필이 저장됐어요');
@@ -1064,7 +1065,7 @@ async function screenJobDetail(){
   <div style="position:absolute; left:0; right:0; bottom:0; padding:14px 20px 22px; background:var(--paper); border-top:1px solid var(--line); display:flex; gap:10px;">
     ${isCompany? `<div class="star-btn" style="width:52px;height:52px;border-radius:12px; color:var(--danger); border-color:#F3D6D2;" onclick="deleteJob(${j.id})">${I.trash}</div><button class="btn btn-outline" onclick="go('jobPost', ${j.id})">수정</button><button class="btn btn-primary" onclick="go('applicants', ${j.id})">지원자 ${j.applicantCount||0}명</button>`
     : `<div class="star-btn ${j.saved?'filled':''}" style="width:52px;height:52px;border-radius:12px;" onclick="toggleSaveJob(${j.id}, event)">${I.star}</div>
-       <button class="btn btn-outline" style="flex:0 0 auto; width:auto; padding:13px 16px;" onclick="startChatWithCompany(${j.company_id})">채팅</button>
+       <button class="btn btn-outline" style="flex:0 0 auto; width:auto; padding:13px 16px;" onclick="startChatWithCompany(${j.company_id}, ${j.id})">채팅</button>
        <button class="btn ${j.applied?'btn-outline':'btn-primary'}" onclick="${j.applied?`cancelApplication(${j.id})`:`applyToJob(${j.id})`}">${j.applied?'지원 취소':'지원하기'}</button>`}
   </div>`;
 }
@@ -1223,7 +1224,7 @@ async function screenChatList(){
     ${data.conversations.map(c=>`
       <div class="chat-row" onclick="go('chatRoom', ${c.id})">
         <div class="avatar">${esc((c.name||'?')[0])}</div>
-        <div class="chat-body"><div class="chat-name">${esc(c.name)}<span class="chat-time">${c.lastMessage? new Date(c.lastMessage.created_at).toLocaleString('ko-KR',{hour:'numeric',minute:'2-digit'}) : ''}</span></div>
+        <div class="chat-body"><div class="chat-name">${esc(c.name)}${c.jobTitle?` <span style="font-family:var(--mono); font-weight:400; font-size:11px; color:var(--slate);">· ${esc(c.jobTitle)}</span>`:''}<span class="chat-time">${c.lastMessage? new Date(c.lastMessage.created_at).toLocaleString('ko-KR',{hour:'numeric',minute:'2-digit'}) : ''}</span></div>
         <div class="chat-preview">${c.lastMessage? esc(c.lastMessage.body) : '대화를 시작해보세요'}</div></div>
         ${c.unread? `<div class="unread">${c.unread}</div>`:''}
       </div>`).join('') || emptyHtml('아직 채팅이 없어요', I.chat)}
@@ -1373,6 +1374,10 @@ async function screenProfileEdit(){
       <label class="form-label">기술스택</label>
       <div class="tag-row" id="pf-tags">${pendingStack.map((s,i)=>`<span class="tag on rm" onclick="removeProfileTag(${i})">${esc(s)} ${I.x}</span>`).join('')}</div>
       <div class="add-tag-row"><input id="pf-newtag" class="form-input" placeholder="기술스택 추가 후 Enter" onkeydown="if(event.key==='Enter'){event.preventDefault();addProfileTag();}"><button class="btn btn-outline" style="width:auto; padding:12px 16px;" onclick="addProfileTag()">추가</button></div>
+    </div>
+    <div class="form-field">
+      <label class="form-label">자기소개</label>
+      <textarea id="pf-summary" class="form-input" placeholder="경력, 강점, 주요 프로젝트 경험 등을 간단히 소개해주세요">${esc(p.summary||'')}</textarea>
     </div>
     <div class="form-field">
       <label class="form-label">경력기술서</label>

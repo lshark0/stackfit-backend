@@ -66,6 +66,19 @@ function fixFilenameEncoding(name) {
   try { return Buffer.from(name, 'latin1').toString('utf8'); } catch (e) { return name; }
 }
 
+// 프로필 완성도: 사용자가 화면에서 실제로 채울 수 있는 항목만으로 100%에 도달 가능하도록 설계
+// (기존엔 사용자가 입력할 수 없는 '인증' 뱃지가 10%를 차지해 100% 달성이 구조적으로 불가능했음)
+function computeCompletion({ role_title, grade, rate, summary, stackCount, hasResume }) {
+  let score = 20; // 이름은 가입 시 항상 있음
+  if (role_title) score += 10;
+  if (grade) score += 10;
+  if (rate) score += 10;
+  if (summary) score += 15;
+  if (hasResume) score += 15;
+  score += Math.min(stackCount, 4) * 5; // 기술스택 4개부터 만점(20)
+  return Math.min(100, score);
+}
+
 // 이력서(프로필) 열람현황 — 어떤 기업이 언제 내 프로필을 봤는지 (잡코리아 스타일)
 router.get('/views', requireAuth, requireRole('freelancer'), async (req, res) => {
   const rows = await all(
@@ -106,17 +119,23 @@ router.put('/', requireAuth, async (req, res) => {
 
     const GRADE_OPTIONS = ['초급', '중급', '고급', '특급'];
     const nextGrade = grade === undefined ? current.grade : (GRADE_OPTIONS.includes(grade) ? grade : null);
+    const nextRoleTitle = role_title !== undefined ? clamp(role_title, 60, current.role_title) : current.role_title;
+    const nextRate = rate !== undefined ? clamp(rate, 40, current.rate) : current.rate;
+    const nextSummary = summary !== undefined ? clamp(summary, 2000, current.summary) : current.summary;
 
-    const completion = Math.min(100, 50 + nextStack.length * 5 + (summary ? 10 : 0) + (current.verified ? 10 : 0));
+    const completion = computeCompletion({
+      role_title: nextRoleTitle, grade: nextGrade, rate: nextRate, summary: nextSummary,
+      stackCount: nextStack.length, hasResume: !!current.resume_filename,
+    });
     await run(
       `UPDATE freelancer_profiles SET name=?, role_title=?, years=?, rate=?, stack_json=?, summary=?, grade=?, completion=? WHERE user_id=?`,
       [
         name !== undefined ? clamp(name, 60, current.name) : current.name,
-        role_title !== undefined ? clamp(role_title, 60, current.role_title) : current.role_title,
+        nextRoleTitle,
         years !== undefined ? clamp(years, 20, current.years) : current.years,
-        rate !== undefined ? clamp(rate, 40, current.rate) : current.rate,
+        nextRate,
         JSON.stringify(nextStack),
-        summary !== undefined ? clamp(summary, 2000, current.summary) : current.summary,
+        nextSummary,
         nextGrade,
         completion,
         req.user.id,
@@ -156,7 +175,10 @@ router.post('/resume', requireAuth, requireRole('freelancer'), (req, res) => {
       fs.unlink(oldPath, () => {});
     }
     const originalName = fixFilenameEncoding(req.file.originalname);
-    const completion = Math.min(100, current.completion + (current.resume_filename ? 0 : 10));
+    const completion = computeCompletion({
+      role_title: current.role_title, grade: current.grade, rate: current.rate, summary: current.summary,
+      stackCount: JSON.parse(current.stack_json).length, hasResume: true,
+    });
     await run('UPDATE freelancer_profiles SET resume_filename=?, resume_original_name=?, completion=? WHERE user_id=?', [
       req.file.filename, clamp(originalName, 200, 'resume.pdf'), completion, req.user.id,
     ]);
@@ -173,8 +195,12 @@ router.delete('/resume', requireAuth, requireRole('freelancer'), async (req, res
   if (current.resume_filename) {
     fs.unlink(path.join(UPLOAD_DIR, current.resume_filename), () => {});
   }
-  await run('UPDATE freelancer_profiles SET resume_filename=NULL, resume_original_name=NULL WHERE user_id=?', [req.user.id]);
-  res.json({ resume_url: null });
+  const completion = computeCompletion({
+    role_title: current.role_title, grade: current.grade, rate: current.rate, summary: current.summary,
+    stackCount: JSON.parse(current.stack_json).length, hasResume: false,
+  });
+  await run('UPDATE freelancer_profiles SET resume_filename=NULL, resume_original_name=NULL, completion=? WHERE user_id=?', [completion, req.user.id]);
+  res.json({ resume_url: null, completion });
 });
 
 module.exports = router;
