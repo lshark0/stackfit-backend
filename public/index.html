@@ -708,7 +708,9 @@ async function decideApplicant(jobId, applicationId, status){
 async function uploadResume(input){
   const file = input.files && input.files[0];
   if(!file) return;
-  if(file.type !== 'application/pdf'){ toast('PDF 파일만 업로드할 수 있어요'); return; }
+  const ext = '.' + (file.name.split('.').pop() || '').toLowerCase();
+  const allowedExt = ['.pdf','.doc','.docx','.ppt','.pptx','.hwp'];
+  if(!allowedExt.includes(ext)){ toast('PDF, Word, PPT, 한글(HWP) 파일만 업로드할 수 있어요'); return; }
   const fd = new FormData();
   fd.append('resume', file);
   try{
@@ -1065,7 +1067,7 @@ async function screenTalentDetail(){
     <div class="tag-row">${t.stack.map(s=>`<span class="tag on">${esc(s)}</span>`).join('')}</div>
     <div class="section-label">소개</div><div class="para">${esc(t.summary) || '소개가 아직 등록되지 않았어요.'}</div>
     <div class="section-label">경력기술서</div>
-    ${t.resume_url ? `<a href="${fileUrl(t.resume_url)}" target="_blank" class="btn btn-outline">📄 경력기술서 PDF 열기</a>` : `<div class="page-sub">아직 첨부된 경력기술서가 없어요.</div>`}
+    ${t.resume_url ? `<a href="${fileUrl(t.resume_url)}" target="_blank" class="btn btn-outline">📄 경력기술서 열기</a>` : `<div class="page-sub">아직 첨부된 경력기술서가 없어요.</div>`}
     <div style="height:90px;"></div>
   </div>
   <div style="position:absolute; left:0; right:0; bottom:0; padding:14px 20px 22px; background:var(--paper); border-top:1px solid var(--line); display:flex; gap:10px;">
@@ -1335,10 +1337,10 @@ async function screenProfileEdit(){
       <div class="add-tag-row"><input id="pf-newtag" class="form-input" placeholder="기술스택 추가 후 Enter" onkeydown="if(event.key==='Enter'){event.preventDefault();addProfileTag();}"><button class="btn btn-outline" style="width:auto; padding:12px 16px;" onclick="addProfileTag()">추가</button></div>
     </div>
     <div class="form-field">
-      <label class="form-label">경력기술서 (PDF)</label>
+      <label class="form-label">경력기술서</label>
       ${p.resume_url ? `
         <div class="card" style="margin-bottom:0; display:flex; align-items:center; justify-content:space-between; gap:10px;">
-          <div style="min-width:0;"><div class="card-title" style="font-size:13px;">📄 ${esc(p.resume_original_name || '경력기술서.pdf')}</div><div class="card-org">업로드 완료</div></div>
+          <div style="min-width:0;"><div class="card-title" style="font-size:13px;">📄 ${esc(p.resume_original_name || '경력기술서')}</div><div class="card-org">업로드 완료</div></div>
           <div style="display:flex; gap:6px; flex:0 0 auto;">
             <a href="${fileUrl(p.resume_url)}" target="_blank" class="btn btn-outline" style="width:auto; padding:9px 12px; font-size:12px;">보기</a>
             <button class="btn btn-outline" style="width:auto; padding:9px 12px; font-size:12px;" onclick="deleteResume()">삭제</button>
@@ -1346,8 +1348,8 @@ async function screenProfileEdit(){
         </div>
         <div class="add-tag-row" style="margin-top:8px;"><label class="btn btn-ghost" style="width:auto; padding:10px 14px; font-size:12.5px;">다른 파일로 교체<input type="file" accept="application/pdf" style="display:none;" onchange="uploadResume(this)"></label></div>
       ` : `
-        <label class="btn btn-outline" style="cursor:pointer;">PDF 파일 선택해서 업로드<input type="file" accept="application/pdf" style="display:none;" onchange="uploadResume(this)"></label>
-        <div class="page-sub" style="margin-top:6px;">PDF, 최대 8MB</div>
+        <label class="btn btn-outline" style="cursor:pointer;">파일 선택해서 업로드<input type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.hwp" style="display:none;" onchange="uploadResume(this)"></label>
+        <div class="page-sub" style="margin-top:6px;">PDF, Word, PPT, 한글(HWP) · 최대 15MB</div>
       `}
     </div>
     <button class="btn btn-primary" onclick="saveProfile()">저장하기</button>
