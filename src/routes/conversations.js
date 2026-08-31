@@ -37,9 +37,18 @@ router.get('/', requireAuth, async (req, res) => {
 // 새 대화 시작 (없으면 생성, 있으면 재사용)
 router.post('/', requireAuth, async (req, res) => {
   const { companyId, freelancerId, jobId } = req.body || {};
-  const cId = req.user.role === 'company' ? req.user.id : companyId;
-  const fId = req.user.role === 'freelancer' ? req.user.id : freelancerId;
+  const cId = req.user.role === 'company' ? req.user.id : Number(companyId);
+  const fId = req.user.role === 'freelancer' ? req.user.id : Number(freelancerId);
   if (!cId || !fId) return res.status(400).json({ error: 'companyId, freelancerId가 필요합니다.' });
+
+  // 상대방이 실제로 존재하는 올바른 역할의 계정인지 확인 (임의 사용자 대상 스팸/알림 남용 방지)
+  if (req.user.role === 'freelancer') {
+    const company = await get('SELECT user_id FROM companies WHERE user_id = ?', [cId]);
+    if (!company) return res.status(404).json({ error: '기업을 찾을 수 없습니다.' });
+  } else {
+    const freelancer = await get('SELECT user_id FROM freelancer_profiles WHERE user_id = ?', [fId]);
+    if (!freelancer) return res.status(404).json({ error: '프리랜서를 찾을 수 없습니다.' });
+  }
 
   let conv = await get(
     'SELECT * FROM conversations WHERE company_id=? AND freelancer_id=? AND job_id IS NOT DISTINCT FROM ?',

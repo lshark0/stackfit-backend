@@ -4,6 +4,7 @@ const path = require('path');
 const crypto = require('crypto');
 const multer = require('multer');
 const { run, get, all } = require('../db');
+const { signedFileUrl } = require('../fileAccess');
 const { requireAuth, requireRole } = require('../middleware/requireAuth');
 const { wrapAllRoutes } = require('../middleware/asyncHandler');
 
@@ -60,7 +61,7 @@ router.get('/', requireAuth, async (req, res) => {
     return res.json({
       ...p,
       stack: JSON.parse(p.stack_json),
-      resume_url: p.resume_filename ? `/uploads/${p.resume_filename}` : null,
+      resume_url: signedFileUrl(p.resume_filename),
     });
   }
   const c = await get('SELECT * FROM companies WHERE user_id = ?', [req.user.id]);
@@ -129,7 +130,7 @@ router.post('/resume', requireAuth, requireRole('freelancer'), (req, res) => {
       req.file.filename, clamp(req.file.originalname, 200, 'resume.pdf'), completion, req.user.id,
     ]);
     res.status(201).json({
-      resume_url: `/uploads/${req.file.filename}`,
+      resume_url: signedFileUrl(req.file.filename),
       resume_original_name: req.file.originalname,
       completion,
     });

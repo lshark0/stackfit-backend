@@ -1,5 +1,6 @@
 const express = require('express');
 const { run, get, all } = require('../db');
+const { signedFileUrl } = require('../fileAccess');
 const { requireAuth, requireRole } = require('../middleware/requireAuth');
 const { wrapAllRoutes } = require('../middleware/asyncHandler');
 
@@ -75,7 +76,7 @@ router.get('/jobs/:id/applicants', requireAuth, requireRole('company'), async (r
     applicants: rows.map(r => ({
       ...r,
       stack: JSON.parse(r.stack_json),
-      resume_url: r.resume_filename ? `/uploads/${r.resume_filename}` : null,
+      resume_url: signedFileUrl(r.resume_filename),
     })),
   });
 });

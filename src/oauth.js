@@ -11,7 +11,9 @@ const PROVIDERS = {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       const data = await res.json();
-      return { id: data.sub, email: data.email, name: data.name };
+      // 이메일이 검증되지 않은 상태라면 계정 자동연동에 쓰지 않습니다 (계정 탈취 방지).
+      const email = data.email_verified ? data.email : null;
+      return { id: data.sub, email, name: data.name };
     },
   },
   naver: {

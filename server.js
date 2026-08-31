@@ -15,6 +15,7 @@ const conversationRoutes = require('./src/routes/conversations');
 const notificationRoutes = require('./src/routes/notifications');
 const companyRoutes = require('./src/routes/companies');
 const oauthRoutes = require('./src/routes/oauth');
+const { verifyToken } = require('./src/auth');
 
 const app = express();
 app.set('trust proxy', 1); // Render는 프록시 뒤에 있으므로 rate-limit이 실제 클라이언트 IP를 보게 함
@@ -57,6 +58,9 @@ const authLimiter = rateLimit({
 });
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/signup', authLimiter);
+app.use('/api/auth/change-password', authLimiter);
+// DELETE /api/auth/me(회원탈퇴)의 비밀번호 확인 무차별 대입만 제한 — GET(세션 확인)은 자주 호출되므로 제외
+app.use('/api/auth/me', (req, res, next) => (req.method === 'DELETE' ? authLimiter(req, res, next) : next()));
 
 // 그 외 전체 API에 대한 넉넉한 기본 레이트리밋 (남용/스크래핑 방지)
 const apiLimiter = rateLimit({
@@ -67,7 +71,22 @@ const apiLimiter = rateLimit({
 });
 app.use('/api', apiLimiter);
 
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// 이력서 등 업로드 파일: 아무나 접근 가능한 고정 URL 대신, 짧은 시간(5분)만 유효한
+// 서명된 링크로만 접근할 수 있게 합니다. URL이 캡처화면/로그 등으로 유출되어도
+// 시간이 지나면 무효화되어 개인정보(이력서) 노출 위험을 줄입니다.
+const UPLOAD_DIR = path.join(__dirname, 'uploads');
+app.get('/uploads/:filename', (req, res) => {
+  const { filename } = req.params;
+  const { token } = req.query;
+  const payload = token ? verifyToken(token) : null;
+  if (!payload || payload.purpose !== 'file_view' || payload.filename !== filename) {
+    return res.status(403).json({ error: '파일에 접근할 수 없거나 링크가 만료됐어요.' });
+  }
+  const safeName = path.basename(filename); // 경로 탈출(path traversal) 방지
+  res.sendFile(path.join(UPLOAD_DIR, safeName), (err) => {
+    if (err) res.status(404).json({ error: '파일을 찾을 수 없습니다.' });
+  });
+});
 app.use(express.static(path.join(__dirname, 'public'), {
   setHeaders: (res, filePath) => {
     // HTML은 절대 캐시되면 안 됨 (통신사 프록시/브라우저가 예전 버전을 계속 보여주는 문제 방지).

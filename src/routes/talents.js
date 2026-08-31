@@ -1,5 +1,6 @@
 const express = require('express');
 const { run, get, all } = require('../db');
+const { signedFileUrl } = require('../fileAccess');
 const { requireAuth, requireRole } = require('../middleware/requireAuth');
 const { wrapAllRoutes } = require('../middleware/asyncHandler');
 const { computeMatch } = require('../match');
@@ -77,7 +78,7 @@ router.get('/:userId', requireAuth, requireRole('company'), async (req, res) => 
     ...t,
     stack: JSON.parse(t.stack_json),
     proposed,
-    resume_url: t.resume_filename ? `/uploads/${t.resume_filename}` : null,
+    resume_url: signedFileUrl(t.resume_filename),
     ...rating,
   });
 });
