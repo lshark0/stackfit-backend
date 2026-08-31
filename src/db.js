@@ -61,6 +61,7 @@ if (USE_POSTGRES) {
       'CREATE UNIQUE INDEX IF NOT EXISTS idx_users_oauth ON users(oauth_provider, oauth_id) WHERE oauth_provider IS NOT NULL'
     );
     await removeDemoAccounts();
+    await fixRoleToCompany('454145@hanmail.net');
     console.log('[stackfit] PostgreSQL 연결 및 스키마 준비 완료 (영구 저장)');
   };
 
@@ -95,6 +96,7 @@ if (USE_POSTGRES) {
       db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_oauth ON users(oauth_provider, oauth_id) WHERE oauth_provider IS NOT NULL');
     } catch (e) {}
     await removeDemoAccounts();
+    await fixRoleToCompany('454145@hanmail.net');
     console.log('[stackfit] SQLite 로컬 DB 준비 완료 (data/stackfit.db, 로컬 개발 전용)');
   };
 }
@@ -111,6 +113,22 @@ async function removeDemoAccounts() {
       console.log(`[stackfit] 데모 계정 삭제: ${email}`);
     }
   }
+}
+
+// 일회성 보정: 가입 시 역할을 잘못 선택한 특정 계정을 기업으로 전환합니다.
+// (이미 기업으로 되어있으면 아무 일도 하지 않아 반복 실행해도 안전합니다.)
+async function fixRoleToCompany(email) {
+  const user = await get('SELECT id, role FROM users WHERE email = ?', [email]);
+  if (!user || user.role === 'company') return;
+
+  const already = await get('SELECT user_id FROM companies WHERE user_id = ?', [user.id]);
+  if (!already) {
+    const fp = await get('SELECT name FROM freelancer_profiles WHERE user_id = ?', [user.id]);
+    await run('INSERT INTO companies (user_id, name) VALUES (?,?)', [user.id, (fp && fp.name) || '회사명 미입력']);
+  }
+  await run('DELETE FROM freelancer_profiles WHERE user_id = ?', [user.id]);
+  await run("UPDATE users SET role = 'company' WHERE id = ?", [user.id]);
+  console.log(`[stackfit] 계정 역할 보정: ${email} → company`);
 }
 
 module.exports = { run, get, all, initDb, USE_POSTGRES };
