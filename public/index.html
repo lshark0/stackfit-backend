@@ -326,18 +326,16 @@ function drawerMenuContent(){
     ${item(I.home,'홈','home')}
     ${item(I.jobs,'공고 탐색','jobs')}
     ${item(I.checklist,'내 지원 현황','myApplications')}
-    ${item(I.building,'관심기업','followedCompanies')}
+    ${item(I.jobs,'관심프로젝트','savedJobs')}
     ${item(I.eye,'프로필 열람현황','profileViews')}
   `;
 
   const activityItems = isCompany ? `
     ${item(I.proj,'프로젝트 관리','projects')}
     ${item(I.chat,'채팅','chatList')}
-    ${item(I.user,'회사 정보 수정','companyProfileEdit')}
   ` : `
     ${item(I.proj,'프로젝트 관리','projects')}
     ${item(I.chat,'채팅','chatList')}
-    ${item(I.user,'프로필 수정','profileEdit')}
   `;
 
   return `
@@ -667,14 +665,6 @@ async function proposeTalent(userId){
   try{ await apiFetch(`/talents/${userId}/propose`, {method:'POST', body:{}}); toast('제안을 보냈어요'); go('talentDetail', userId); }
   catch(e){ toast(e.message); }
 }
-async function toggleFollowCompany(companyId, ev){
-  if(ev) ev.stopPropagation();
-  try{
-    const r = await apiFetch(`/companies/${companyId}/follow`, {method:'POST'});
-    toast(r.following ? '관심기업으로 등록했어요' : '관심기업에서 해제했어요');
-    render();
-  }catch(e){ toast(e.message); }
-}
 async function markAlertRead(id){
   try{ await apiFetch(`/notifications/${id}/read`, {method:'PATCH'}); render(); }catch(e){ toast(e.message); }
 }
@@ -982,7 +972,7 @@ async function screenHome(){
       <div class="quick-grid">
         <div class="quick-item" onclick="go('jobs')"><div class="qi-ic">${I.jobs}</div><div class="qi-lbl">공고 탐색</div></div>
         <div class="quick-item" onclick="go('projects')"><div class="qi-ic">${I.proj}</div><div class="qi-lbl">프로젝트</div></div>
-        <div class="quick-item" onclick="go('followedCompanies')"><div class="qi-ic">${I.building}</div><div class="qi-lbl">관심기업</div></div>
+        <div class="quick-item" onclick="go('savedJobs')"><div class="qi-ic">${I.jobs}</div><div class="qi-lbl">관심프로젝트</div></div>
         <div class="quick-item" onclick="go('profileViews')"><div class="qi-ic">${I.eye}</div><div class="qi-lbl">열람현황</div></div>
       </div>
       <div class="section-label">추천 공고</div>
@@ -1040,10 +1030,7 @@ async function screenJobDetail(){
   <div class="content" style="padding-top:14px;">
     <div class="back-row" style="padding:0 0 10px;"><div class="back-btn" onclick="go('jobs')">${I.back}</div><div class="page-sub">공고 상세</div></div>
     <div class="detail-hero">
-      <div class="org" style="display:flex; align-items:center; justify-content:space-between;">
-        <span>${esc(j.org)}</span>
-        ${!isCompany? `<span onclick="toggleFollowCompany(${j.company_id}, event)" style="cursor:pointer; font-family:var(--mono); font-size:10.5px; padding:4px 9px; border-radius:999px; background:${j.following?'var(--amber)':'rgba(255,255,255,.12)'}; color:${j.following?'var(--ink)':'var(--amber-soft)'};">${j.following?'✓ 관심기업':'+ 관심기업'}</span>` : ''}
-      </div>
+      <div class="org">${esc(j.org)}</div>
       <h2>${esc(j.title)}</h2>${gauge(j.match)}
       <div style="margin-top:8px;">${ratingBadge(j.rating_avg, j.rating_count)}</div>
     </div>
@@ -1265,7 +1252,7 @@ async function screenMypage(){
     <div class="section-label">계정</div>
     <div class="list-item" onclick="go('${isCompany?'companyProfileEdit':'profileEdit'}')"><div class="li-l"><div class="li-icon">${I.user}</div><div class="li-tt">프로필 ${isCompany?'/ 회사 정보':'수정'}</div></div>${I.back}</div>
     ${!isCompany?`
-    <div class="list-item" onclick="go('followedCompanies')"><div class="li-l"><div class="li-icon">${I.building}</div><div class="li-tt">관심기업</div></div>${I.back}</div>
+    <div class="list-item" onclick="go('savedJobs')"><div class="li-l"><div class="li-icon">${I.jobs}</div><div class="li-tt">관심프로젝트</div></div>${I.back}</div>
     <div class="list-item" onclick="go('profileViews')"><div class="li-l"><div class="li-icon">${I.eye}</div><div class="li-tt">내 프로필 열람현황</div></div>${I.back}</div>` : ''}
     ${me.user.hasPassword ? `<div class="list-item" onclick="go('changePassword')"><div class="li-l"><div class="li-icon">${I.gear}</div><div class="li-tt">비밀번호 변경</div></div>${I.back}</div>` : ''}
     <div class="section-label">약관 및 정책</div>
@@ -1330,20 +1317,12 @@ async function submitDeleteAccount(hasPassword){
 }
 
 
-async function screenFollowedCompanies(){
-  const data = await apiFetch('/companies/followed');
+async function screenSavedJobs(){
+  const data = await apiFetch('/jobs?saved=true');
   return `${statusbar()}
-  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('mypage')">${I.back}</div><div class="page-title" style="font-size:18px;">관심기업</div></div></div>
+  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('mypage')">${I.back}</div><div class="page-title" style="font-size:18px;">관심프로젝트</div></div></div>
   <div class="content">
-    ${data.companies.map(c=>`
-      <div class="card">
-        <div class="card-top">
-          <div><div class="card-title">${esc(c.name)}</div><div class="card-org">${esc(c.description||'')}</div></div>
-          <div class="star-btn filled" onclick="toggleFollowCompany(${c.user_id}, event)">${I.star}</div>
-        </div>
-        <div class="meta-row"><span class="rate">채용중 공고 ${c.open_jobs}건</span></div>
-        ${c.open_jobs>0? `<button class="btn btn-outline" style="margin-top:10px;" onclick="jobQuery=${JSON.stringify(c.name)}; go('jobs');">이 기업 공고 보기</button>` : ''}
-      </div>`).join('') || emptyHtml('아직 등록한 관심기업이 없어요', I.building)}
+    ${data.jobs.map(jobCard).join('') || emptyHtml('아직 저장한 프로젝트가 없어요', I.jobs)}
   </div>`;
 }
 
@@ -1492,7 +1471,7 @@ async function render(){
       oauthRole: screenOauthRole,
       changePassword: screenChangePassword, deleteAccount: screenDeleteAccount,
       myApplications: screenMyApplications,
-      followedCompanies: screenFollowedCompanies, profileViews: screenProfileViews,
+      savedJobs: screenSavedJobs, profileViews: screenProfileViews,
       reviewForm: screenReviewForm,
     };
     const fn = map[state.screen] || screenOnboarding;
