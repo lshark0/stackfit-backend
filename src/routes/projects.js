@@ -10,11 +10,16 @@ router.get('/', requireAuth, async (req, res) => {
   const col = req.user.role === 'freelancer' ? 'freelancer_id' : 'company_id';
   const rows = await all(`SELECT * FROM projects WHERE ${col} = ? ORDER BY created_at DESC, id DESC`, [req.user.id]);
 
-  // 각 프로젝트에 내가 이미 리뷰를 남겼는지 함께 내려줍니다 (완료된 프로젝트에만 의미 있음)
+  // 각 프로젝트에 내가 이미 리뷰를 남겼는지, 그리고 상대방이 나에게 남긴 평가도 함께 내려줍니다.
   const withReview = [];
   for (const p of rows) {
     const mine = await get('SELECT rating FROM reviews WHERE project_id=? AND reviewer_id=?', [p.id, req.user.id]);
-    withReview.push({ ...p, myReview: mine ? { rating: mine.rating } : null });
+    const received = await get('SELECT rating, comment FROM reviews WHERE project_id=? AND reviewee_id=?', [p.id, req.user.id]);
+    withReview.push({
+      ...p,
+      myReview: mine ? { rating: mine.rating } : null,
+      receivedReview: received ? { rating: received.rating, comment: received.comment } : null,
+    });
   }
   res.json({ projects: withReview });
 });

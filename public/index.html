@@ -331,6 +331,7 @@ function drawerMenuContent(){
   `;
 
   const activityItems = isCompany ? `
+    ${item(I.proj,'프로젝트 관리','projects')}
     ${item(I.chat,'채팅','chatList')}
     ${item(I.user,'회사 정보 수정','companyProfileEdit')}
   ` : `
@@ -348,7 +349,6 @@ function drawerMenuContent(){
     <div class="drawer-sec"><div class="drawer-sec-label">탐색</div>${exploreItems}</div>
     <div class="drawer-sec"><div class="drawer-sec-label">내 활동</div>${activityItems}${item(I.bell,'알림','alerts')}${item(I.user,'마이페이지','mypage')}</div>
     <div class="drawer-sec"><div class="drawer-sec-label">설정 및 정책</div>
-      ${item(I.gear,'서버 연결 설정','serverSetup')}
       <div class="drawer-item" onclick="closeDrawer(); window.open('/terms.html','_blank');"><span class="ic">${I.building}</span>이용약관</div>
       <div class="drawer-item" onclick="closeDrawer(); window.open('/privacy.html','_blank');"><span class="ic">${I.eye}</span>개인정보처리방침</div>
       <div class="drawer-item" onclick="closeDrawer(); logout();"><span class="ic">${I.logout}</span>로그아웃</div>
@@ -410,7 +410,7 @@ function tabs(nc){
   if(state.role==="freelancer"){
     return [{k:"home",l:"홈",i:I.home},{k:"jobs",l:"공고",i:I.jobs},{k:"projects",l:"프로젝트",i:I.proj},{k:"chatList",l:"채팅",i:I.chat},{k:"mypage",l:"MY",i:I.user}];
   }
-  return [{k:"home",l:"홈",i:I.home},{k:"talent",l:"인재풀",i:I.talent},{k:"jobs",l:"공고관리",i:I.jobs},{k:"chatList",l:"채팅",i:I.chat},{k:"mypage",l:"MY",i:I.user}];
+  return [{k:"home",l:"홈",i:I.home},{k:"talent",l:"인재풀",i:I.talent},{k:"jobs",l:"공고관리",i:I.jobs},{k:"projects",l:"프로젝트",i:I.proj},{k:"chatList",l:"채팅",i:I.chat},{k:"mypage",l:"MY",i:I.user}];
 }
 function tabbar(active){
   return `<div class="tabbar">${tabs().map(t=>{
@@ -1128,6 +1128,12 @@ async function screenProjects(){
         ${p.stage<4? `<button class="btn btn-outline" style="margin-top:10px;" onclick="advanceStage(${p.id}, ${p.stage+1})">다음 단계로 진행</button>`
         : p.myReview ? `<div class="page-sub" style="margin-top:10px;">내가 남긴 평점: ${'★'.repeat(p.myReview.rating)}${'☆'.repeat(5-p.myReview.rating)}</div>`
         : `<button class="btn btn-primary" style="margin-top:10px;" onclick="go('reviewForm', ${p.id})">리뷰 남기기</button>`}
+        ${p.receivedReview? `
+          <div style="margin-top:10px; padding:12px; background:var(--card); border:1px solid var(--line); border-radius:12px;">
+            <div style="font-size:11.5px; font-weight:700; color:var(--slate); margin-bottom:4px;">상대방이 남긴 평가</div>
+            <div style="color:var(--amber-deep); font-size:14px;">${'★'.repeat(p.receivedReview.rating)}${'☆'.repeat(5-p.receivedReview.rating)}</div>
+            ${p.receivedReview.comment? `<div class="page-sub" style="margin-top:6px; line-height:1.6;">${esc(p.receivedReview.comment)}</div>` : ''}
+          </div>` : (p.stage>=4? `<div class="page-sub" style="margin-top:10px;">아직 상대방의 평가가 등록되지 않았어요.</div>` : '')}
       </div>`).join('') || emptyHtml('진행 중인 프로젝트가 없어요', I.proj)}
   </div>${tabbar('projects')}`;
 }
@@ -1266,7 +1272,6 @@ async function screenMypage(){
     <div class="list-item" onclick="window.open('/terms.html','_blank')"><div class="li-l"><div class="li-icon">${I.building}</div><div class="li-tt">이용약관</div></div>${I.back}</div>
     <div class="list-item" onclick="window.open('/privacy.html','_blank')"><div class="li-l"><div class="li-icon">${I.eye}</div><div class="li-tt">개인정보처리방침</div></div>${I.back}</div>
     <div class="section-label">설정</div>
-    <div class="list-item" onclick="go('serverSetup')"><div class="li-l"><div class="li-icon">${I.gear}</div><div class="li-tt">서버 연결 설정</div></div>${I.back}</div>
     <div class="list-item" onclick="logout()"><div class="li-l"><div class="li-icon">${I.logout}</div><div class="li-tt">로그아웃</div></div></div>
     <div class="list-item" onclick="go('deleteAccount')"><div class="li-l"><div class="li-icon" style="color:var(--danger);">${I.trash}</div><div class="li-tt" style="color:var(--danger);">회원탈퇴</div></div>${I.back}</div>
   </div>${tabbar('mypage')}`;
