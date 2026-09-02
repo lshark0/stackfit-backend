@@ -293,6 +293,28 @@ function viewerUrl(relPath){
   }
   return absolute;
 }
+// 일부 모바일 브라우저(삼성인터넷 등)는 <a download> 속성을 무시하고 그냥 페이지 이동을
+// 시켜버리는 경우가 있어서, 파일을 직접 fetch해서 blob으로 강제 저장시킵니다.
+async function downloadResume(relPath, filename){
+  if(!relPath) return;
+  try{
+    toast('다운로드 중...');
+    const res = await fetch(fileUrl(relPath));
+    if(!res.ok) throw new Error('다운로드에 실패했어요');
+    const blob = await res.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = filename || '경력기술서';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(()=>URL.revokeObjectURL(blobUrl), 8000);
+  }catch(e){ toast(e.message); }
+}
+function jsAttrStr(s){
+  return String(s ?? '').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;').replace(/</g,'&lt;');
+}
 async function unreadCount(){
   if(!state.token) return 0;
   try{ const d = await apiFetch('/notifications'); return d.notifications.filter(n=>!n.is_read).length; }
@@ -1141,7 +1163,7 @@ async function screenTalentDetail(){
     ${t.resume_url ? `
       <div style="display:flex; gap:8px;">
         <a href="${viewerUrl(t.resume_url)}" target="_blank" class="btn btn-outline" style="flex:1;">📄 경력기술서 열기</a>
-        <a href="${fileUrl(t.resume_url)}" download="${esc(t.resume_original_name||'경력기술서')}" class="btn btn-outline" style="flex:0 0 auto; width:auto; padding:13px 16px;">⬇</a>
+        <button onclick="downloadResume('${jsAttrStr(t.resume_url)}', '${jsAttrStr(t.resume_original_name||'경력기술서')}')" class="btn btn-outline" style="flex:0 0 auto; width:auto; padding:13px 16px;">⬇</button>
       </div>` : `<div class="page-sub">아직 첨부된 경력기술서가 없어요.</div>`}
     <div style="height:90px;"></div>
   </div>
@@ -1268,7 +1290,7 @@ async function screenApplicants(){
         ${gauge(a.match)}
         <div class="meta-row">
           <span class="rate">${esc(a.rate)}</span>
-          ${a.resume_url? `<span style="display:flex; align-items:center; gap:8px;"><a href="${viewerUrl(a.resume_url)}" target="_blank" style="color:var(--ink); font-weight:600;">📄 경력기술서 보기</a><a href="${fileUrl(a.resume_url)}" download="${esc(a.resume_original_name||'경력기술서')}" style="color:var(--slate); font-weight:600;">⬇ 다운로드</a></span>` : `<span style="color:var(--slate-light);">경력기술서 미첨부</span>`}
+          ${a.resume_url? `<span style="display:flex; align-items:center; gap:8px;"><a href="${viewerUrl(a.resume_url)}" target="_blank" style="color:var(--ink); font-weight:600;">📄 경력기술서 보기</a><span onclick="downloadResume('${jsAttrStr(a.resume_url)}', '${jsAttrStr(a.resume_original_name||'경력기술서')}')" style="color:var(--slate); font-weight:600; cursor:pointer;">⬇ 다운로드</span></span>` : `<span style="color:var(--slate-light);">경력기술서 미첨부</span>`}
         </div>
         ${a.status==='submitted'? `
           <div style="display:flex; gap:8px; margin-top:12px;">
@@ -1446,7 +1468,7 @@ function resumeSectionHtml(resumeUrl, resumeName){
       <div style="min-width:0;"><div class="card-title" style="font-size:13px;">📄 ${esc(resumeName || '경력기술서')}</div><div class="card-org">업로드 완료</div></div>
       <div style="display:flex; gap:6px; flex:0 0 auto;">
         <a href="${viewerUrl(resumeUrl)}" target="_blank" class="btn btn-outline" style="width:auto; padding:9px 12px; font-size:12px;">보기</a>
-        <a href="${fileUrl(resumeUrl)}" download="${esc(resumeName||'경력기술서')}" class="btn btn-outline" style="width:auto; padding:9px 12px; font-size:12px;">⬇</a>
+        <button onclick="downloadResume('${jsAttrStr(resumeUrl)}', '${jsAttrStr(resumeName||'경력기술서')}')" class="btn btn-outline" style="width:auto; padding:9px 12px; font-size:12px;">⬇</button>
         <button class="btn btn-outline" style="width:auto; padding:9px 12px; font-size:12px;" onclick="deleteResume()">삭제</button>
       </div>
     </div>
