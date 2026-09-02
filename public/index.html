@@ -185,6 +185,9 @@
   .quick-item{display:flex; flex-direction:column; align-items:center; gap:7px; cursor:pointer;}
   .quick-item .qi-ic{width:46px; height:46px; border-radius:14px; background:var(--card); border:1px solid var(--line); display:flex; align-items:center; justify-content:center; color:var(--ink);}
   .quick-item .qi-lbl{font-size:10.5px; color:var(--slate); text-align:center; line-height:1.3;}
+  .btn-social{width:100%; height:54px; border-radius:999px; border:1px solid var(--line); background:#fff; display:flex; align-items:center; justify-content:center; gap:10px; font-size:15px; font-weight:700; cursor:pointer; -webkit-tap-highlight-color:transparent;}
+  .btn-social:active{transform:scale(.98);}
+  .soc-ic{width:22px; height:22px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:12px; font-weight:900; flex:0 0 auto; background:#fff;}
   .toast.show{opacity:1; transform:translateX(-50%) translateY(-6px);}
   .empty{display:flex; flex-direction:column; align-items:center; text-align:center; gap:6px; padding:50px 20px; color:var(--slate);}
   .empty .ic{width:52px; height:52px; border-radius:16px; background:var(--paper-dim); display:flex; align-items:center; justify-content:center; color:var(--slate); margin-bottom:6px;}
@@ -493,7 +496,10 @@ async function loginAs(role){
     go('serverSetup');
   }
 }
-function logout(){ clearToken(); state.role=null; state.userId=null; go('onboarding'); }
+function logout(){
+  if(!confirm('로그아웃 하시겠어요?')) return;
+  clearToken(); state.role=null; state.userId=null; go('onboarding');
+}
 
 let signupRole = 'freelancer';
 function setSignupRole(role, el){
@@ -885,21 +891,23 @@ async function screenOnboarding(){
 }
 
 function socialLoginButtons(){
-  return `<div style="display:flex; align-items:center; gap:10px; margin:18px 0;">
+  return `
+  <div style="display:flex; flex-direction:column; gap:12px;">
+    <button class="btn-social" style="background:#FEE500; color:#3C1E1E;" onclick="oauthStart('kakao')"><span class="soc-ic" style="background:#3C1E1E; color:#FEE500;">💬</span>카카오로 시작하기</button>
+    <button class="btn-social" style="background:#03C75A; color:#fff;" onclick="oauthStart('naver')"><span class="soc-ic" style="background:#fff; color:#03C75A;">N</span>네이버로 시작하기</button>
+    <button class="btn-social" style="background:#fff; color:#191600;" onclick="oauthStart('google')"><span class="soc-ic" style="background:#fff; color:#4285F4;">G</span>구글로 시작하기</button>
+  </div>
+  <div style="display:flex; align-items:center; gap:10px; margin:20px 0;">
     <div style="flex:1; height:1px; background:var(--line);"></div>
     <span class="page-sub">또는</span>
     <div style="flex:1; height:1px; background:var(--line);"></div>
-  </div>
-  <div style="display:flex; flex-direction:column; gap:10px;">
-    <button class="btn btn-outline" style="background:#fff;" onclick="oauthStart('google')">구글로 계속하기</button>
-    <button class="btn btn-outline" style="background:#03C75A; color:#fff; border-color:#03C75A;" onclick="oauthStart('naver')">네이버로 계속하기</button>
-    <button class="btn btn-outline" style="background:#FEE500; color:#191600; border-color:#FEE500;" onclick="oauthStart('kakao')">카카오로 계속하기</button>
   </div>`;
 }
 function screenSignup(){
   return `${statusbar()}
   <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('onboarding')">${I.back}</div><div class="page-title">회원가입</div></div></div>
   <div class="content">
+    ${socialLoginButtons()}
     <div class="chip-row" id="signupRoleChips">
       <div class="chip active" onclick="setSignupRole('freelancer', this)">프리랜서</div>
       <div class="chip" onclick="setSignupRole('company', this)">기업</div>
@@ -929,7 +937,6 @@ function screenSignup(){
       </label>
     </div>
     <button class="btn btn-primary" onclick="doSignup()">가입하고 시작하기</button>
-    ${socialLoginButtons()}
     <div class="server-line" style="margin-top:16px;">이미 계정이 있으신가요? <b onclick="go('login')">로그인</b></div>
   </div>`;
 }
@@ -940,10 +947,10 @@ function screenLogin(){
   return `${statusbar()}
   <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('onboarding')">${I.back}</div><div class="page-title">${heading}</div></div></div>
   <div class="content">
+    ${socialLoginButtons()}
     <div class="form-field" style="margin-top:6px;"><label class="form-label">이메일</label><input id="li-email" class="form-input" type="email" placeholder="you@example.com"></div>
     <div class="form-field"><label class="form-label">비밀번호</label><input id="li-password" class="form-input" type="password" placeholder="비밀번호" onkeydown="if(event.key==='Enter'){event.preventDefault();doLogin();}"></div>
-    <button class="btn btn-primary" onclick="doLogin()">로그인</button>
-    ${socialLoginButtons()}
+    <button class="btn btn-primary" onclick="doLogin()">이메일로 로그인</button>
     <div class="server-line" style="margin-top:16px;">계정이 없으신가요? <b onclick="go('signup')">회원가입</b></div>
   </div>`;
 }
