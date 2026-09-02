@@ -1,6 +1,7 @@
 const express = require('express');
 const { run, get, all } = require('../db');
 const { signedFileUrl } = require('../fileAccess');
+const { computeMatch } = require('../match');
 const { requireAuth, requireRole } = require('../middleware/requireAuth');
 const { wrapAllRoutes } = require('../middleware/asyncHandler');
 
@@ -65,6 +66,7 @@ router.get('/me/applications', requireAuth, requireRole('freelancer'), async (re
 router.get('/jobs/:id/applicants', requireAuth, requireRole('company'), async (req, res) => {
   const job = await get('SELECT * FROM jobs WHERE id = ? AND company_id = ?', [req.params.id, req.user.id]);
   if (!job) return res.status(404).json({ error: '공고를 찾을 수 없습니다.' });
+  const jobStack = JSON.parse(job.stack_json);
   const rows = await all(
     `SELECT a.id AS application_id, a.status, a.created_at, f.*
      FROM applications a JOIN freelancer_profiles f ON f.user_id = a.freelancer_id
@@ -73,11 +75,15 @@ router.get('/jobs/:id/applicants', requireAuth, requireRole('company'), async (r
   );
   res.json({
     job: { id: job.id, title: job.title },
-    applicants: rows.map(r => ({
-      ...r,
-      stack: JSON.parse(r.stack_json),
-      resume_url: signedFileUrl(r.resume_filename),
-    })),
+    applicants: rows.map(r => {
+      const stack = JSON.parse(r.stack_json);
+      return {
+        ...r,
+        stack,
+        match: computeMatch(jobStack, stack),
+        resume_url: signedFileUrl(r.resume_filename),
+      };
+    }),
   });
 });
 

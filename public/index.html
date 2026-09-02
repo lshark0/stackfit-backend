@@ -449,7 +449,7 @@ function jobCard(j){
     <div class="tag-row">${j.stack.map(s=>`<span class="tag">${esc(s)}</span>`).join('')}</div>
     <div class="meta-row"><span>${I.pin}${esc(j.location)}</span><span class="rate">${esc(j.rate)}</span>${ddayBadge(j.d_day)}</div>
     <div class="meta-row" style="margin-top:4px;">${ratingBadge(j.rating_avg, j.rating_count)}</div>
-    ${gauge(j.match)}
+    ${state.role==='freelancer' ? gauge(j.match) : ''}
   </div>`;
 }
 function talentCard(t){
@@ -1033,7 +1033,7 @@ async function screenJobDetail(){
     <div class="back-row" style="padding:0 0 10px;"><div class="back-btn" onclick="go('jobs')">${I.back}</div><div class="page-sub">공고 상세</div></div>
     <div class="detail-hero">
       <div class="org">${esc(j.org)}</div>
-      <h2>${esc(j.title)}</h2>${gauge(j.match)}
+      <h2>${esc(j.title)}</h2>${!isCompany ? gauge(j.match) : ''}
       <div style="margin-top:8px;">${ratingBadge(j.rating_avg, j.rating_count)}</div>
     </div>
     <div class="kv-grid">
@@ -1214,6 +1214,7 @@ async function screenApplicants(){
           <span class="tag ${a.status==='accepted'?'on':''}" style="border-radius:999px; ${a.status==='rejected'?'opacity:.55;':''}">${statusLabel[a.status]||a.status}</span>
         </div>
         <div class="tag-row">${a.stack.map(s=>`<span class="tag">${esc(s)}</span>`).join('')}</div>
+        ${gauge(a.match)}
         <div class="meta-row">
           <span class="rate">${esc(a.rate)}</span>
           ${a.resume_url? `<span><a href="${fileUrl(a.resume_url)}" target="_blank" style="color:var(--ink); font-weight:600;">📄 경력기술서 보기</a></span>` : `<span style="color:var(--slate-light);">경력기술서 미첨부</span>`}
