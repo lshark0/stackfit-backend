@@ -170,6 +170,15 @@
   .fab{position:absolute; right:20px; bottom:96px; width:52px; height:52px; border-radius:16px; background:var(--amber); color:var(--ink); display:flex; align-items:center; justify-content:center; box-shadow:0 10px 20px -6px rgba(232,163,61,.55); z-index:12; cursor:pointer; border:none;}
   .toast{position:absolute; bottom:96px; left:50%; transform:translateX(-50%); background:var(--ink); color:#F5EFE4; font-size:12.5px; font-weight:600; padding:11px 18px; border-radius:999px; z-index:30; box-shadow:0 10px 24px rgba(0,0,0,.3); white-space:nowrap; opacity:0; pointer-events:none; transition:opacity .2s, transform .2s; max-width:80%; overflow:hidden; text-overflow:ellipsis;}
   .drawer-overlay{position:absolute; inset:0; background:rgba(20,23,28,.45); opacity:0; pointer-events:none; transition:opacity .22s; z-index:48;}
+  .confirm-overlay{position:absolute; inset:0; background:rgba(20,23,28,.5); opacity:0; pointer-events:none; transition:opacity .18s; z-index:58; display:flex; align-items:center; justify-content:center; padding:0 32px;}
+  .confirm-overlay.open{opacity:1; pointer-events:auto;}
+  .confirm-box{background:var(--paper); border-radius:18px; padding:26px 22px 18px; width:100%; max-width:300px; text-align:center; transform:scale(.92); transition:transform .18s;}
+  .confirm-overlay.open .confirm-box{transform:scale(1);}
+  .confirm-msg{font-size:15px; font-weight:700; color:var(--ink); line-height:1.5; margin-bottom:20px;}
+  .confirm-actions{display:flex; gap:8px;}
+  .confirm-actions button{flex:1; padding:12px 0; border-radius:12px; border:none; font-size:14px; font-weight:700; cursor:pointer;}
+  .confirm-cancel{background:var(--paper-dim); color:var(--slate);}
+  .confirm-ok{background:var(--ink); color:var(--amber-soft);}
   .drawer-overlay.open{opacity:1; pointer-events:auto;}
   .drawer{position:absolute; top:0; left:0; bottom:0; width:80%; max-width:320px; background:var(--paper); z-index:49; transform:translateX(-100%); transition:transform .25s cubic-bezier(.4,0,.2,1); box-shadow:10px 0 30px rgba(0,0,0,.18); overflow-y:auto; display:flex; flex-direction:column;}
   .drawer.open{transform:translateX(0);}
@@ -225,6 +234,15 @@
     <div class="toast" id="toast"></div>
     <div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
     <div class="drawer" id="drawer"></div>
+    <div class="confirm-overlay" id="confirmOverlay">
+      <div class="confirm-box">
+        <div class="confirm-msg" id="confirmMsg"></div>
+        <div class="confirm-actions">
+          <button class="confirm-cancel" onclick="closeConfirm()">취소</button>
+          <button class="confirm-ok" id="confirmOkBtn">확인</button>
+        </div>
+      </div>
+    </div>
   </div>
 
 <script>
@@ -496,9 +514,19 @@ async function loginAs(role){
     go('serverSetup');
   }
 }
+function showConfirm(message, onConfirm){
+  document.getElementById('confirmMsg').textContent = message;
+  const okBtn = document.getElementById('confirmOkBtn');
+  okBtn.onclick = () => { closeConfirm(); onConfirm(); };
+  document.getElementById('confirmOverlay').classList.add('open');
+}
+function closeConfirm(){
+  document.getElementById('confirmOverlay').classList.remove('open');
+}
 function logout(){
-  if(!confirm('로그아웃 하시겠어요?')) return;
-  clearToken(); state.role=null; state.userId=null; go('onboarding');
+  showConfirm('로그아웃 하시겠어요?', () => {
+    clearToken(); state.role=null; state.userId=null; go('onboarding');
+  });
 }
 
 let signupRole = 'freelancer';
