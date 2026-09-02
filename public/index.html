@@ -326,6 +326,7 @@ function drawerMenuContent(){
     ${item(I.home,'홈','home')}
     ${item(I.jobs,'공고 탐색','jobs')}
     ${item(I.checklist,'내 지원 현황','myApplications')}
+    ${item(I.bell,'받은 제안','receivedProposals')}
     ${item(I.jobs,'관심프로젝트','savedJobs')}
     ${item(I.eye,'프로필 열람현황','profileViews')}
   `;
@@ -665,8 +666,9 @@ async function proposeTalent(userId){
   try{ await apiFetch(`/talents/${userId}/propose`, {method:'POST', body:{}}); toast('제안을 보냈어요'); go('talentDetail', userId); }
   catch(e){ toast(e.message); }
 }
-async function markAlertRead(id){
-  try{ await apiFetch(`/notifications/${id}/read`, {method:'PATCH'}); render(); }catch(e){ toast(e.message); }
+async function markAlertRead(id, tag){
+  try{ await apiFetch(`/notifications/${id}/read`, {method:'PATCH'}); }catch(e){ toast(e.message); return; }
+  if(tag==='제안') go('receivedProposals'); else render();
 }
 async function startChatWithTalent(freelancerId){
   try{ const conv = await apiFetch('/conversations', {method:'POST', body:{freelancerId}}); go('chatRoom', conv.id); }
@@ -1158,6 +1160,21 @@ async function submitReview(projectId){
   }catch(e){ toast(e.message); }
 }
 
+async function screenReceivedProposals(){
+  const nc = await unreadCount();
+  const data = await apiFetch('/proposals/received');
+  return `${statusbar()}${header("받은 제안", `${data.proposals.length}건`, {back:'home'}, nc)}
+  <div class="content">
+    ${data.proposals.map(p=>`
+      <div class="card">
+        <div class="card-top"><div><div class="card-title">${esc(p.company_name)}</div><div class="card-org">${p.job_title? esc(p.job_title)+' 포지션 제안' : '포지션 제안'}</div></div></div>
+        ${p.company_description? `<div class="para" style="margin-top:6px;">${esc(p.company_description)}</div>` : ''}
+        <div class="page-sub" style="margin-top:10px;">${new Date(p.created_at).toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric'})} 도착</div>
+        <button class="btn btn-primary" style="margin-top:10px;" onclick="startChatWithCompany(${p.company_id}${p.job_id?`, ${p.job_id}`:''})">채팅으로 답장하기</button>
+      </div>`).join('') || emptyHtml('아직 받은 제안이 없어요', I.checklist)}
+  </div>`;
+}
+
 async function screenMyApplications(){
   const nc = await unreadCount();
   const data = await apiFetch('/me/applications');
@@ -1252,7 +1269,8 @@ async function screenMypage(){
     <div class="section-label">계정</div>
     <div class="list-item" onclick="go('${isCompany?'companyProfileEdit':'profileEdit'}')"><div class="li-l"><div class="li-icon">${I.user}</div><div class="li-tt">프로필 ${isCompany?'/ 회사 정보':'수정'}</div></div>${I.back}</div>
     ${!isCompany?`
-    <div class="list-item" onclick="go('myApplications')"><div class="li-l"><div class="li-icon">${I.checklist}</div><div class="li-tt">내 지원 현황</div></div>${I.back}</div>` : ''}
+    <div class="list-item" onclick="go('myApplications')"><div class="li-l"><div class="li-icon">${I.checklist}</div><div class="li-tt">내 지원 현황</div></div>${I.back}</div>
+    <div class="list-item" onclick="go('receivedProposals')"><div class="li-l"><div class="li-icon">${I.bell}</div><div class="li-tt">받은 제안</div></div>${I.back}</div>` : ''}
     ${me.user.hasPassword ? `<div class="list-item" onclick="go('changePassword')"><div class="li-l"><div class="li-icon">${I.gear}</div><div class="li-tt">비밀번호 변경</div></div>${I.back}</div>` : ''}
     <div class="section-label">약관 및 정책</div>
     <div class="list-item" onclick="window.open('/terms.html','_blank')"><div class="li-l"><div class="li-icon">${I.building}</div><div class="li-tt">이용약관</div></div>${I.back}</div>
@@ -1416,7 +1434,7 @@ async function screenAlerts(){
   <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go(state.prevScreen||'home')">${I.back}</div><div class="page-title">알림</div></div></div>
   <div class="content">
     ${data.notifications.map(a=>`
-      <div class="card" style="cursor:pointer; ${a.is_read?'opacity:.6;':''}" onclick="markAlertRead(${a.id})">
+      <div class="card" style="cursor:pointer; ${a.is_read?'opacity:.6;':''}" onclick="markAlertRead(${a.id}, '${esc(a.tag)}')">
         <div class="card-top"><span class="tag on" style="border-radius:999px;">${esc(a.tag)}</span><span class="chat-time">${new Date(a.created_at).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'numeric',minute:'2-digit'})}</span></div>
         <div class="card-title" style="margin-top:9px; font-size:13.5px;">${esc(a.title)}${!a.is_read?' <span style="color:var(--amber-deep)">●</span>':''}</div>
         <div class="page-sub" style="font-family:var(--sans); color:var(--slate); margin-top:3px;">${esc(a.body)}</div>
@@ -1470,7 +1488,7 @@ async function render(){
       oauthRole: screenOauthRole,
       changePassword: screenChangePassword, deleteAccount: screenDeleteAccount,
       myApplications: screenMyApplications,
-      savedJobs: screenSavedJobs, profileViews: screenProfileViews,
+      savedJobs: screenSavedJobs, profileViews: screenProfileViews, receivedProposals: screenReceivedProposals,
       reviewForm: screenReviewForm,
     };
     const fn = map[state.screen] || screenOnboarding;

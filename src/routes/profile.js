@@ -96,10 +96,21 @@ router.get('/views', requireAuth, requireRole('freelancer'), async (req, res) =>
 router.get('/', requireAuth, async (req, res) => {
   if (req.user.role === 'freelancer') {
     const p = await get('SELECT * FROM freelancer_profiles WHERE user_id = ?', [req.user.id]);
+    let resumeUrl = signedFileUrl(p.resume_filename);
+    // Render 재배포로 실제 파일은 사라졌는데 DB엔 남아있는 경우, 여기서 바로잡아줍니다.
+    if (p.resume_filename && !resumeUrl) {
+      const stackCount = JSON.parse(p.stack_json).length;
+      const completion = computeCompletion({
+        role_title: p.role_title, grade: p.grade, rate: p.rate, summary: p.summary,
+        stackCount, hasResume: false,
+      });
+      await run('UPDATE freelancer_profiles SET resume_filename=NULL, resume_original_name=NULL, completion=? WHERE user_id=?', [completion, req.user.id]);
+      p.resume_filename = null; p.resume_original_name = null; p.completion = completion;
+    }
     return res.json({
       ...p,
       stack: JSON.parse(p.stack_json),
-      resume_url: signedFileUrl(p.resume_filename),
+      resume_url: resumeUrl,
     });
   }
   const c = await get('SELECT * FROM companies WHERE user_id = ?', [req.user.id]);

@@ -1,5 +1,5 @@
 const express = require('express');
-const { run, get } = require('../db');
+const { run, get, all } = require('../db');
 const { requireAuth, requireRole } = require('../middleware/requireAuth');
 const { wrapAllRoutes } = require('../middleware/asyncHandler');
 
@@ -24,6 +24,22 @@ router.post('/talents/:userId/propose', requireAuth, requireRole('company'), asy
   ]);
 
   res.status(201).json({ proposed: true });
+});
+
+// 내가(프리랜서) 받은 제안 목록
+router.get('/proposals/received', requireAuth, requireRole('freelancer'), async (req, res) => {
+  const rows = await all(
+    `SELECT p.id, p.created_at, p.job_id, p.company_id,
+            c.name AS company_name, c.description AS company_description,
+            j.title AS job_title
+     FROM proposals p
+     JOIN companies c ON c.user_id = p.company_id
+     LEFT JOIN jobs j ON j.id = p.job_id
+     WHERE p.freelancer_id = ?
+     ORDER BY p.created_at DESC, p.id DESC`,
+    [req.user.id]
+  );
+  res.json({ proposals: rows });
 });
 
 module.exports = router;
