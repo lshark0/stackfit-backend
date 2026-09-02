@@ -442,7 +442,7 @@ function tabs(nc){
   if(state.role==="freelancer"){
     return [{k:"home",l:"홈",i:I.home},{k:"jobs",l:"공고",i:I.jobs},{k:"projects",l:"프로젝트 관리",i:I.proj},{k:"chatList",l:"채팅",i:I.chat},{k:"mypage",l:"MY",i:I.user}];
   }
-  return [{k:"home",l:"홈",i:I.home},{k:"talent",l:"인재풀",i:I.talent},{k:"jobs",l:"공고관리",i:I.jobs},{k:"projects",l:"프로젝트",i:I.proj},{k:"chatList",l:"채팅",i:I.chat},{k:"mypage",l:"MY",i:I.user}];
+  return [{k:"home",l:"홈",i:I.home},{k:"talent",l:"인재풀",i:I.talent},{k:"jobs",l:"공고관리",i:I.jobs},{k:"projects",l:"프로젝트 관리",i:I.proj},{k:"chatList",l:"채팅",i:I.chat},{k:"mypage",l:"MY",i:I.user}];
 }
 function tabbar(active){
   return `<div class="tabbar">${tabs().map(t=>{
