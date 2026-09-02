@@ -1079,17 +1079,17 @@ async function screenTalentDetail(){
     <div class="back-row" style="padding:0 0 10px;"><div class="back-btn" onclick="go('talent')">${I.back}</div><div class="page-sub">프로필 상세</div></div>
     <div class="detail-hero" style="display:flex; gap:14px; align-items:center;">
       <div class="avatar lg">${esc(t.name[0])}</div>
-      <div><div class="org">${esc(t.role_title)} · ${esc(t.years)} ${t.verified?'· ✓ 인증':''}</div><h2 style="font-size:18px;">${esc(t.name)}</h2>
+      <div><div class="org">${esc(t.role_title)} ${t.verified?'· ✓ 인증':''}</div><h2 style="font-size:18px;">${esc(t.name)}</h2>
       <div style="margin-top:6px;">${ratingBadge(t.rating_avg, t.rating_count)}</div></div>
     </div>
     <div class="kv-grid">
+      <div class="kv-box"><div class="kv-lbl">업무</div><div class="kv-val">${esc(t.role_title)}</div></div>
       <div class="kv-box"><div class="kv-lbl">희망단가</div><div class="kv-val">${esc(t.rate)}</div></div>
-      <div class="kv-box"><div class="kv-lbl">경력</div><div class="kv-val">${esc(t.years)}</div></div>
       ${t.grade?`<div class="kv-box"><div class="kv-lbl">등급</div><div class="kv-val">${esc(t.grade)}</div></div>`:''}
     </div>
-    <div class="section-label">보유 기술스택</div>
+    <div class="section-label">기술스택</div>
     <div class="tag-row">${t.stack.map(s=>`<span class="tag on">${esc(s)}</span>`).join('')}</div>
-    <div class="section-label">소개</div><div class="para">${esc(t.summary) || '소개가 아직 등록되지 않았어요.'}</div>
+    <div class="section-label">자기 소개</div><div class="para">${esc(t.summary) || '자기 소개가 아직 등록되지 않았어요.'}</div>
     <div class="section-label">경력기술서</div>
     ${t.resume_url ? `<a href="${fileUrl(t.resume_url)}" target="_blank" class="btn btn-outline">📄 경력기술서 열기</a>` : `<div class="page-sub">아직 첨부된 경력기술서가 없어요.</div>`}
     <div style="height:90px;"></div>
