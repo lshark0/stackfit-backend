@@ -1138,7 +1138,11 @@ async function screenTalentDetail(){
     <div class="tag-row">${t.stack.map(s=>`<span class="tag on">${esc(s)}</span>`).join('')}</div>
     <div class="section-label">자기 소개</div><div class="para">${esc(t.summary) || '자기 소개가 아직 등록되지 않았어요.'}</div>
     <div class="section-label">경력기술서</div>
-    ${t.resume_url ? `<a href="${viewerUrl(t.resume_url)}" target="_blank" class="btn btn-outline">📄 경력기술서 열기</a>` : `<div class="page-sub">아직 첨부된 경력기술서가 없어요.</div>`}
+    ${t.resume_url ? `
+      <div style="display:flex; gap:8px;">
+        <a href="${viewerUrl(t.resume_url)}" target="_blank" class="btn btn-outline" style="flex:1;">📄 경력기술서 열기</a>
+        <a href="${fileUrl(t.resume_url)}" download="${esc(t.resume_original_name||'경력기술서')}" class="btn btn-outline" style="flex:0 0 auto; width:auto; padding:13px 16px;">⬇</a>
+      </div>` : `<div class="page-sub">아직 첨부된 경력기술서가 없어요.</div>`}
     <div style="height:90px;"></div>
   </div>
   <div style="position:absolute; left:0; right:0; bottom:0; padding:14px 20px 22px; background:var(--paper); border-top:1px solid var(--line); display:flex; gap:10px;">
@@ -1264,7 +1268,7 @@ async function screenApplicants(){
         ${gauge(a.match)}
         <div class="meta-row">
           <span class="rate">${esc(a.rate)}</span>
-          ${a.resume_url? `<span><a href="${viewerUrl(a.resume_url)}" target="_blank" style="color:var(--ink); font-weight:600;">📄 경력기술서 보기</a></span>` : `<span style="color:var(--slate-light);">경력기술서 미첨부</span>`}
+          ${a.resume_url? `<span style="display:flex; align-items:center; gap:8px;"><a href="${viewerUrl(a.resume_url)}" target="_blank" style="color:var(--ink); font-weight:600;">📄 경력기술서 보기</a><a href="${fileUrl(a.resume_url)}" download="${esc(a.resume_original_name||'경력기술서')}" style="color:var(--slate); font-weight:600;">⬇ 다운로드</a></span>` : `<span style="color:var(--slate-light);">경력기술서 미첨부</span>`}
         </div>
         ${a.status==='submitted'? `
           <div style="display:flex; gap:8px; margin-top:12px;">
@@ -1441,7 +1445,8 @@ function resumeSectionHtml(resumeUrl, resumeName){
     <div class="card" style="margin-bottom:0; display:flex; align-items:center; justify-content:space-between; gap:10px;">
       <div style="min-width:0;"><div class="card-title" style="font-size:13px;">📄 ${esc(resumeName || '경력기술서')}</div><div class="card-org">업로드 완료</div></div>
       <div style="display:flex; gap:6px; flex:0 0 auto;">
-        <a href="${fileUrl(resumeUrl)}" target="_blank" class="btn btn-outline" style="width:auto; padding:9px 12px; font-size:12px;">보기</a>
+        <a href="${viewerUrl(resumeUrl)}" target="_blank" class="btn btn-outline" style="width:auto; padding:9px 12px; font-size:12px;">보기</a>
+        <a href="${fileUrl(resumeUrl)}" download="${esc(resumeName||'경력기술서')}" class="btn btn-outline" style="width:auto; padding:9px 12px; font-size:12px;">⬇</a>
         <button class="btn btn-outline" style="width:auto; padding:9px 12px; font-size:12px;" onclick="deleteResume()">삭제</button>
       </div>
     </div>
