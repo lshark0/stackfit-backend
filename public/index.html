@@ -971,9 +971,9 @@ async function screenHome(){
       <div class="section-label">바로가기</div>
       <div class="quick-grid">
         <div class="quick-item" onclick="go('jobs')"><div class="qi-ic">${I.jobs}</div><div class="qi-lbl">공고 탐색</div></div>
-        <div class="quick-item" onclick="go('projects')"><div class="qi-ic">${I.proj}</div><div class="qi-lbl">프로젝트</div></div>
+        <div class="quick-item" onclick="go('projects')"><div class="qi-ic">${I.proj}</div><div class="qi-lbl">프로젝트 관리</div></div>
         <div class="quick-item" onclick="go('savedJobs')"><div class="qi-ic">${I.jobs}</div><div class="qi-lbl">관심프로젝트</div></div>
-        <div class="quick-item" onclick="go('profileViews')"><div class="qi-ic">${I.eye}</div><div class="qi-lbl">열람현황</div></div>
+        <div class="quick-item" onclick="go('profileViews')"><div class="qi-ic">${I.eye}</div><div class="qi-lbl">내 프로필 열람현황</div></div>
       </div>
       <div class="section-label">추천 공고</div>
       ${jobs.slice(0,3).map(jobCard).join('') || emptyHtml('등록된 공고가 없어요', I.jobs)}
@@ -1252,8 +1252,7 @@ async function screenMypage(){
     <div class="section-label">계정</div>
     <div class="list-item" onclick="go('${isCompany?'companyProfileEdit':'profileEdit'}')"><div class="li-l"><div class="li-icon">${I.user}</div><div class="li-tt">프로필 ${isCompany?'/ 회사 정보':'수정'}</div></div>${I.back}</div>
     ${!isCompany?`
-    <div class="list-item" onclick="go('savedJobs')"><div class="li-l"><div class="li-icon">${I.jobs}</div><div class="li-tt">관심프로젝트</div></div>${I.back}</div>
-    <div class="list-item" onclick="go('profileViews')"><div class="li-l"><div class="li-icon">${I.eye}</div><div class="li-tt">내 프로필 열람현황</div></div>${I.back}</div>` : ''}
+    <div class="list-item" onclick="go('myApplications')"><div class="li-l"><div class="li-icon">${I.checklist}</div><div class="li-tt">내 지원 현황</div></div>${I.back}</div>` : ''}
     ${me.user.hasPassword ? `<div class="list-item" onclick="go('changePassword')"><div class="li-l"><div class="li-icon">${I.gear}</div><div class="li-tt">비밀번호 변경</div></div>${I.back}</div>` : ''}
     <div class="section-label">약관 및 정책</div>
     <div class="list-item" onclick="window.open('/terms.html','_blank')"><div class="li-l"><div class="li-icon">${I.building}</div><div class="li-tt">이용약관</div></div>${I.back}</div>
