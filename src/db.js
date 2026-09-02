@@ -54,6 +54,7 @@ if (USE_POSTGRES) {
     await pool.query(schema);
     await ensureColumnPg('freelancer_profiles', 'resume_filename', 'TEXT');
     await ensureColumnPg('freelancer_profiles', 'resume_original_name', 'TEXT');
+    await ensureColumnPg('freelancer_profiles', 'resume_data', 'BYTEA');
     await ensureColumnPg('jobs', 'deadline', 'TEXT');
     await ensureColumnPg('jobs', 'duty', 'TEXT');
     await ensureColumnPg('jobs', 'grade', 'TEXT');
@@ -92,6 +93,7 @@ if (USE_POSTGRES) {
     db.exec(schema);
     try { db.exec('ALTER TABLE freelancer_profiles ADD COLUMN resume_filename TEXT'); } catch (e) {}
     try { db.exec('ALTER TABLE freelancer_profiles ADD COLUMN resume_original_name TEXT'); } catch (e) {}
+    try { db.exec('ALTER TABLE freelancer_profiles ADD COLUMN resume_data BLOB'); } catch (e) {}
     try { db.exec('ALTER TABLE jobs ADD COLUMN deadline TEXT'); } catch (e) {}
     try { db.exec('ALTER TABLE jobs ADD COLUMN duty TEXT'); } catch (e) {}
     try { db.exec('ALTER TABLE jobs ADD COLUMN grade TEXT'); } catch (e) {}

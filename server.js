@@ -74,8 +74,16 @@ app.use('/api', apiLimiter);
 // 이력서 등 업로드 파일: 아무나 접근 가능한 고정 URL 대신, 짧은 시간(5분)만 유효한
 // 서명된 링크로만 접근할 수 있게 합니다. URL이 캡처화면/로그 등으로 유출되어도
 // 시간이 지나면 무효화되어 개인정보(이력서) 노출 위험을 줄입니다.
-const UPLOAD_DIR = path.join(__dirname, 'uploads');
-app.get('/uploads/:filename', (req, res) => {
+// 파일 내용은 디스크가 아니라 DB(resume_data)에 저장되어 있어, 재배포와 무관하게 보존됩니다.
+const MIME_BY_EXT = {
+  '.pdf': 'application/pdf',
+  '.doc': 'application/msword',
+  '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  '.ppt': 'application/vnd.ms-powerpoint',
+  '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  '.hwp': 'application/x-hwp',
+};
+app.get('/uploads/:filename', async (req, res) => {
   const { filename } = req.params;
   const { token } = req.query;
   const payload = token ? verifyToken(token) : null;
@@ -83,9 +91,16 @@ app.get('/uploads/:filename', (req, res) => {
     return res.status(403).json({ error: '파일에 접근할 수 없거나 링크가 만료됐어요.' });
   }
   const safeName = path.basename(filename); // 경로 탈출(path traversal) 방지
-  res.sendFile(path.join(UPLOAD_DIR, safeName), (err) => {
-    if (err) res.status(404).json({ error: '파일을 찾을 수 없습니다.' });
-  });
+  const row = await get(
+    'SELECT resume_data, resume_original_name FROM freelancer_profiles WHERE resume_filename = ?',
+    [safeName]
+  );
+  if (!row || !row.resume_data) {
+    return res.status(404).json({ error: '파일을 찾을 수 없습니다.' });
+  }
+  const ext = path.extname(safeName).toLowerCase();
+  res.setHeader('Content-Type', MIME_BY_EXT[ext] || 'application/octet-stream');
+  res.send(Buffer.from(row.resume_data));
 });
 app.use(express.static(path.join(__dirname, 'public'), {
   setHeaders: (res, filePath) => {

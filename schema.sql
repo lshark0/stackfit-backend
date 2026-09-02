@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS freelancer_profiles (
   completion  INTEGER NOT NULL DEFAULT 20,
   resume_filename TEXT,
   resume_original_name TEXT,
+  resume_data BLOB,
   grade       TEXT
 );
 
