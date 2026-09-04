@@ -6,37 +6,47 @@ const { wrapAllRoutes } = require('../middleware/asyncHandler');
 const router = express.Router();
 wrapAllRoutes(router);
 
-async function counterpartName(conv, viewerRole) {
-  if (viewerRole === 'freelancer') {
-    const c = await get('SELECT name FROM companies WHERE user_id = ?', [conv.company_id]);
-    return c ? c.name : '기업';
-  }
-  const f = await get('SELECT name FROM freelancer_profiles WHERE user_id = ?', [conv.freelancer_id]);
-  return f ? f.name : '프리랜서';
-}
-
 router.get('/', requireAuth, async (req, res) => {
   const col = req.user.role === 'freelancer' ? 'freelancer_id' : 'company_id';
   const convs = await all(`SELECT * FROM conversations WHERE ${col} = ? ORDER BY created_at DESC, id DESC`, [req.user.id]);
+  if (convs.length === 0) return res.json({ conversations: [] });
 
-  const result = [];
-  for (const c of convs) {
-    const last = await get('SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at DESC, id DESC LIMIT 1', [c.id]);
-    const unreadRow = await get(
-      `SELECT COUNT(*) AS n FROM messages
-       WHERE conversation_id = ? AND sender_id != ?
-       AND created_at > COALESCE((SELECT MAX(created_at) FROM messages WHERE conversation_id=? AND sender_id=?), '1970-01-01')`,
-      [c.id, req.user.id, c.id, req.user.id]
-    );
-    const jobTitle = c.job_id ? (await get('SELECT title FROM jobs WHERE id = ?', [c.job_id])) : null;
-    result.push({
+  // N+1 방지: 상대방 이름 / 공고 제목 / 메시지를 각각 한 번의 쿼리로 모아온 뒤 메모리에서 조합합니다.
+  const convIds = convs.map((c) => c.id);
+  const msgPlaceholders = convIds.map(() => '?').join(',');
+  const allMsgs = await all(
+    `SELECT * FROM messages WHERE conversation_id IN (${msgPlaceholders}) ORDER BY created_at ASC, id ASC`,
+    convIds
+  );
+
+  const counterpartIds = [...new Set(convs.map((c) => (req.user.role === 'freelancer' ? c.company_id : c.freelancer_id)))];
+  const cpPlaceholders = counterpartIds.map(() => '?').join(',');
+  const counterpartRows = req.user.role === 'freelancer'
+    ? await all(`SELECT user_id, name FROM companies WHERE user_id IN (${cpPlaceholders})`, counterpartIds)
+    : await all(`SELECT user_id, name FROM freelancer_profiles WHERE user_id IN (${cpPlaceholders})`, counterpartIds);
+  const nameById = Object.fromEntries(counterpartRows.map((r) => [r.user_id, r.name]));
+
+  const jobIds = [...new Set(convs.map((c) => c.job_id).filter(Boolean))];
+  const jobRows = jobIds.length
+    ? await all(`SELECT id, title FROM jobs WHERE id IN (${jobIds.map(() => '?').join(',')})`, jobIds)
+    : [];
+  const jobTitleById = Object.fromEntries(jobRows.map((j) => [j.id, j.title]));
+
+  const result = convs.map((c) => {
+    const msgs = allMsgs.filter((m) => m.conversation_id === c.id);
+    const last = msgs.length ? msgs[msgs.length - 1] : null;
+    // 내가 마지막으로 보낸 시각 이후에 상대가 보낸 메시지를 안 읽은 것으로 계산합니다.
+    const myLastSentAt = msgs.filter((m) => m.sender_id === req.user.id).map((m) => m.created_at).pop() || '1970-01-01';
+    const unread = msgs.filter((m) => m.sender_id !== req.user.id && m.created_at > myLastSentAt).length;
+    const counterpartId = req.user.role === 'freelancer' ? c.company_id : c.freelancer_id;
+    return {
       ...c,
-      name: await counterpartName(c, req.user.role),
-      jobTitle: jobTitle ? jobTitle.title : null,
+      name: nameById[counterpartId] || (req.user.role === 'freelancer' ? '기업' : '프리랜서'),
+      jobTitle: c.job_id ? (jobTitleById[c.job_id] || null) : null,
       lastMessage: last,
-      unread: Number(unreadRow.n),
-    });
-  }
+      unread,
+    };
+  });
 
   res.json({ conversations: result });
 });
@@ -57,12 +67,22 @@ router.post('/', requireAuth, async (req, res) => {
     if (!freelancer) return res.status(404).json({ error: '프리랜서를 찾을 수 없습니다.' });
   }
 
+  // 공고를 지정한 경우, 실제 존재하며 그 기업의 공고가 맞는지 확인합니다.
+  let safeJobId = null;
+  if (jobId !== undefined && jobId !== null && jobId !== '') {
+    const jid = Number(jobId);
+    if (!Number.isInteger(jid)) return res.status(400).json({ error: '올바르지 않은 공고 ID입니다.' });
+    const job = await get('SELECT id FROM jobs WHERE id = ? AND company_id = ?', [jid, cId]);
+    if (!job) return res.status(404).json({ error: '공고를 찾을 수 없습니다.' });
+    safeJobId = jid;
+  }
+
   let conv = await get(
     'SELECT * FROM conversations WHERE company_id=? AND freelancer_id=? AND job_id IS NOT DISTINCT FROM ?',
-    [cId, fId, jobId || null]
+    [cId, fId, safeJobId]
   );
   if (!conv) {
-    const r = await run('INSERT INTO conversations (company_id, freelancer_id, job_id) VALUES (?,?,?)', [cId, fId, jobId || null]);
+    const r = await run('INSERT INTO conversations (company_id, freelancer_id, job_id) VALUES (?,?,?)', [cId, fId, safeJobId]);
     conv = await get('SELECT * FROM conversations WHERE id = ?', [r.lastInsertRowid]);
   }
   res.status(201).json(conv);

@@ -68,17 +68,21 @@ router.get('/jobs/:id/applicants', requireAuth, requireRole('company'), async (r
   if (!job) return res.status(404).json({ error: '공고를 찾을 수 없습니다.' });
   const jobStack = JSON.parse(job.stack_json);
   const rows = await all(
-    `SELECT a.id AS application_id, a.status, a.created_at, f.*
-     FROM applications a JOIN freelancer_profiles f ON f.user_id = a.freelancer_id
+    `SELECT a.id AS application_id, a.status, a.created_at, a.freelancer_id, f.*
+     FROM applications a LEFT JOIN freelancer_profiles f ON f.user_id = a.freelancer_id
      WHERE a.job_id = ? ORDER BY a.created_at DESC`,
     [req.params.id]
   );
   res.json({
     job: { id: job.id, title: job.title },
     applicants: rows.map(r => {
-      const stack = JSON.parse(r.stack_json);
+      const stack = r.stack_json ? JSON.parse(r.stack_json) : [];
       return {
         ...r,
+        user_id: r.user_id ?? r.freelancer_id,
+        name: r.name || '(탈퇴한 회원)',
+        role_title: r.role_title || '',
+        rate: r.rate || '',
         stack,
         match: computeMatch(jobStack, stack),
         resume_url: signedFileUrl(r.resume_filename),
@@ -98,6 +102,9 @@ router.patch('/jobs/:jobId/applicants/:applicationId', requireAuth, requireRole(
 
   const application = await get('SELECT * FROM applications WHERE id = ? AND job_id = ?', [req.params.applicationId, job.id]);
   if (!application) return res.status(404).json({ error: '지원 내역을 찾을 수 없습니다.' });
+  if (application.status !== 'submitted') {
+    return res.status(400).json({ error: '이미 처리된 지원이에요.' });
+  }
 
   await run('UPDATE applications SET status = ? WHERE id = ?', [status, application.id]);
 

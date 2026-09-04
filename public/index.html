@@ -746,14 +746,31 @@ async function startChatWithCompany(companyId, jobId){
   try{ const conv = await apiFetch('/conversations', {method:'POST', body:{companyId, jobId: jobId||null}}); go('chatRoom', conv.id); }
   catch(e){ toast(e.message); }
 }
+function chatBubblesHtml(messages){
+  return messages.map(m=>`
+      <div class="bubble ${m.sender_id===state.userId?'me':'them'}">${esc(m.body)}<div class="bubble-time">${new Date(m.created_at).toLocaleString('ko-KR',{hour:'numeric',minute:'2-digit'})}</div></div>
+    `).join('') || `<div class="empty"><div class="ic">${I.chat}</div><div class="tt">첫 메시지를 보내보세요</div></div>`;
+}
 async function sendMessage(convId){
   const input = document.getElementById('chatInputEl');
   if(!input) return;
   const text = input.value.trim();
   if(!text) return;
   input.disabled = true;
-  try{ await apiFetch(`/conversations/${convId}/messages`, {method:'POST', body:{body:text}}); go('chatRoom', convId); }
-  catch(e){ toast(e.message); input.disabled=false; }
+  try{
+    const data = await apiFetch(`/conversations/${convId}/messages`, {method:'POST', body:{body:text}});
+    input.value = '';
+    const wrap = document.querySelector('#chatScroll .bubble-wrap');
+    if(wrap){
+      wrap.innerHTML = chatBubblesHtml(data.messages);
+      const box = document.getElementById('chatScroll');
+      if(box) box.scrollTop = box.scrollHeight;
+    } else {
+      go('chatRoom', convId);
+    }
+  }
+  catch(e){ toast(e.message); }
+  finally{ input.disabled=false; input.focus(); }
 }
 function chatKeydown(ev, convId){ if(ev.key==='Enter'){ ev.preventDefault(); sendMessage(convId); } }
 
@@ -1343,9 +1360,7 @@ async function screenChatRoom(){
   return `${statusbar()}
   <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('chatList')">${I.back}</div><div class="page-title" style="font-size:15px;">대화</div></div></div>
   <div class="content" id="chatScroll">
-    <div class="bubble-wrap">${data.messages.map(m=>`
-      <div class="bubble ${m.sender_id===state.userId?'me':'them'}">${esc(m.body)}<div class="bubble-time">${new Date(m.created_at).toLocaleString('ko-KR',{hour:'numeric',minute:'2-digit'})}</div></div>
-    `).join('') || `<div class="empty"><div class="ic">${I.chat}</div><div class="tt">첫 메시지를 보내보세요</div></div>`}</div>
+    <div class="bubble-wrap">${chatBubblesHtml(data.messages)}</div>
   </div>
   <div class="chat-input-bar">
     <input id="chatInputEl" class="chat-input" placeholder="메시지를 입력하세요" onkeydown="chatKeydown(event, ${state.param})">
