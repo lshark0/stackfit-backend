@@ -468,7 +468,7 @@ function tabs(nc){
 }
 function tabbar(active){
   return `<div class="tabbar">${tabs().map(t=>{
-    const onclick = t.k==='jobs' ? "jobQuery=''; jobCat='전체'; go('jobs')" : `go('${t.k}')`;
+    const onclick = t.k==='jobs' ? "jobQuery=''; jobCat='전체'; jobGrade='전체'; jobDuty=''; go('jobs')" : `go('${t.k}')`;
     return `<button class="tab-btn ${t.k===active?'active':''}" onclick="${onclick}">${t.i}<span class="tab-lbl">${t.l}</span></button>`;
   }).join('')}</div>`;
 }
@@ -802,7 +802,7 @@ async function advanceStage(id, nextStage){
 }
 
 /* ---- Job search / filter (partial refresh, keeps input focus) ---- */
-let jobQuery="", jobCat="전체";
+let jobQuery="", jobCat="전체", jobGrade="전체", jobDuty="";
 async function refreshJobList(){
   const el = document.getElementById('jobList');
   if(!el) return;
@@ -811,6 +811,8 @@ async function refreshJobList(){
     const qs = new URLSearchParams();
     if(jobQuery) qs.set('q', jobQuery);
     if(jobCat && jobCat!=='전체') qs.set('category', jobCat);
+    if(jobGrade && jobGrade!=='전체') qs.set('grade', jobGrade);
+    if(jobDuty) qs.set('duty', jobDuty);
     const data = await apiFetch('/jobs?' + qs.toString());
     el.innerHTML = data.jobs.length ? data.jobs.map(jobCard).join('') : emptyHtml('조건에 맞는 공고가 없어요', I.jobs);
   }catch(e){ el.innerHTML = emptyHtml(e.message, I.jobs); }
@@ -823,7 +825,7 @@ function setJobCat(cat, el){
   refreshJobList();
 }
 
-let talentQuery="", talentCat="전체";
+let talentQuery="", talentCat="전체", talentGrade="전체";
 async function refreshTalentList(){
   const el = document.getElementById('talentList');
   if(!el) return;
@@ -832,6 +834,7 @@ async function refreshTalentList(){
     const qs = new URLSearchParams();
     if(talentQuery) qs.set('q', talentQuery);
     if(talentCat && talentCat!=='전체') qs.set('category', talentCat);
+    if(talentGrade && talentGrade!=='전체') qs.set('grade', talentGrade);
     const data = await apiFetch('/talents?' + qs.toString());
     el.innerHTML = data.talents.length ? data.talents.map(talentCard).join('') : emptyHtml('조건에 맞는 인재가 없어요', I.talent);
   }catch(e){ el.innerHTML = emptyHtml(e.message, I.talent); }
@@ -892,7 +895,7 @@ async function postJob(){
       description: document.getElementById('pj-desc').value.trim(),
     }});
     toast('공고가 등록됐어요');
-    jobQuery=''; jobCat='전체';
+    jobQuery=''; jobCat='전체'; jobGrade='전체'; jobDuty='';
     go('jobs');
   }catch(e){ toast(e.message); }
 }
@@ -1081,14 +1084,26 @@ async function screenJobs(){
   const qs = new URLSearchParams();
   if(jobQuery) qs.set('q', jobQuery);
   if(jobCat && jobCat!=='전체') qs.set('category', jobCat);
+  if(jobGrade && jobGrade!=='전체') qs.set('grade', jobGrade);
+  if(jobDuty) qs.set('duty', jobDuty);
   const data = await apiFetch('/jobs?' + qs.toString());
   const cats = ["전체","인프라","클라우드"];
+  const grades = ["전체","초급","중급","고급","특급"];
+  const duties = ["","PM","PL","TA","SA","DBA","개발자","QA","보안","감리","기타"];
   return `${statusbar()}${header(isCompany?"등록한 공고":"공고 탐색", `${data.jobs.length}개의 공고`,{}, nc)}
   <div class="content">
     <div class="search-box">${I.search}<input value="${esc(jobQuery)}" placeholder="제목, 기업명, 기술스택 검색" oninput="onJobSearch(this.value)"></div>
     <div class="chip-row" id="jobChips">${cats.map((c)=>`<div class="chip ${c===jobCat?'active':''}" onclick="setJobCat('${c}', this)">${c}</div>`).join('')}</div>
+    <div style="display:flex; gap:8px; margin:10px 0;">
+      <select id="jobGradeSel" class="form-input" style="flex:1; padding:9px 10px; font-size:12.5px;" onchange="jobGrade=this.value; refreshJobList();">
+        ${grades.map(g=>`<option value="${g}" ${g===jobGrade?'selected':''}>${g==='전체'?'등급 전체':g}</option>`).join('')}
+      </select>
+      <select id="jobDutySel" class="form-input" style="flex:1; padding:9px 10px; font-size:12.5px;" onchange="jobDuty=this.value; refreshJobList();">
+        ${duties.map(d=>`<option value="${d}" ${d===jobDuty?'selected':''}>${d===''?'업무 전체':d}</option>`).join('')}
+      </select>
+    </div>
     <div class="section-label">${isCompany?"등록 현황":"매칭률 순"}</div>
-    <div id="jobList">${data.jobs.map(jobCard).join('') || emptyHtml('등록된 공고가 없어요', I.jobs)}</div>
+    <div id="jobList">${data.jobs.map(jobCard).join('') || emptyHtml('조건에 맞는 공고가 없어요', I.jobs)}</div>
   </div>
   ${isCompany?`<button class="fab" onclick="go('jobPost')">${I.plus}</button>`:''}
   ${tabbar('jobs')}`;
@@ -1130,12 +1145,20 @@ async function screenJobDetail(){
 
 async function screenTalent(){
   const nc = await unreadCount();
-  const data = await apiFetch('/talents');
+  const qs = new URLSearchParams();
+  if(talentQuery) qs.set('q', talentQuery);
+  if(talentCat && talentCat!=='전체') qs.set('category', talentCat);
+  if(talentGrade && talentGrade!=='전체') qs.set('grade', talentGrade);
+  const data = await apiFetch('/talents?' + qs.toString());
   const cats = ["전체","인프라","클라우드","DBA","보안"];
+  const grades = ["전체","초급","중급","고급","특급"];
   return `${statusbar()}${header("인재풀 검색","기술스택 · 경력으로 필터링",{}, nc)}
   <div class="content">
-    <div class="search-box">${I.search}<input placeholder="이름, 직무, 기술스택 검색" oninput="onTalentSearch(this.value)"></div>
-    <div class="chip-row" id="talentChips">${cats.map((c,i)=>`<div class="chip ${i===0?'active':''}" onclick="setTalentCat('${c}', this)">${c}</div>`).join('')}</div>
+    <div class="search-box">${I.search}<input value="${esc(talentQuery)}" placeholder="이름, 직무, 기술스택 검색" oninput="onTalentSearch(this.value)"></div>
+    <div class="chip-row" id="talentChips">${cats.map((c)=>`<div class="chip ${c===talentCat?'active':''}" onclick="setTalentCat('${c}', this)">${c}</div>`).join('')}</div>
+    <select id="talentGradeSel" class="form-input" style="margin:10px 0; padding:9px 10px; font-size:12.5px;" onchange="talentGrade=this.value; refreshTalentList();">
+      ${grades.map(g=>`<option value="${g}" ${g===talentGrade?'selected':''}>${g==='전체'?'등급 전체':g}</option>`).join('')}
+    </select>
     <div class="section-label">매칭률 순</div>
     <div id="talentList">${data.talents.map(talentCard).join('') || emptyHtml('등록된 인재가 없어요', I.talent)}</div>
   </div>${tabbar('talent')}`;

@@ -4,13 +4,13 @@ const { signedFileUrl } = require('../fileAccess');
 const { requireAuth, requireRole } = require('../middleware/requireAuth');
 const { wrapAllRoutes } = require('../middleware/asyncHandler');
 const { computeMatch } = require('../match');
-const { getRatingSummary } = require('../ratings');
+const { getRatingSummary, getRatingSummaries } = require('../ratings');
 
 const router = express.Router();
 wrapAllRoutes(router);
 
 router.get('/', requireAuth, requireRole('company'), async (req, res) => {
-  const { q, category, jobId } = req.query;
+  const { q, category, jobId, grade } = req.query;
   const rows = await all('SELECT * FROM freelancer_profiles');
   let talents = rows.map(t => ({ ...t, stack: JSON.parse(t.stack_json) }));
 
@@ -25,6 +25,9 @@ router.get('/', requireAuth, requireRole('company'), async (req, res) => {
   if (category && category !== '전체') {
     talents = talents.filter(t => t.stack.some(s => s.toLowerCase().includes(String(category).toLowerCase())));
   }
+  if (grade && grade !== '전체') {
+    talents = talents.filter(t => t.grade === grade);
+  }
 
   let jobStack = [];
   if (jobId) {
@@ -34,16 +37,14 @@ router.get('/', requireAuth, requireRole('company'), async (req, res) => {
   const proposalRows = await all('SELECT freelancer_id FROM proposals WHERE company_id = ?', [req.user.id]);
   const proposedIds = new Set(proposalRows.map(p => p.freelancer_id));
 
-  const result = [];
-  for (const t of talents) {
-    const rating = await getRatingSummary(t.user_id);
-    result.push({
-      ...t,
-      match: jobStack.length ? computeMatch(jobStack, t.stack) : Math.round(55 + t.stack.length * 6),
-      proposed: proposedIds.has(t.user_id),
-      ...rating,
-    });
-  }
+  // N+1 방지: 평점을 한 번의 쿼리로 일괄 조회한 뒤 메모리에서 조합합니다.
+  const ratingById = await getRatingSummaries(talents.map((t) => t.user_id));
+  const result = talents.map((t) => ({
+    ...t,
+    match: jobStack.length ? computeMatch(jobStack, t.stack) : Math.round(55 + t.stack.length * 6),
+    proposed: proposedIds.has(t.user_id),
+    ...(ratingById[t.user_id] || { rating_avg: null, rating_count: 0 }),
+  }));
 
   res.json({ talents: result });
 });

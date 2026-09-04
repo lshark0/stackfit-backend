@@ -4,7 +4,7 @@ const { requireAuth, requireRole } = require('../middleware/requireAuth');
 const { wrapAllRoutes } = require('../middleware/asyncHandler');
 const { verifyToken } = require('../auth');
 const { computeMatch } = require('../match');
-const { getRatingSummary } = require('../ratings');
+const { getRatingSummary, getRatingSummaries } = require('../ratings');
 
 // SI/공공 프로젝트에서 흔히 쓰는 업무 구분과 기술등급
 const DUTY_OPTIONS = ['PM', 'PL', 'TA', 'SA', 'DBA', '개발자', 'QA', '보안', '감리', '기타'];
@@ -22,16 +22,20 @@ function optionalAuth(req, _res, next) {
   next();
 }
 
-async function withCompanyAndStack(job) {
-  const company = await get('SELECT name FROM companies WHERE user_id = ?', [job.company_id]);
-  const rating = await getRatingSummary(job.company_id);
+function baseJob(job, companyName, rating) {
   return {
     ...job,
-    org: company ? company.name : '알 수 없음',
+    org: companyName || '알 수 없음',
     stack: JSON.parse(job.stack_json),
     d_day: dDay(job.deadline),
     ...rating,
   };
+}
+
+async function withCompanyAndStack(job) {
+  const company = await get('SELECT name FROM companies WHERE user_id = ?', [job.company_id]);
+  const rating = await getRatingSummary(job.company_id);
+  return baseJob(job, company ? company.name : null, rating);
 }
 
 // 마감일 문자열('YYYY-MM-DD')을 D-day 라벨로 변환 (잡코리아 스타일)
@@ -48,9 +52,18 @@ function dDay(deadline) {
 }
 
 router.get('/', optionalAuth, async (req, res) => {
-  const { q, category } = req.query;
+  const { q, category, duty, grade, location } = req.query;
   const rows = await all("SELECT * FROM jobs WHERE status = 'open' ORDER BY created_at DESC, id DESC");
-  let jobs = await Promise.all(rows.map(withCompanyAndStack));
+
+  // N+1 방지: 회사명/평점을 각각 한 번의 쿼리로 일괄 조회한 뒤 메모리에서 조합합니다.
+  const companyIds = [...new Set(rows.map((j) => j.company_id))];
+  const companyRows = companyIds.length
+    ? await all(`SELECT user_id, name FROM companies WHERE user_id IN (${companyIds.map(() => '?').join(',')})`, companyIds)
+    : [];
+  const companyNameById = Object.fromEntries(companyRows.map((c) => [c.user_id, c.name]));
+  const ratingById = await getRatingSummaries(companyIds);
+
+  let jobs = rows.map((j) => baseJob(j, companyNameById[j.company_id], ratingById[j.company_id] || { rating_avg: null, rating_count: 0 }));
 
   if (q) {
     const needle = String(q).toLowerCase();
@@ -62,6 +75,16 @@ router.get('/', optionalAuth, async (req, res) => {
   }
   if (category && category !== '전체') {
     jobs = jobs.filter(j => j.category === category);
+  }
+  if (duty && duty !== '전체') {
+    jobs = jobs.filter(j => j.duty === duty);
+  }
+  if (grade && grade !== '전체') {
+    jobs = jobs.filter(j => j.grade === grade);
+  }
+  if (location) {
+    const needle = String(location).toLowerCase();
+    jobs = jobs.filter(j => (j.location || '').toLowerCase().includes(needle));
   }
 
   let profileStack = [];
