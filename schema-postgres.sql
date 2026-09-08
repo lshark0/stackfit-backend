@@ -148,6 +148,20 @@ CREATE TABLE IF NOT EXISTS followed_companies (
   UNIQUE(freelancer_id, company_id)
 );
 
+-- 이랜서 스타일: 프리랜서가 참여했던 프로젝트 이력(포트폴리오)
+CREATE TABLE IF NOT EXISTS portfolios (
+  id            SERIAL PRIMARY KEY,
+  freelancer_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  title         TEXT NOT NULL,
+  client        TEXT NOT NULL DEFAULT '',
+  role_title    TEXT NOT NULL DEFAULT '',
+  period        TEXT NOT NULL DEFAULT '',
+  stack_json    TEXT NOT NULL DEFAULT '[]',
+  description   TEXT NOT NULL DEFAULT '',
+  link_url      TEXT NOT NULL DEFAULT '',
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE INDEX IF NOT EXISTS idx_jobs_company ON jobs(company_id);
 CREATE INDEX IF NOT EXISTS idx_applications_job ON applications(job_id);
 CREATE INDEX IF NOT EXISTS idx_applications_freelancer ON applications(freelancer_id);
@@ -156,3 +170,4 @@ CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
 CREATE INDEX IF NOT EXISTS idx_reviews_reviewee ON reviews(reviewee_id);
 CREATE INDEX IF NOT EXISTS idx_profile_views_freelancer ON profile_views(freelancer_id);
 CREATE INDEX IF NOT EXISTS idx_followed_companies_freelancer ON followed_companies(freelancer_id);
+CREATE INDEX IF NOT EXISTS idx_portfolios_freelancer ON portfolios(freelancer_id);

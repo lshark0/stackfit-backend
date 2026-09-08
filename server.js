@@ -15,6 +15,7 @@ const conversationRoutes = require('./src/routes/conversations');
 const notificationRoutes = require('./src/routes/notifications');
 const companyRoutes = require('./src/routes/companies');
 const recommendRoutes = require('./src/routes/recommend');
+const portfolioRoutes = require('./src/routes/portfolios');
 const oauthRoutes = require('./src/routes/oauth');
 const { verifyToken } = require('./src/auth');
 
@@ -138,6 +139,7 @@ app.use('/api/conversations', conversationRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/companies', companyRoutes);
 app.use('/api/recommend', recommendRoutes);
+app.use('/api/portfolios', portfolioRoutes);
 
 app.use((req, res) => res.status(404).json({ error: 'Not found' }));
 // eslint-disable-next-line no-unused-vars

@@ -386,6 +386,7 @@ function drawerMenuContent(){
     ${item(I.jobs,'공고 탐색','jobs')}
     ${item(I.checklist,'내 지원 현황','myApplications')}
     ${item(I.bell,'받은 제안','receivedProposals')}
+    ${item(I.checklist,'포트폴리오','portfolios')}
     ${item(I.jobs,'관심프로젝트','savedJobs')}
     ${item(I.eye,'프로필 열람현황','profileViews')}
   `;
@@ -1240,6 +1241,17 @@ async function screenTalentDetail(){
     <div class="section-label">기술스택</div>
     <div class="tag-row">${t.stack.map(s=>`<span class="tag on">${esc(s)}</span>`).join('')}</div>
     <div class="section-label">자기 소개</div><div class="para">${esc(t.summary) || '자기 소개가 아직 등록되지 않았어요.'}</div>
+    <div class="section-label">포트폴리오 ${(t.portfolios||[]).length ? `(${t.portfolios.length}건)` : ''}</div>
+    ${(t.portfolios||[]).length
+      ? t.portfolios.map(p=>`
+        <div class="card">
+          <div class="card-top"><div><div class="card-title">${esc(p.title)}</div><div class="card-org">${esc(p.client||'')}${p.role_title?` · ${esc(p.role_title)}`:''}</div></div></div>
+          ${p.period?`<div class="meta-row"><span>${I.clock}${esc(p.period)}</span></div>`:''}
+          ${p.stack.length?`<div class="tag-row">${p.stack.map(s=>`<span class="tag">${esc(s)}</span>`).join('')}</div>`:''}
+          ${p.description?`<div class="para" style="margin-top:8px;">${esc(p.description)}</div>`:''}
+          ${p.link_url?`<a href="${esc(p.link_url)}" target="_blank" rel="noopener noreferrer" class="page-sub" style="display:inline-block; margin-top:8px; color:var(--ink); text-decoration:underline;">🔗 관련 링크 열기</a>`:''}
+        </div>`).join('')
+      : `<div class="page-sub">아직 등록된 포트폴리오가 없어요.</div>`}
     <div class="section-label">경력기술서</div>
     ${t.resume_url ? `
       <div style="display:flex; gap:8px;">
@@ -1327,6 +1339,81 @@ async function screenReceivedProposals(){
         <button class="btn btn-primary" style="margin-top:10px;" onclick="startChatWithCompany(${p.company_id}${p.job_id?`, ${p.job_id}`:''})">채팅으로 답장하기</button>
       </div>`).join('') || emptyHtml('아직 받은 제안이 없어요', I.checklist)}
   </div>`;
+}
+
+async function screenPortfolios(){
+  const nc = await unreadCount();
+  const data = await apiFetch('/portfolios');
+  return `${statusbar()}${header("포트폴리오", `${data.portfolios.length}건 등록됨`, {back:'mypage'}, nc)}
+  <div class="content">
+    <div class="page-sub" style="margin-bottom:12px;">참여했던 프로젝트를 등록하면 기업이 회원님의 실력을 더 잘 판단할 수 있어요.</div>
+    ${data.portfolios.map(p=>`
+      <div class="card">
+        <div class="card-top">
+          <div><div class="card-title">${esc(p.title)}</div><div class="card-org">${esc(p.client||'')}${p.role_title?` · ${esc(p.role_title)}`:''}</div></div>
+        </div>
+        ${p.period?`<div class="meta-row"><span>${I.clock}${esc(p.period)}</span></div>`:''}
+        ${p.stack.length?`<div class="tag-row">${p.stack.map(s=>`<span class="tag">${esc(s)}</span>`).join('')}</div>`:''}
+        ${p.description?`<div class="para" style="margin-top:8px;">${esc(p.description)}</div>`:''}
+        ${p.link_url?`<a href="${esc(p.link_url)}" target="_blank" rel="noopener noreferrer" class="page-sub" style="display:inline-block; margin-top:8px; color:var(--ink); text-decoration:underline;">🔗 관련 링크 열기</a>`:''}
+        <div style="display:flex; gap:6px; margin-top:12px;">
+          <button class="btn btn-outline" style="width:auto; padding:9px 14px; font-size:12px;" onclick="go('portfolioEdit', ${p.id})">수정</button>
+          <button class="btn btn-outline" style="width:auto; padding:9px 14px; font-size:12px; border-color:var(--danger); color:var(--danger);" onclick="deletePortfolio(${p.id})">삭제</button>
+        </div>
+      </div>`).join('') || `<div class="reco-empty">아직 등록한 포트폴리오가 없어요.<br>아래 버튼으로 첫 프로젝트를 추가해보세요.</div>`}
+    <button class="btn btn-primary" style="margin-top:14px;" onclick="go('portfolioEdit')">+ 프로젝트 추가</button>
+    <div style="height:20px;"></div>
+  </div>`;
+}
+
+async function screenPortfolioEdit(){
+  const isEdit = !!state.param;
+  let p = { title:'', client:'', role_title:'', period:'', stack:[], description:'', link_url:'' };
+  if(isEdit){
+    const data = await apiFetch('/portfolios');
+    const found = data.portfolios.find(x=>x.id===Number(state.param));
+    if(found) p = found;
+  }
+  return `${statusbar()}
+  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('portfolios')">${I.back}</div><div class="page-title">${isEdit?'포트폴리오 수정':'프로젝트 추가'}</div></div></div>
+  <div class="content">
+    <div class="form-field"><label class="form-label">프로젝트명</label><input id="pf2-title" class="form-input" placeholder="예: 대형 유통사 클라우드 전환" value="${esc(p.title)}"></div>
+    <div class="form-field"><label class="form-label">고객사 / 발주처</label><input id="pf2-client" class="form-input" placeholder="예: ○○그룹" value="${esc(p.client)}"></div>
+    <div class="form-field"><label class="form-label">담당 업무</label><input id="pf2-role" class="form-input" placeholder="예: DBA, 인프라 설계" value="${esc(p.role_title)}"></div>
+    <div class="form-field"><label class="form-label">참여 기간</label><input id="pf2-period" class="form-input" placeholder="예: 2024.03 ~ 2024.09 (7개월)" value="${esc(p.period)}"></div>
+    <div class="form-field"><label class="form-label">사용 기술 (콤마로 구분)</label><input id="pf2-stack" class="form-input" placeholder="예: AWS, Kubernetes, Oracle" value="${esc(p.stack.join(', '))}"></div>
+    <div class="form-field"><label class="form-label">상세 내용 / 성과</label><textarea id="pf2-desc" class="form-input" placeholder="맡았던 역할과 성과를 구체적으로 적어주세요">${esc(p.description)}</textarea></div>
+    <div class="form-field"><label class="form-label">관련 링크 (선택)</label><input id="pf2-link" class="form-input" placeholder="https://..." value="${esc(p.link_url)}"></div>
+    <button class="btn btn-primary" onclick="${isEdit?`savePortfolio(${state.param})`:'savePortfolio()'}">${isEdit?'수정 완료':'등록하기'}</button>
+    <div style="height:20px;"></div>
+  </div>`;
+}
+
+async function savePortfolio(id){
+  const title = document.getElementById('pf2-title').value.trim();
+  if(!title){ toast('프로젝트명을 입력해주세요'); return; }
+  const stackRaw = document.getElementById('pf2-stack').value.trim();
+  const body = {
+    title,
+    client: document.getElementById('pf2-client').value.trim(),
+    role_title: document.getElementById('pf2-role').value.trim(),
+    period: document.getElementById('pf2-period').value.trim(),
+    stack: stackRaw ? stackRaw.split(',').map(s=>s.trim()).filter(Boolean) : [],
+    description: document.getElementById('pf2-desc').value.trim(),
+    link_url: document.getElementById('pf2-link').value.trim(),
+  };
+  try{
+    if(id) await apiFetch('/portfolios/'+id, {method:'PUT', body});
+    else await apiFetch('/portfolios', {method:'POST', body});
+    toast(id?'수정됐어요':'등록됐어요');
+    go('portfolios');
+  }catch(e){ toast(e.message); }
+}
+async function deletePortfolio(id){
+  showConfirm('이 포트폴리오를 삭제할까요?', async () => {
+    try{ await apiFetch('/portfolios/'+id, {method:'DELETE'}); toast('삭제됐어요'); go('portfolios'); }
+    catch(e){ toast(e.message); }
+  });
 }
 
 async function screenMyApplications(){
@@ -1423,7 +1510,8 @@ async function screenMypage(){
     <div class="list-item" onclick="go('${isCompany?'companyProfileEdit':'profileEdit'}')"><div class="li-l"><div class="li-icon">${I.user}</div><div class="li-tt">프로필 ${isCompany?'/ 회사 정보':'수정'}</div></div>${I.back}</div>
     ${!isCompany?`
     <div class="list-item" onclick="go('myApplications')"><div class="li-l"><div class="li-icon">${I.checklist}</div><div class="li-tt">내 지원 현황</div></div>${I.back}</div>
-    <div class="list-item" onclick="go('receivedProposals')"><div class="li-l"><div class="li-icon">${I.bell}</div><div class="li-tt">받은 제안</div></div>${I.back}</div>` : ''}
+    <div class="list-item" onclick="go('receivedProposals')"><div class="li-l"><div class="li-icon">${I.bell}</div><div class="li-tt">받은 제안</div></div>${I.back}</div>
+    <div class="list-item" onclick="go('portfolios')"><div class="li-l"><div class="li-icon">${I.checklist}</div><div class="li-tt">포트폴리오</div></div>${I.back}</div>` : ''}
     ${me.user.hasPassword ? `<div class="list-item" onclick="go('changePassword')"><div class="li-l"><div class="li-icon">${I.gear}</div><div class="li-tt">비밀번호 변경</div></div>${I.back}</div>` : ''}
     <div class="section-label">약관 및 정책</div>
     <div class="list-item" onclick="window.open('/terms.html','_blank')"><div class="li-l"><div class="li-icon">${I.building}</div><div class="li-tt">이용약관</div></div>${I.back}</div>
@@ -1642,6 +1730,7 @@ async function render(){
       oauthRole: screenOauthRole,
       changePassword: screenChangePassword, deleteAccount: screenDeleteAccount,
       myApplications: screenMyApplications,
+      portfolios: screenPortfolios, portfolioEdit: screenPortfolioEdit,
       savedJobs: screenSavedJobs, profileViews: screenProfileViews, receivedProposals: screenReceivedProposals,
       reviewForm: screenReviewForm,
     };

@@ -74,12 +74,17 @@ router.get('/:userId', requireAuth, requireRole('company'), async (req, res) => 
   }
 
   const rating = await getRatingSummary(freelancerId);
+  const portfolioRows = await all(
+    'SELECT * FROM portfolios WHERE freelancer_id = ? ORDER BY created_at DESC, id DESC',
+    [freelancerId]
+  );
 
   res.json({
     ...t,
     stack: JSON.parse(t.stack_json),
     proposed,
     resume_url: signedFileUrl(t.resume_filename),
+    portfolios: portfolioRows.map((p) => ({ ...p, stack: JSON.parse(p.stack_json) })),
     ...rating,
   });
 });
