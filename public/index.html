@@ -117,6 +117,9 @@
   .stat-lbl{font-size:10.5px; color:var(--slate); margin-top:3px;}
   .banner{background:linear-gradient(135deg, var(--ink) 0%, var(--ink-soft) 100%); border-radius:18px; padding:18px; color:#fff; position:relative; overflow:hidden; margin-top:16px; cursor:pointer;}
   .banner::after{content:""; position:absolute; right:-30px; top:-30px; width:120px; height:120px; border-radius:50%; background:radial-gradient(circle, rgba(232,163,61,.35), transparent 70%);}
+  .banner::before{content:""; position:absolute; left:-20px; bottom:-40px; width:110px; height:110px; border-radius:32px; transform:rotate(28deg); background:linear-gradient(135deg, rgba(47,182,166,.16), transparent 65%); pointer-events:none;}
+  .banner > *{position:relative; z-index:1;}
+  .hero-art{position:absolute; right:0; top:0; width:150px; height:100%; opacity:.9; pointer-events:none;}
   .banner-eyebrow{font-family:var(--mono); font-size:10px; letter-spacing:.12em; color:var(--amber-soft); text-transform:uppercase;}
   .banner-title{font-size:16px; font-weight:700; margin-top:6px; line-height:1.4;}
   .banner-sub{font-size:11.5px; color:#B8BEC8; margin-top:5px;}
@@ -553,6 +556,103 @@ function gauge(pct){
 function statusbar(){
   return `<div class="statusbar"></div>`;
 }
+// ── SVG 일러스트레이션 ───────────────────────────
+// 외부 이미지 대신 앱에 직접 그려넣는 방식이라, 로딩이 즉시 되고 오프라인에서도 보입니다.
+const ART = {
+  // 빈 공고 목록
+  noJobs: `<svg viewBox="0 0 200 140" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="34" y="38" width="132" height="82" rx="12" fill="var(--paper-dim)"/>
+    <rect x="34" y="38" width="132" height="82" rx="12" stroke="var(--line)" stroke-width="2"/>
+    <rect x="72" y="26" width="56" height="22" rx="7" fill="var(--card)" stroke="var(--line)" stroke-width="2"/>
+    <rect x="50" y="60" width="60" height="7" rx="3.5" fill="var(--slate-light)" opacity=".5"/>
+    <rect x="50" y="76" width="90" height="6" rx="3" fill="var(--line)"/>
+    <rect x="50" y="90" width="70" height="6" rx="3" fill="var(--line)"/>
+    <circle cx="150" cy="98" r="18" fill="var(--amber)" opacity=".18"/>
+    <path d="M144 98l4.5 4.5L158 93" stroke="var(--amber-deep)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`,
+  // 빈 인재풀
+  noTalents: `<svg viewBox="0 0 200 140" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="100" cy="52" r="24" fill="var(--paper-dim)" stroke="var(--line)" stroke-width="2"/>
+    <path d="M64 116c0-20 16-32 36-32s36 12 36 32" fill="var(--paper-dim)" stroke="var(--line)" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="48" cy="70" r="14" fill="var(--card)" stroke="var(--line)" stroke-width="2"/>
+    <circle cx="152" cy="70" r="14" fill="var(--card)" stroke="var(--line)" stroke-width="2"/>
+    <circle cx="100" cy="46" r="6" fill="var(--amber)" opacity=".55"/>
+  </svg>`,
+  // 빈 채팅
+  noChat: `<svg viewBox="0 0 200 140" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="30" y="34" width="104" height="60" rx="14" fill="var(--paper-dim)" stroke="var(--line)" stroke-width="2"/>
+    <path d="M52 94l-10 16 26-16" fill="var(--paper-dim)" stroke="var(--line)" stroke-width="2" stroke-linejoin="round"/>
+    <rect x="48" y="54" width="50" height="6" rx="3" fill="var(--line)"/>
+    <rect x="48" y="68" width="34" height="6" rx="3" fill="var(--line)"/>
+    <rect x="96" y="62" width="74" height="44" rx="12" fill="var(--ink)"/>
+    <rect x="110" y="76" width="40" height="5" rx="2.5" fill="var(--amber-soft)" opacity=".8"/>
+    <rect x="110" y="88" width="26" height="5" rx="2.5" fill="var(--amber-soft)" opacity=".45"/>
+  </svg>`,
+  // 빈 알림
+  noAlerts: `<svg viewBox="0 0 200 140" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M100 34c-16 0-28 12-28 28v18l-10 14h76l-10-14V62c0-16-12-28-28-28z" fill="var(--paper-dim)" stroke="var(--line)" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M88 100a12 12 0 0 0 24 0" stroke="var(--line)" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="100" cy="30" r="5" fill="var(--amber)"/>
+    <path d="M46 60c2-10 7-18 14-24M154 60c-2-10-7-18-14-24" stroke="var(--line)" stroke-width="2" stroke-linecap="round"/>
+  </svg>`,
+  // 빈 프로젝트
+  noProjects: `<svg viewBox="0 0 200 140" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="40" y="44" width="120" height="72" rx="12" fill="var(--paper-dim)" stroke="var(--line)" stroke-width="2"/>
+    <path d="M40 62h120" stroke="var(--line)" stroke-width="2"/>
+    <circle cx="54" cy="53" r="3.5" fill="var(--danger)" opacity=".6"/>
+    <circle cx="66" cy="53" r="3.5" fill="var(--amber)" opacity=".7"/>
+    <circle cx="78" cy="53" r="3.5" fill="var(--cyan)" opacity=".7"/>
+    <rect x="56" y="78" width="26" height="24" rx="5" fill="var(--amber)" opacity=".35"/>
+    <rect x="88" y="86" width="26" height="16" rx="5" fill="var(--cyan)" opacity=".35"/>
+    <rect x="120" y="72" width="26" height="30" rx="5" fill="var(--ink)" opacity=".18"/>
+  </svg>`,
+  // 빈 포트폴리오
+  noPortfolio: `<svg viewBox="0 0 200 140" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="44" y="46" width="112" height="70" rx="12" fill="var(--paper-dim)" stroke="var(--line)" stroke-width="2"/>
+    <path d="M78 46V38a8 8 0 0 1 8-8h28a8 8 0 0 1 8 8v8" stroke="var(--line)" stroke-width="2" stroke-linecap="round"/>
+    <rect x="62" y="64" width="44" height="6" rx="3" fill="var(--line)"/>
+    <rect x="62" y="78" width="66" height="5" rx="2.5" fill="var(--line)" opacity=".7"/>
+    <rect x="62" y="90" width="52" height="5" rx="2.5" fill="var(--line)" opacity=".7"/>
+    <circle cx="132" cy="96" r="14" fill="var(--amber)" opacity=".2"/>
+    <path d="M132 89v14M125 96h14" stroke="var(--amber-deep)" stroke-width="2.5" stroke-linecap="round"/>
+  </svg>`,
+  // 홈 히어로 배경 (기하학적 패턴)
+  heroPattern: `<svg viewBox="0 0 320 120" fill="none" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
+    <circle cx="272" cy="16" r="52" fill="var(--amber)" opacity=".13"/>
+    <circle cx="300" cy="72" r="30" fill="var(--cyan)" opacity=".10"/>
+    <rect x="226" y="52" width="30" height="30" rx="8" transform="rotate(24 226 52)" fill="var(--amber)" opacity=".16"/>
+    <path d="M188 96l14-24 14 24z" fill="var(--amber-soft)" opacity=".22"/>
+  </svg>`,
+};
+
+// 기업/사람 이름으로 고유한 색상 아바타를 자동 생성합니다 (이미지 업로드 없이도 시각적으로 구분됨).
+const AVATAR_COLORS = [
+  ['#E8A33D','#C6822A'], ['#2FB6A6','#1E8D80'], ['#6C8EE3','#4763B8'],
+  ['#D97B8F','#B15468'], ['#8B7BD8','#6355B0'], ['#5FA860','#3F8442'],
+];
+function autoAvatar(name, size){
+  const label = String(name || '?').trim();
+  const initial = label ? label[0] : '?';
+  let hash = 0;
+  for (let i = 0; i < label.length; i++) hash = (hash * 31 + label.charCodeAt(i)) >>> 0;
+  const [c1, c2] = AVATAR_COLORS[hash % AVATAR_COLORS.length];
+  const px = size || 44;
+  const radius = Math.round(px * 0.27);
+  return `<div style="width:${px}px; height:${px}px; border-radius:${radius}px; flex:0 0 auto;
+    background:linear-gradient(145deg, ${c1}, ${c2}); color:#fff; font-family:var(--mono); font-weight:700;
+    font-size:${Math.round(px*0.34)}px; display:flex; align-items:center; justify-content:center;
+    box-shadow:0 3px 10px rgba(20,23,28,.15);">${esc(initial)}</div>`;
+}
+
+// 일러스트가 들어간 빈 화면
+function emptyArt(art, title, desc){
+  return `<div style="padding:26px 20px; text-align:center;">
+    <div style="width:100%; max-width:200px; margin:0 auto 14px;">${art}</div>
+    <div style="font-size:14px; font-weight:700; color:var(--ink); margin-bottom:5px;">${esc(title)}</div>
+    ${desc?`<div style="font-size:12.5px; color:var(--slate); line-height:1.6;">${desc}</div>`:''}
+  </div>`;
+}
+
 function emptyHtml(msg, icon){
   return `<div class="empty"><div class="ic">${icon||I.jobs}</div><div class="tt">${esc(msg)}</div></div>`;
 }
@@ -638,7 +738,7 @@ function recoTalentCard(t){
   return `<div class="card clickable" onclick="go('talentDetail', ${t.user_id})">
     <div class="card-top">
       <div style="display:flex; gap:12px; align-items:center;">
-        <div class="avatar">${esc((t.name||'?')[0])}</div>
+        ${autoAvatar(t.name)}
         <div><div class="card-title">${esc(t.name)}${t.grade?` <span style="font-family:var(--mono); font-size:10.5px; font-weight:700; color:var(--amber-deep);">${esc(t.grade)}</span>`:''}</div>
         <div class="card-org">${esc(t.role_title||'')}</div></div>
       </div>
@@ -652,7 +752,7 @@ function talentCard(t){
   return `<div class="card clickable" onclick="go('talentDetail', ${t.user_id})">
     <div class="card-top">
       <div style="display:flex; gap:12px; align-items:center;">
-        <div class="avatar">${esc(t.name[0])}</div>
+        ${autoAvatar(t.name)}
         <div><div class="card-title">${esc(t.name)} <span style="font-family:var(--mono); font-weight:400; font-size:11px; color:var(--slate);">· ${esc(t.years)}</span>${t.grade?` <span style="font-family:var(--mono); font-size:10.5px; font-weight:700; color:var(--amber-deep);">${esc(t.grade)}</span>`:''}</div>
         <div class="card-org">${esc(t.role_title)}${t.verified?' · 인증됨':''}${t.proposed?' · <span style="color:var(--cyan)">제안완료</span>':''}</div></div>
       </div>
@@ -1219,7 +1319,7 @@ async function screenHome(){
         ? recoData.jobs.map(recoJobCard).join('')
         : `<div class="reco-empty">프로필에 기술스택·업무·등급을 채우면<br>딱 맞는 프로젝트를 추천해드려요.<br><b onclick="go('profileEdit')" style="color:var(--ink); text-decoration:underline; cursor:pointer;">프로필 채우러 가기</b></div>`}
       <div class="section-label">전체 공고</div>
-      ${jobs.slice(0,3).map(jobCard).join('') || emptyHtml('등록된 공고가 없어요', I.jobs)}
+      ${jobs.slice(0,3).map(jobCard).join('') || emptyArt(ART.noJobs, '등록된 공고가 없어요')}
     </div>${tabbar('home')}`;
   }
   const [company, talentsData, jobsData, recoData] = await Promise.all([
@@ -1242,7 +1342,10 @@ async function screenHome(){
         label:g, value: talentsData.talents.filter(t=>t.grade===g).length
       })), true)}
     </div>` : ''}
-    <div class="banner" onclick="go('jobPost')"><div class="banner-eyebrow">Job Posting</div><div class="banner-title">새 공고를 등록해보세요</div><div class="banner-sub">등록 즉시 인재풀과 매칭이 시작돼요</div></div>
+    <div class="banner" onclick="go('jobPost')">
+      <div class="hero-art">${ART.heroPattern}</div>
+      <div class="banner-eyebrow">Job Posting</div><div class="banner-title">새 공고를 등록해보세요</div><div class="banner-sub">등록 즉시 인재풀과 매칭이 시작돼요</div>
+    </div>
     <div class="section-label">바로가기</div>
     <div class="quick-grid">
       <div class="quick-item" onclick="go('jobPost')"><div class="qi-ic">${I.plus}</div><div class="qi-lbl">공고 등록</div></div>
@@ -1257,7 +1360,7 @@ async function screenHome(){
           ? '아직 조건에 맞는 인재가 없어요.<br>공고의 기술스택·업무·등급을 채우면 정확도가 올라가요.'
           : '공고를 등록하면 딱 맞는 인재를<br>자동으로 추천해드려요.<br><b onclick="go(\'jobPost\')" style="color:var(--ink); text-decoration:underline; cursor:pointer;">공고 등록하러 가기</b>'}</div>`}
     <div class="section-label">전체 인재풀</div>
-    ${talentsData.talents.slice(0,3).map(talentCard).join('') || emptyHtml('등록된 인재가 없어요', I.talent)}
+    ${talentsData.talents.slice(0,3).map(talentCard).join('') || emptyArt(ART.noTalents, '등록된 인재가 없어요')}
   </div>${tabbar('home')}`;
 }
 
@@ -1286,7 +1389,7 @@ async function screenJobs(){
       </select>
     </div>
     <div class="section-label">${isCompany?"등록 현황":"매칭률 순"}</div>
-    <div id="jobList">${data.jobs.map(jobCard).join('') || emptyHtml('조건에 맞는 공고가 없어요', I.jobs)}</div>
+    <div id="jobList">${data.jobs.map(jobCard).join('') || emptyArt(ART.noJobs, '조건에 맞는 공고가 없어요', '검색어나 필터를 바꿔보세요.')}</div>
   </div>
   ${isCompany?`<button class="fab" onclick="go('jobPost')">${I.plus}</button>`:''}
   ${tabbar('jobs')}`;
@@ -1357,7 +1460,7 @@ async function screenTalent(){
       ${grades.map(g=>`<option value="${g}" ${g===talentGrade?'selected':''}>${g==='전체'?'등급 전체':g}</option>`).join('')}
     </select>
     <div class="section-label">매칭률 순</div>
-    <div id="talentList">${data.talents.map(talentCard).join('') || emptyHtml('등록된 인재가 없어요', I.talent)}</div>
+    <div id="talentList">${data.talents.map(talentCard).join('') || emptyArt(ART.noTalents, '조건에 맞는 인재가 없어요', '검색어나 등급 필터를 바꿔보세요.')}</div>
   </div>${tabbar('talent')}`;
 }
 
@@ -1367,7 +1470,7 @@ async function screenTalentDetail(){
   <div class="content" style="padding-top:14px;">
     <div class="back-row" style="padding:0 0 10px;"><div class="back-btn" onclick="go('talent')">${I.back}</div><div class="page-sub">프로필 상세</div></div>
     <div class="detail-hero" style="display:flex; gap:14px; align-items:center;">
-      <div class="avatar lg">${esc(t.name[0])}</div>
+      ${autoAvatar(t.name, 64)}
       <div><div class="org">${esc(t.role_title)} ${t.verified?'· ✓ 인증':''}</div><h2 style="font-size:18px;">${esc(t.name)}</h2>
       <div style="margin-top:6px;">${ratingBadge(t.rating_avg, t.rating_count)}</div></div>
     </div>
@@ -1424,7 +1527,7 @@ async function screenProjects(){
             <div style="color:var(--amber-deep); font-size:14px;">${'★'.repeat(p.receivedReview.rating)}${'☆'.repeat(5-p.receivedReview.rating)}</div>
             ${p.receivedReview.comment? `<div class="page-sub" style="margin-top:6px; line-height:1.6;">${esc(p.receivedReview.comment)}</div>` : ''}
           </div>` : (p.stage>=4? `<div class="page-sub" style="margin-top:10px;">아직 상대방의 평가가 등록되지 않았어요.</div>` : '')}
-      </div>`).join('') || emptyHtml('진행 중인 프로젝트가 없어요', I.proj)}
+      </div>`).join('') || emptyArt(ART.noProjects, '진행 중인 프로젝트가 없어요', '지원이 수락되면 프로젝트가 자동으로 생성돼요.')}
   </div>${tabbar('projects')}`;
 }
 
@@ -1472,7 +1575,7 @@ async function screenReceivedProposals(){
         ${p.company_description? `<div class="para" style="margin-top:6px;">${esc(p.company_description)}</div>` : ''}
         <div class="page-sub" style="margin-top:10px;">${new Date(p.created_at).toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric'})} 도착</div>
         <button class="btn btn-primary" style="margin-top:10px;" onclick="startChatWithCompany(${p.company_id}${p.job_id?`, ${p.job_id}`:''})">채팅으로 답장하기</button>
-      </div>`).join('') || emptyHtml('아직 받은 제안이 없어요', I.checklist)}
+      </div>`).join('') || emptyArt(ART.noAlerts, '아직 받은 제안이 없어요', '프로필을 채우면 기업의 제안을 받을 확률이 높아져요.')}
   </div>`;
 }
 
@@ -1495,7 +1598,7 @@ async function screenPortfolios(){
           <button class="btn btn-outline" style="width:auto; padding:9px 14px; font-size:12px;" onclick="go('portfolioEdit', ${p.id})">수정</button>
           <button class="btn btn-outline" style="width:auto; padding:9px 14px; font-size:12px; border-color:var(--danger); color:var(--danger);" onclick="deletePortfolio(${p.id})">삭제</button>
         </div>
-      </div>`).join('') || `<div class="reco-empty">아직 등록한 포트폴리오가 없어요.<br>아래 버튼으로 첫 프로젝트를 추가해보세요.</div>`}
+      </div>`).join('') || emptyArt(ART.noPortfolio, '아직 등록한 포트폴리오가 없어요', '참여했던 프로젝트를 등록하면<br>기업이 실력을 더 잘 판단할 수 있어요.')}
     <button class="btn btn-primary" style="margin-top:14px;" onclick="go('portfolioEdit')">+ 프로젝트 추가</button>
     <div style="height:20px;"></div>
   </div>`;
@@ -1567,7 +1670,7 @@ async function screenMyApplications(){
         <div class="tag-row">${a.stack.map(s=>`<span class="tag">${esc(s)}</span>`).join('')}</div>
         <div class="meta-row"><span>${I.pin}${esc(a.location)}</span><span class="rate">${esc(a.rate)}</span></div>
         <div class="page-sub" style="margin-top:8px;">${new Date(a.created_at).toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric'})} 지원</div>
-      </div>`).join('') || emptyHtml('아직 지원한 공고가 없어요', I.jobs)}
+      </div>`).join('') || emptyArt(ART.noJobs, '아직 지원한 공고가 없어요', '마음에 드는 공고에 지원해보세요.')}
   </div>${tabbar('home')}`;
 }
 
@@ -1583,7 +1686,7 @@ async function screenApplicants(){
       <div class="card">
         <div class="card-top">
           <div style="display:flex; gap:12px; align-items:center;">
-            <div class="avatar">${esc(a.name[0])}</div>
+            ${autoAvatar(a.name)}
             <div><div class="card-title">${esc(a.name)} <span style="font-family:var(--mono); font-weight:400; font-size:11px; color:var(--slate);">· ${esc(a.years)}</span></div>
             <div class="card-org">${esc(a.role_title)}${a.verified?' · 인증됨':''}</div></div>
           </div>
@@ -1600,7 +1703,7 @@ async function screenApplicants(){
             <button class="btn btn-outline" onclick="decideApplicant(${state.param}, ${a.application_id}, 'rejected')">거절</button>
             <button class="btn btn-primary" onclick="decideApplicant(${state.param}, ${a.application_id}, 'accepted')">수락</button>
           </div>` : ''}
-      </div>`).join('') || emptyHtml('아직 지원자가 없어요', I.talent)}
+      </div>`).join('') || emptyArt(ART.noTalents, '아직 지원자가 없어요', '인재풀에서 직접 포지션을 제안해볼 수도 있어요.')}
   </div>`;
 }
 
@@ -1610,11 +1713,11 @@ async function screenChatList(){
   <div class="content">
     ${data.conversations.map(c=>`
       <div class="chat-row" onclick="go('chatRoom', ${c.id})">
-        <div class="avatar">${esc((c.name||'?')[0])}</div>
+        ${autoAvatar(c.name)}
         <div class="chat-body"><div class="chat-name">${esc(c.name)}${c.jobTitle?` <span style="font-family:var(--mono); font-weight:400; font-size:11px; color:var(--slate);">· ${esc(c.jobTitle)}</span>`:''}<span class="chat-time">${c.lastMessage? new Date(c.lastMessage.created_at).toLocaleString('ko-KR',{hour:'numeric',minute:'2-digit'}) : ''}</span></div>
         <div class="chat-preview">${c.lastMessage? esc(c.lastMessage.body) : '대화를 시작해보세요'}</div></div>
         ${c.unread? `<div class="unread">${c.unread}</div>`:''}
-      </div>`).join('') || emptyHtml('아직 채팅이 없어요', I.chat)}
+      </div>`).join('') || emptyArt(ART.noChat, '아직 채팅이 없어요', '공고나 인재 상세에서 대화를 시작할 수 있어요.')}
   </div>${tabbar('chatList')}`;
 }
 
@@ -1637,7 +1740,7 @@ async function screenMypage(){
   return `${statusbar()}${header("마이페이지","",{bell:false})}
   <div class="content">
     <div class="mypage-head">
-      <div class="avatar lg">${esc((profile.name||'?')[0])}</div>
+      ${autoAvatar(profile.name, 64)}
       <div><div class="card-title">${esc(profile.name)}</div><div class="card-org">${isCompany?esc(profile.contact_person||''):esc(profile.role_title||'')+' · '+esc(profile.years||'')}</div></div>
     </div>
     ${!isCompany?`<div class="banner" onclick="go('profileEdit')"><div class="banner-eyebrow">Profile</div><div class="banner-title">프로필 완성도 ${profile.completion}%</div><div class="profile-bar"><div class="profile-bar-fill" style="width:${profile.completion}%"></div></div></div>`:''}
@@ -1715,7 +1818,7 @@ async function screenSavedJobs(){
   return `${statusbar()}
   <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('mypage')">${I.back}</div><div class="page-title" style="font-size:18px;">관심프로젝트</div></div></div>
   <div class="content">
-    ${data.jobs.map(jobCard).join('') || emptyHtml('아직 저장한 프로젝트가 없어요', I.jobs)}
+    ${data.jobs.map(jobCard).join('') || emptyArt(ART.noJobs, '아직 저장한 프로젝트가 없어요', '공고 카드의 ★ 버튼으로 저장할 수 있어요.')}
   </div>`;
 }
 
@@ -1727,10 +1830,10 @@ async function screenProfileViews(){
     <div class="page-sub" style="margin-bottom:10px;">최근 50건까지 표시돼요</div>
     ${data.views.map(v=>`
       <div class="chat-row" style="cursor:default;">
-        <div class="avatar">${esc((v.company_name||'?')[0])}</div>
+        ${autoAvatar(v.company_name)}
         <div class="chat-body"><div class="chat-name">${esc(v.company_name)}<span class="chat-time">${new Date(v.created_at).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'numeric',minute:'2-digit'})}</span></div>
         <div class="chat-preview">회원님의 프로필을 열람했어요</div></div>
-      </div>`).join('') || emptyHtml('아직 프로필을 열람한 기업이 없어요', I.eye)}
+      </div>`).join('') || emptyArt(ART.noTalents, '아직 프로필을 열람한 기업이 없어요', '프로필을 채우면 기업 노출이 늘어나요.')}
   </div>`;
 }
 
@@ -1815,7 +1918,7 @@ async function screenAlerts(){
         <div class="card-top"><span class="tag on" style="border-radius:999px;">${esc(a.tag)}</span><span class="chat-time">${new Date(a.created_at).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'numeric',minute:'2-digit'})}</span></div>
         <div class="card-title" style="margin-top:9px; font-size:13.5px;">${esc(a.title)}${!a.is_read?' <span style="color:var(--amber-deep)">●</span>':''}</div>
         <div class="page-sub" style="font-family:var(--sans); color:var(--slate); margin-top:3px;">${esc(a.body)}</div>
-      </div>`).join('') || emptyHtml('아직 알림이 없어요', I.bell)}
+      </div>`).join('') || emptyArt(ART.noAlerts, '아직 알림이 없어요', '지원·제안·메시지가 오면 여기에 표시돼요.')}
   </div>`;
 }
 
