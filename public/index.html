@@ -253,11 +253,14 @@
   .sbadge{display:inline-flex; align-items:center; gap:4px; font-size:10.5px; font-weight:700; padding:4px 9px 4px 7px; border-radius:999px; line-height:1; white-space:nowrap;}
   .sbadge svg{flex:0 0 auto;}
   .sbadge.applied{background:var(--cyan-soft); color:#177C70;}
+  .sbadge.proposed{background:#F0E9FA; color:#6355B0;}
+  .sbadge.verified{background:#DCEFEC; color:#177C70;}
   .sbadge.pending{background:#FDF0D9; color:var(--amber-deep);}
   .sbadge.pass{background:var(--ink); color:var(--amber-soft);}
   .sbadge.fail{background:var(--paper-dim); color:var(--slate);}
   /* 지원완료 공고 카드는 왼쪽에 컬러 띠로 구분 */
   .card.is-applied{border-left:4px solid var(--cyan);}
+  .card.is-proposed{border-left:4px solid #8B7BD8;}
   /* 아이콘이 붙은 메타 정보 줄 */
   .icon-meta{display:flex; flex-wrap:wrap; gap:10px 14px; margin-top:9px;}
   .icon-meta .im{display:inline-flex; align-items:center; gap:5px; font-size:11.5px; color:var(--slate);}
@@ -417,6 +420,8 @@ const I = {
   wallet:`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3" y="6" width="18" height="13" rx="3"/><path d="M3 10h18M16.5 14.5h.01" stroke-linecap="round"/></svg>`,
   calendar:`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3.5" y="5" width="17" height="16" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4" stroke-linecap="round"/></svg>`,
   layers:`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 3l9 5-9 5-9-5 9-5z" stroke-linejoin="round"/><path d="M3.5 12.5L12 17l8.5-4.5M3.5 16.5L12 21l8.5-4.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  sent:`<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M21 3L3 10.5l7 2.7 2.7 7L21 3z" fill="currentColor"/><path d="M10 13.2L21 3" stroke="#fff" stroke-width="1.6" stroke-linecap="round" opacity=".55"/></svg>`,
+  verified:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 2.5l2.4 1.9 3-.3 1.1 2.9 2.6 1.4-.8 3 .8 3-2.6 1.4-1.1 2.9-3-.3L12 21.5 9.6 19.6l-3 .3-1.1-2.9L2.9 15.6l.8-3-.8-3L5.5 8.2l1.1-2.9 3 .3L12 2.5z" fill="currentColor"/><path d="M8.8 12.2l2.2 2.2 4.4-4.8" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   badgeCheck:`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 3l2.2 1.7 2.7-.3 1 2.6 2.4 1.3-.7 2.7.7 2.7-2.4 1.3-1 2.6-2.7-.3L12 21l-2.2-1.7-2.7.3-1-2.6L3.7 15.7l.7-2.7-.7-2.7 2.4-1.3 1-2.6 2.7.3L12 3z" stroke-linejoin="round"/><path d="M9 12l2 2 4-4.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   checklist:`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 9l1.5 1.5L12.5 7.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 15h8" stroke-linecap="round"/></svg>`,
   trash:`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 11v6M14 11v6" stroke-linecap="round"/></svg>`,
@@ -821,8 +826,10 @@ function recoTalentCard(t){
     <div class="card-top">
       <div style="display:flex; gap:12px; align-items:center;">
         ${autoAvatar(t.name)}
-        <div><div class="card-title">${esc(t.name)} ${gradeBadge(t.grade)}</div>
-        <div class="card-org">${esc(t.role_title||'')}</div></div>
+        <div style="min-width:0;">
+          <div class="card-title">${esc(t.name)} ${gradeBadge(t.grade)}</div>
+          <div style="margin-top:5px;">${dutyBadge(t.role_title)}</div>
+        </div>
       </div>
       <span class="reco-badge">추천 ${t.score}%</span>
     </div>
@@ -831,16 +838,25 @@ function recoTalentCard(t){
   </div>`;
 }
 function talentCard(t){
-  return `<div class="card clickable" onclick="go('talentDetail', ${t.user_id})">
+  return `<div class="card clickable ${t.proposed?'is-proposed':''}" onclick="go('talentDetail', ${t.user_id})">
     <div class="card-top">
-      <div style="display:flex; gap:12px; align-items:center;">
+      <div style="display:flex; gap:12px; align-items:center; min-width:0;">
         ${autoAvatar(t.name)}
-        <div><div class="card-title">${esc(t.name)} ${gradeBadge(t.grade)}</div>
-        <div class="card-org">${esc(t.role_title)}${t.verified?' · 인증됨':''}${t.proposed?' · <span style="color:var(--cyan)">제안완료</span>':''}</div></div>
+        <div style="min-width:0;">
+          <div class="card-title">${esc(t.name)} ${gradeBadge(t.grade)}</div>
+          <div style="margin-top:5px; display:flex; flex-wrap:wrap; gap:5px; align-items:center;">
+            ${dutyBadge(t.role_title)}
+            ${t.verified?`<span class="sbadge verified">${I.verified}인증됨</span>`:''}
+            ${t.proposed?`<span class="sbadge proposed">${I.sent}제안완료</span>`:''}
+          </div>
+        </div>
       </div>
     </div>
     <div class="tag-row">${t.stack.map(s=>`<span class="tag">${esc(s)}</span>`).join('')}</div>
-    <div class="meta-row"><span class="rate">${esc(t.rate)}</span>${ratingBadge(t.rating_avg, t.rating_count)}</div>
+    <div class="icon-meta">
+      <span class="im">${I.wallet}<b>${esc(t.rate)}</b></span>
+      ${t.rating_count>0?`<span class="im">${ratingBadge(t.rating_avg, t.rating_count)}</span>`:''}
+    </div>
     ${gauge(t.match)}
   </div>`;
 }
@@ -1556,8 +1572,15 @@ async function screenTalentDetail(){
     <div class="back-row" style="padding:0 0 10px;"><div class="back-btn" onclick="go('talent')">${I.back}</div><div class="page-sub">프로필 상세</div></div>
     <div class="detail-hero" style="display:flex; gap:14px; align-items:center;">
       ${autoAvatar(t.name, 64)}
-      <div><div class="org">${esc(t.role_title)} ${t.verified?'· ✓ 인증':''}</div><h2 style="font-size:18px;">${esc(t.name)}</h2>
-      <div style="margin-top:6px;">${ratingBadge(t.rating_avg, t.rating_count)}</div></div>
+      <div style="min-width:0;">
+        <h2 style="font-size:18px;">${esc(t.name)}</h2>
+        <div style="margin-top:7px; display:flex; flex-wrap:wrap; gap:5px; align-items:center;">
+          ${gradeBadge(t.grade)}
+          ${t.verified?`<span class="sbadge verified">${I.verified}인증됨</span>`:''}
+          ${t.proposed?`<span class="sbadge proposed">${I.sent}제안완료</span>`:''}
+        </div>
+        <div style="margin-top:6px;">${ratingBadge(t.rating_avg, t.rating_count)}</div>
+      </div>
     </div>
     <div class="kv-grid">
       <div class="kv-box"><div class="kv-lbl">업무</div><div class="kv-val">${t.role_title ? dutyBadge(t.role_title) : '-'}</div></div>
@@ -1588,7 +1611,7 @@ async function screenTalentDetail(){
   </div>
   <div style="position:absolute; left:0; right:0; bottom:0; padding:14px 20px 22px; background:var(--paper); border-top:1px solid var(--line); display:flex; gap:10px;">
     <button class="btn btn-outline" onclick="startChatWithTalent(${t.user_id})">메시지 보내기</button>
-    <button class="btn btn-primary" ${t.proposed?'disabled':''} onclick="proposeTalent(${t.user_id})">${t.proposed?'제안 완료':'제안 보내기'}</button>
+    <button class="btn btn-primary" ${t.proposed?'disabled':''} onclick="proposeTalent(${t.user_id})" style="display:flex; align-items:center; justify-content:center; gap:7px;">${I.sent}${t.proposed?'제안 완료':'제안 보내기'}</button>
   </div>`;
 }
 
@@ -1768,7 +1791,11 @@ async function screenMyApplications(){
 async function screenApplicants(){
   const nc = await unreadCount();
   const data = await apiFetch('/jobs/' + state.param + '/applicants');
-  const statusLabel = { submitted:'검토중', accepted:'수락됨', rejected:'거절됨' };
+  const badge = {
+    submitted: `<span class="sbadge pending">${I.clockSm}검토중</span>`,
+    accepted: `<span class="sbadge pass">${I.trophy}수락됨</span>`,
+    rejected: `<span class="sbadge fail">${I.xCircle}거절됨</span>`,
+  };
   return `${statusbar()}
   <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('jobDetail', ${state.param})">${I.back}</div>
     <div><div class="page-title" style="font-size:18px;">지원자 관리</div><div class="page-sub">${esc(data.job.title)}</div></div></div></div>
@@ -1778,10 +1805,15 @@ async function screenApplicants(){
         <div class="card-top">
           <div style="display:flex; gap:12px; align-items:center;">
             ${autoAvatar(a.name)}
-            <div><div class="card-title">${esc(a.name)} <span style="font-family:var(--mono); font-weight:400; font-size:11px; color:var(--slate);">· ${esc(a.years)}</span></div>
-            <div class="card-org">${esc(a.role_title)}${a.verified?' · 인증됨':''}</div></div>
+            <div style="min-width:0;">
+              <div class="card-title">${esc(a.name)} ${gradeBadge(a.grade)}</div>
+              <div style="margin-top:5px; display:flex; flex-wrap:wrap; gap:5px; align-items:center;">
+                ${dutyBadge(a.role_title)}
+                ${a.verified?`<span class="sbadge verified">${I.verified}인증됨</span>`:''}
+              </div>
+            </div>
           </div>
-          <span class="tag ${a.status==='accepted'?'on':''}" style="border-radius:999px; ${a.status==='rejected'?'opacity:.55;':''}">${statusLabel[a.status]||a.status}</span>
+          ${badge[a.status] || `<span class="sbadge fail">${esc(a.status)}</span>`}
         </div>
         <div class="tag-row">${a.stack.map(s=>`<span class="tag">${esc(s)}</span>`).join('')}</div>
         ${gauge(a.match)}
