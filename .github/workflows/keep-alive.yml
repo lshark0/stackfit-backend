@@ -2,14 +2,32 @@ name: Keep STACKFIT backend awake
 
 on:
   schedule:
-    # 5분마다 실행 (Render는 15분, Neon DB는 그보다 훨씬 짧게 유휴 시 잠들기 때문에 더 자주 깨움)
-    - cron: "*/5 * * * *"
+    # GitHub Actions의 무료 스케줄러는 지연이 잦아, 3분 간격으로 넉넉히 잡아
+    # 실제로는 10~15분 안에 반드시 한 번은 실행되도록 합니다.
+    # (Render 무료 플랜은 15분 유휴 시 슬립)
+    - cron: "*/3 * * * *"
   workflow_dispatch: {}
+
+# 이전 실행이 아직 돌고 있으면 중복 실행하지 않습니다.
+concurrency:
+  group: keep-alive
+  cancel-in-progress: false
 
 jobs:
   ping:
     runs-on: ubuntu-latest
+    timeout-minutes: 3
     steps:
-      - name: Ping health endpoint
+      - name: Ping health endpoint (with retry)
         run: |
-          curl -sf --max-time 30 https://stackfit-backend.onrender.com/api/health || echo "핑 실패 (일시적일 수 있음, 다음 스케줄에서 재시도)"
+          URL="https://stackfit-backend.onrender.com/api/health"
+          for attempt in 1 2 3; do
+            # 슬립에서 깨어나는 중이면 응답이 느리므로 넉넉히 90초까지 기다립니다.
+            if curl -sf --max-time 90 "$URL" -o /tmp/health.json; then
+              echo "핑 성공 (시도 ${attempt}회): $(cat /tmp/health.json)"
+              exit 0
+            fi
+            echo "시도 ${attempt} 실패, 재시도합니다..."
+            sleep 10
+          done
+          echo "3회 모두 실패 (일시적일 수 있으며 다음 스케줄에서 재시도됩니다)"
