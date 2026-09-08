@@ -198,6 +198,53 @@
   .reco-reasons{display:flex; flex-wrap:wrap; gap:5px; margin-top:8px;}
   .reco-reason{font-size:10.5px; color:var(--slate); background:var(--paper-dim); border:1px solid var(--line); padding:3px 8px; border-radius:999px;}
   .reco-empty{padding:16px; text-align:center; font-size:12.5px; color:var(--slate); background:var(--card); border:1px dashed var(--line); border-radius:14px; line-height:1.6;}
+
+  /* ── 그래픽 컴포넌트 ── */
+  .ring-wrap{display:flex; align-items:center; justify-content:center; gap:18px; padding:6px 0;}
+  .ring{position:relative; width:104px; height:104px; flex:0 0 auto;}
+  .ring svg{transform:rotate(-90deg);}
+  .ring-track{stroke:var(--paper-dim);}
+  .ring-fill{stroke:var(--amber); stroke-linecap:round; transition:stroke-dashoffset .9s cubic-bezier(.4,0,.2,1);}
+  .ring-center{position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;}
+  .ring-num{font-family:var(--mono); font-size:22px; font-weight:700; color:var(--ink); line-height:1;}
+  .ring-lbl{font-size:10px; color:var(--slate); margin-top:3px;}
+  .ring-legend{display:flex; flex-direction:column; gap:8px;}
+  .ring-legend .li{display:flex; align-items:center; gap:7px; font-size:11.5px; color:var(--slate);}
+  .ring-legend .dot{width:8px; height:8px; border-radius:50%; flex:0 0 auto;}
+
+  .barchart{display:flex; align-items:flex-end; gap:8px; height:96px; padding:8px 2px 0;}
+  .barchart .bcol{flex:1; display:flex; flex-direction:column; align-items:center; gap:6px; height:100%; justify-content:flex-end;}
+  .barchart .bbar{width:100%; max-width:34px; border-radius:7px 7px 3px 3px; background:linear-gradient(180deg, var(--amber) 0%, var(--amber-deep) 100%); min-height:4px; transition:height .7s cubic-bezier(.4,0,.2,1);}
+  .barchart .bbar.cyan{background:linear-gradient(180deg, var(--cyan) 0%, #1E8D80 100%);}
+  .barchart .bval{font-family:var(--mono); font-size:11px; font-weight:700; color:var(--ink);}
+  .barchart .blbl{font-size:10px; color:var(--slate-light); text-align:center; line-height:1.2;}
+
+  .steps-graphic{display:flex; align-items:center; margin:14px 0 6px;}
+  .steps-graphic .snode{width:26px; height:26px; border-radius:50%; flex:0 0 auto; display:flex; align-items:center; justify-content:center; font-family:var(--mono); font-size:11px; font-weight:700; background:var(--paper-dim); color:var(--slate-light); border:2px solid var(--line);}
+  .steps-graphic .snode.done{background:var(--amber); color:var(--ink); border-color:var(--amber);}
+  .steps-graphic .snode.now{background:var(--ink); color:var(--amber-soft); border-color:var(--ink); box-shadow:0 0 0 4px rgba(232,163,61,.22);}
+  .steps-graphic .sline{flex:1; height:3px; background:var(--line); border-radius:2px;}
+  .steps-graphic .sline.done{background:var(--amber);}
+  .steps-labels{display:flex; margin-bottom:4px;}
+  .steps-labels span{flex:1; font-size:9.5px; color:var(--slate-light); text-align:center;}
+  .steps-labels span:first-child{text-align:left;}
+  .steps-labels span:last-child{text-align:right;}
+
+  .skillbars{display:flex; flex-direction:column; gap:9px; margin-top:4px;}
+  .skillbar{display:flex; align-items:center; gap:10px;}
+  .skillbar .sname{font-size:11.5px; color:var(--ink); width:82px; flex:0 0 auto; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .skillbar .strack{flex:1; height:7px; background:var(--paper-dim); border-radius:99px; overflow:hidden;}
+  .skillbar .sfill{height:100%; border-radius:99px; background:var(--cyan); transition:width .8s cubic-bezier(.4,0,.2,1);}
+  .skillbar .sfill.miss{background:var(--line);}
+  .skillbar .sicon{font-size:11px; width:14px; flex:0 0 auto; text-align:center;}
+
+  .hero-stat{display:flex; gap:10px; margin:4px 0 2px;}
+  .hero-stat .hs{flex:1; background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px 10px; text-align:center;}
+  .hero-stat .hs-num{font-family:var(--mono); font-size:19px; font-weight:700; color:var(--ink); line-height:1;}
+  .hero-stat .hs-lbl{font-size:10px; color:var(--slate); margin-top:5px;}
+  .hero-stat .hs-spark{display:flex; align-items:flex-end; justify-content:center; gap:2px; height:18px; margin-top:7px;}
+  .hero-stat .hs-spark i{width:4px; border-radius:2px; background:var(--amber-soft); display:block;}
+  .hero-stat .hs-spark i.on{background:var(--amber);}
   .btn-social{width:100%; height:54px; border-radius:999px; border:1px solid var(--line); background:#fff; display:flex; align-items:center; justify-content:center; gap:10px; font-size:15px; font-weight:700; cursor:pointer; -webkit-tap-highlight-color:transparent;}
   .btn-social:active{transform:scale(.98);}
   .soc-ic{width:22px; height:22px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:12px; font-weight:900; flex:0 0 auto; background:#fff;}
@@ -432,6 +479,70 @@ function toast(msg){
   t.textContent = msg; t.classList.add('show');
   clearTimeout(window.__toastTimer);
   window.__toastTimer = setTimeout(()=>t.classList.remove('show'), 3000);
+}
+
+// ── 그래픽 컴포넌트 ──────────────────────────────
+// 원형 도넛 게이지 (프로필 완성도, 매칭률 등)
+function ringGauge(pct, label, color){
+  const p = Math.max(0, Math.min(100, Number(pct)||0));
+  const r = 44, c = 2 * Math.PI * r;
+  const offset = c - (p/100) * c;
+  return `<div class="ring">
+    <svg width="104" height="104" viewBox="0 0 104 104">
+      <circle class="ring-track" cx="52" cy="52" r="${r}" fill="none" stroke-width="10"/>
+      <circle class="ring-fill" cx="52" cy="52" r="${r}" fill="none" stroke-width="10"
+        stroke="${color||'var(--amber)'}" stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}"/>
+    </svg>
+    <div class="ring-center"><div class="ring-num">${p}%</div><div class="ring-lbl">${esc(label||'')}</div></div>
+  </div>`;
+}
+
+// 세로 막대 차트 (등급별/업무별 분포 등)
+function barChart(items, useCyan){
+  const max = Math.max(1, ...items.map(i=>i.value));
+  return `<div class="barchart">${items.map(i=>{
+    const h = Math.round((i.value / max) * 100);
+    return `<div class="bcol">
+      <div class="bval">${i.value}</div>
+      <div class="bbar ${useCyan?'cyan':''}" style="height:${Math.max(4, h)}%"></div>
+      <div class="blbl">${esc(i.label)}</div>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+// 프로젝트 진행 단계 시각화
+function stepsGraphic(stage, steps){
+  const nodes = [];
+  steps.forEach((s, i) => {
+    const done = i < stage - 1;
+    const now = i === stage - 1;
+    nodes.push(`<div class="snode ${done?'done':''} ${now?'now':''}">${done?'✓':(i+1)}</div>`);
+    if(i < steps.length - 1) nodes.push(`<div class="sline ${i < stage - 1 ?'done':''}"></div>`);
+  });
+  return `<div class="steps-graphic">${nodes.join('')}</div>
+  <div class="steps-labels">${steps.map(s=>`<span>${esc(s)}</span>`).join('')}</div>`;
+}
+
+// 공고 요구 기술 대비 보유 여부를 막대로 비교
+function skillBars(jobStack, myStack){
+  const mine = new Set((myStack||[]).map(s=>s.toLowerCase()));
+  return `<div class="skillbars">${(jobStack||[]).slice(0,6).map(s=>{
+    const has = mine.has(s.toLowerCase());
+    return `<div class="skillbar">
+      <span class="sname">${esc(s)}</span>
+      <span class="strack"><span class="sfill ${has?'':'miss'}" style="width:${has?100:12}%"></span></span>
+      <span class="sicon">${has?'✓':'—'}</span>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+// 작은 스파크라인 (통계 카드 하단 장식 겸 추이 표현)
+function sparkline(values){
+  const max = Math.max(1, ...values);
+  return `<div class="hs-spark">${values.map(v=>{
+    const h = Math.max(3, Math.round((v/max)*18));
+    return `<i class="${v>0?'on':''}" style="height:${h}px"></i>`;
+  }).join('')}</div>`;
 }
 
 function gauge(pct){
@@ -1080,15 +1191,21 @@ async function screenHome(){
     const activeProjects = projectsData.projects.filter(p=>p.status==='진행중').length;
     return `${statusbar()}${header(`안녕하세요, ${esc(profile.name)}님`,"오늘도 좋은 매칭 찾아드릴게요",{roleChip:true}, nc)}
     <div class="content">
-      <div class="stat-strip">
-        <div class="stat-box" onclick="go('myApplications')"><div class="stat-num">${appliedCount}</div><div class="stat-lbl">지원한 공고</div></div>
-        <div class="stat-box" onclick="go('jobs')"><div class="stat-num">${maxMatch}%</div><div class="stat-lbl">최고 매칭률</div></div>
-        <div class="stat-box" onclick="go('projects')"><div class="stat-num">${activeProjects}</div><div class="stat-lbl">진행 프로젝트</div></div>
+      <div class="hero-stat">
+        <div class="hs" onclick="go('myApplications')"><div class="hs-num">${appliedCount}</div><div class="hs-lbl">지원한 공고</div>${sparkline([1,2,1,3,appliedCount||1])}</div>
+        <div class="hs" onclick="go('jobs')"><div class="hs-num">${maxMatch}%</div><div class="hs-lbl">최고 매칭률</div>${sparkline([2,1,3,2,Math.max(1,Math.round(maxMatch/25))])}</div>
+        <div class="hs" onclick="go('projects')"><div class="hs-num">${activeProjects}</div><div class="hs-lbl">진행 프로젝트</div>${sparkline([1,1,2,2,activeProjects||1])}</div>
       </div>
       <div class="banner" onclick="go('profileEdit')">
-        <div class="banner-eyebrow">Profile</div><div class="banner-title">프로필 완성도 ${profile.completion}%</div>
-        <div class="profile-bar"><div class="profile-bar-fill" style="width:${profile.completion}%"></div></div>
-        <div class="banner-sub">경력기술서를 추가하면 매칭률이 더 올라가요</div>
+        <div class="banner-eyebrow">Profile</div>
+        <div class="ring-wrap">
+          ${ringGauge(profile.completion, '완성도')}
+          <div class="ring-legend">
+            <div class="li"><span class="dot" style="background:var(--amber);"></span>작성 완료 ${profile.completion}%</div>
+            <div class="li"><span class="dot" style="background:rgba(255,255,255,.25);"></span>남은 항목 ${100-profile.completion}%</div>
+            <div class="li" style="color:var(--amber-soft); font-weight:600;">탭해서 채우기 →</div>
+          </div>
+        </div>
       </div>
       <div class="section-label">바로가기</div>
       <div class="quick-grid">
@@ -1113,11 +1230,18 @@ async function screenHome(){
   const applicantSum = jobs.reduce((a,j)=>a+(j.applicantCount||0),0);
   return `${statusbar()}${header("오늘의 인재 추천",`${esc(company.name)} · 채용 대시보드`,{roleChip:true}, nc)}
   <div class="content">
-    <div class="stat-strip">
-      <div class="stat-box" onclick="go('jobs')"><div class="stat-num">${jobs.length}</div><div class="stat-lbl">등록 공고</div></div>
-      <div class="stat-box" onclick="go('jobs')"><div class="stat-num">${applicantSum}</div><div class="stat-lbl">지원자</div></div>
-      <div class="stat-box" onclick="go('talent')"><div class="stat-num">${talentsData.talents.length}</div><div class="stat-lbl">인재풀</div></div>
+    <div class="hero-stat">
+      <div class="hs" onclick="go('jobs')"><div class="hs-num">${jobs.length}</div><div class="hs-lbl">등록 공고</div>${sparkline([1,2,1,2,jobs.length||1])}</div>
+      <div class="hs" onclick="go('jobs')"><div class="hs-num">${applicantSum}</div><div class="hs-lbl">지원자</div>${sparkline([1,1,2,3,applicantSum||1])}</div>
+      <div class="hs" onclick="go('talent')"><div class="hs-num">${talentsData.talents.length}</div><div class="hs-lbl">인재풀</div>${sparkline([2,2,3,3,talentsData.talents.length||1])}</div>
     </div>
+    ${talentsData.talents.length ? `
+    <div class="card">
+      <div class="card-title" style="font-size:13.5px;">인재풀 등급 분포</div>
+      ${barChart(['초급','중급','고급','특급'].map(g=>({
+        label:g, value: talentsData.talents.filter(t=>t.grade===g).length
+      })), true)}
+    </div>` : ''}
     <div class="banner" onclick="go('jobPost')"><div class="banner-eyebrow">Job Posting</div><div class="banner-title">새 공고를 등록해보세요</div><div class="banner-sub">등록 즉시 인재풀과 매칭이 시작돼요</div></div>
     <div class="section-label">바로가기</div>
     <div class="quick-grid">
@@ -1169,16 +1293,30 @@ async function screenJobs(){
 }
 
 async function screenJobDetail(){
-  const j = await apiFetch('/jobs/' + state.param);
   const isCompany = state.role==="company";
+  const [j, myProfile] = await Promise.all([
+    apiFetch('/jobs/' + state.param),
+    isCompany ? Promise.resolve(null) : apiFetch('/profile').catch(()=>null),
+  ]);
   return `${statusbar()}
   <div class="content" style="padding-top:14px;">
     <div class="back-row" style="padding:0 0 10px;"><div class="back-btn" onclick="go('jobs')">${I.back}</div><div class="page-sub">공고 상세</div></div>
     <div class="detail-hero">
       <div class="org">${esc(j.org)}</div>
-      <h2>${esc(j.title)}</h2>${!isCompany ? gauge(j.match) : ''}
+      <h2>${esc(j.title)}</h2>
       <div style="margin-top:8px;">${ratingBadge(j.rating_avg, j.rating_count)}</div>
     </div>
+    ${!isCompany ? `
+    <div class="card">
+      <div class="card-title" style="font-size:13.5px;">나와의 매칭 분석</div>
+      <div class="ring-wrap">
+        ${ringGauge(j.match, '스택매치', 'var(--cyan)')}
+        <div style="flex:1; min-width:0;">
+          ${skillBars(j.stack, myProfile ? myProfile.stack : [])}
+        </div>
+      </div>
+      ${!myProfile || !myProfile.stack.length ? `<div class="page-sub" style="margin-top:8px;">프로필에 기술스택을 등록하면 정확한 매칭 분석을 볼 수 있어요.</div>` : ''}
+    </div>` : ''}
     <div class="kv-grid">
       <div class="kv-box"><div class="kv-lbl">단가</div><div class="kv-val">${esc(j.rate)}</div></div>
       <div class="kv-box"><div class="kv-lbl">기간</div><div class="kv-val">${esc(j.period)}</div></div>
@@ -1276,10 +1414,7 @@ async function screenProjects(){
       <div class="card">
         <div class="card-top"><div><div class="card-title">${esc(p.title)}</div></div><span class="tag ${p.status==='진행중'?'on':''}" style="border-radius:999px;">${p.status}</span></div>
         <div class="meta-row"><span>${I.clock}${esc(p.period)}</span><span class="rate">${esc(p.rate)}</span></div>
-        <div style="margin-top:16px;">
-          ${steps.map((step,i)=>`
-            <div class="tl-item"><div class="tl-dot ${i<p.stage?'done':''}"></div><div><div class="tl-tt">${step}</div>${i===p.stage-1?`<div class="tl-ds">현재 단계 진행 중</div>`:''}</div></div>`).join('')}
-        </div>
+        ${stepsGraphic(p.stage, steps)}
         ${p.stage<4? `<button class="btn btn-outline" style="margin-top:10px;" onclick="advanceStage(${p.id}, ${p.stage+1})">다음 단계로 진행</button>`
         : p.myReview ? `<div class="page-sub" style="margin-top:10px;">내가 남긴 평점: ${'★'.repeat(p.myReview.rating)}${'☆'.repeat(5-p.myReview.rating)}</div>`
         : `<button class="btn btn-primary" style="margin-top:10px;" onclick="go('reviewForm', ${p.id})">리뷰 남기기</button>`}
