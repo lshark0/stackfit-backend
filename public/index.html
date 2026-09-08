@@ -194,6 +194,10 @@
   .quick-item{display:flex; flex-direction:column; align-items:center; gap:7px; cursor:pointer;}
   .quick-item .qi-ic{width:46px; height:46px; border-radius:14px; background:var(--card); border:1px solid var(--line); display:flex; align-items:center; justify-content:center; color:var(--ink);}
   .quick-item .qi-lbl{font-size:10.5px; color:var(--slate); text-align:center; line-height:1.3;}
+  .reco-badge{display:inline-flex; align-items:center; gap:4px; font-family:var(--mono); font-size:10px; font-weight:700; letter-spacing:.04em; padding:3px 8px; border-radius:999px; background:var(--ink); color:var(--amber-soft);}
+  .reco-reasons{display:flex; flex-wrap:wrap; gap:5px; margin-top:8px;}
+  .reco-reason{font-size:10.5px; color:var(--slate); background:var(--paper-dim); border:1px solid var(--line); padding:3px 8px; border-radius:999px;}
+  .reco-empty{padding:16px; text-align:center; font-size:12.5px; color:var(--slate); background:var(--card); border:1px dashed var(--line); border-radius:14px; line-height:1.6;}
   .btn-social{width:100%; height:54px; border-radius:999px; border:1px solid var(--line); background:#fff; display:flex; align-items:center; justify-content:center; gap:10px; font-size:15px; font-weight:700; cursor:pointer; -webkit-tap-highlight-color:transparent;}
   .btn-social:active{transform:scale(.98);}
   .soc-ic{width:22px; height:22px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:12px; font-weight:900; flex:0 0 auto; background:#fff;}
@@ -505,6 +509,31 @@ function jobCard(j){
     <div class="meta-row"><span>${I.pin}${esc(j.location)}</span><span class="rate">${esc(j.rate)}</span>${ddayBadge(j.d_day)}</div>
     <div class="meta-row" style="margin-top:4px;">${ratingBadge(j.rating_avg, j.rating_count)}</div>
     ${state.role==='freelancer' ? gauge(j.match) : ''}
+  </div>`;
+}
+function recoJobCard(j){
+  return `<div class="card clickable" onclick="go('jobDetail', ${j.id})">
+    <div class="card-top">
+      <div><div class="card-title">${esc(j.title)}</div><div class="card-org">${esc(j.org)}</div></div>
+      <span class="reco-badge">추천 ${j.score}%</span>
+    </div>
+    <div class="tag-row">${j.stack.map(s=>`<span class="tag">${esc(s)}</span>`).join('')}</div>
+    <div class="meta-row"><span>${I.pin}${esc(j.location)}</span><span class="rate">${esc(j.rate)}</span></div>
+    <div class="reco-reasons">${(j.reasons||[]).map(r=>`<span class="reco-reason">${esc(r)}</span>`).join('')}</div>
+  </div>`;
+}
+function recoTalentCard(t){
+  return `<div class="card clickable" onclick="go('talentDetail', ${t.user_id})">
+    <div class="card-top">
+      <div style="display:flex; gap:12px; align-items:center;">
+        <div class="avatar">${esc((t.name||'?')[0])}</div>
+        <div><div class="card-title">${esc(t.name)}${t.grade?` <span style="font-family:var(--mono); font-size:10.5px; font-weight:700; color:var(--amber-deep);">${esc(t.grade)}</span>`:''}</div>
+        <div class="card-org">${esc(t.role_title||'')}</div></div>
+      </div>
+      <span class="reco-badge">추천 ${t.score}%</span>
+    </div>
+    <div class="tag-row">${t.stack.map(s=>`<span class="tag">${esc(s)}</span>`).join('')}</div>
+    <div class="reco-reasons">${(t.reasons||[]).map(r=>`<span class="reco-reason">${esc(r)}</span>`).join('')}</div>
   </div>`;
 }
 function talentCard(t){
@@ -1040,8 +1069,9 @@ function screenServerSetup(){
 async function screenHome(){
   const nc = await unreadCount();
   if(state.role==="freelancer"){
-    const [profile, jobsData, projectsData] = await Promise.all([
+    const [profile, jobsData, projectsData, recoData] = await Promise.all([
       apiFetch('/profile'), apiFetch('/jobs'), apiFetch('/projects').catch(()=>({projects:[]})),
+      apiFetch('/recommend/jobs').catch(()=>({jobs:[]})),
     ]);
     const jobs = jobsData.jobs;
     const appliedCount = jobs.filter(j=>j.applied).length;
@@ -1066,12 +1096,17 @@ async function screenHome(){
         <div class="quick-item" onclick="go('savedJobs')"><div class="qi-ic">${I.jobs}</div><div class="qi-lbl">관심프로젝트</div></div>
         <div class="quick-item" onclick="go('profileViews')"><div class="qi-ic">${I.eye}</div><div class="qi-lbl">내 프로필 열람현황</div></div>
       </div>
-      <div class="section-label">추천 공고</div>
+      <div class="section-label">나에게 맞는 프로젝트</div>
+      ${recoData.jobs.length
+        ? recoData.jobs.map(recoJobCard).join('')
+        : `<div class="reco-empty">프로필에 기술스택·업무·등급을 채우면<br>딱 맞는 프로젝트를 추천해드려요.<br><b onclick="go('profileEdit')" style="color:var(--ink); text-decoration:underline; cursor:pointer;">프로필 채우러 가기</b></div>`}
+      <div class="section-label">전체 공고</div>
       ${jobs.slice(0,3).map(jobCard).join('') || emptyHtml('등록된 공고가 없어요', I.jobs)}
     </div>${tabbar('home')}`;
   }
-  const [company, talentsData, jobsData] = await Promise.all([
+  const [company, talentsData, jobsData, recoData] = await Promise.all([
     apiFetch('/profile'), apiFetch('/talents'), apiFetch('/jobs'),
+    apiFetch('/recommend/talents').catch(()=>({job:null, talents:[]})),
   ]);
   const jobs = jobsData.jobs;
   const applicantSum = jobs.reduce((a,j)=>a+(j.applicantCount||0),0);
@@ -1090,7 +1125,13 @@ async function screenHome(){
       <div class="quick-item" onclick="go('jobs')"><div class="qi-ic">${I.jobs}</div><div class="qi-lbl">공고 관리</div></div>
       <div class="quick-item" onclick="go('chatList')"><div class="qi-ic">${I.chat}</div><div class="qi-lbl">채팅</div></div>
     </div>
-    <div class="section-label">매칭률 높은 인재</div>
+    <div class="section-label">${recoData.job ? `"${esc(recoData.job.title)}"에 맞는 인재` : '맞춤 인재 추천'}</div>
+    ${recoData.talents.length
+      ? recoData.talents.map(recoTalentCard).join('')
+      : `<div class="reco-empty">${recoData.job
+          ? '아직 조건에 맞는 인재가 없어요.<br>공고의 기술스택·업무·등급을 채우면 정확도가 올라가요.'
+          : '공고를 등록하면 딱 맞는 인재를<br>자동으로 추천해드려요.<br><b onclick="go(\'jobPost\')" style="color:var(--ink); text-decoration:underline; cursor:pointer;">공고 등록하러 가기</b>'}</div>`}
+    <div class="section-label">전체 인재풀</div>
     ${talentsData.talents.slice(0,3).map(talentCard).join('') || emptyHtml('등록된 인재가 없어요', I.talent)}
   </div>${tabbar('home')}`;
 }
