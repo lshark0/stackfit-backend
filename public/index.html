@@ -266,6 +266,20 @@
   /* 섹션 제목 앞 아이콘 */
   .section-label.with-ic{display:flex; align-items:center; gap:6px;}
   .section-label.with-ic svg{color:var(--amber-deep); width:14px; height:14px;}
+
+  /* 업무(PM/TA/DBA...) · 등급(초급~특급) 배지 */
+  .dbadge{display:inline-flex; align-items:center; gap:4px; font-size:10px; font-weight:700; font-family:var(--mono); letter-spacing:.02em;
+    padding:3px 7px 3px 5px; border-radius:7px; line-height:1; background:var(--cyan-soft); color:#177C70; vertical-align:middle;}
+  .dbadge svg{width:11px; height:11px; flex:0 0 auto;}
+  .gbadge{display:inline-flex; align-items:center; gap:3px; font-size:10px; font-weight:700; font-family:var(--mono);
+    padding:3px 7px; border-radius:7px; line-height:1; vertical-align:middle;}
+  .gbadge .pips{display:inline-flex; gap:1.5px; align-items:center;}
+  .gbadge .pips i{width:3px; height:3px; border-radius:50%; background:currentColor; opacity:.32; display:block;}
+  .gbadge .pips i.on{opacity:1;}
+  .gbadge.g1{background:#EFEFEC; color:#6C7480;}
+  .gbadge.g2{background:#DCEFEC; color:#177C70;}
+  .gbadge.g3{background:#FDF0D9; color:var(--amber-deep);}
+  .gbadge.g4{background:var(--ink); color:var(--amber-soft);}
   .btn-social{width:100%; height:54px; border-radius:999px; border:1px solid var(--line); background:#fff; display:flex; align-items:center; justify-content:center; gap:10px; font-size:15px; font-weight:700; cursor:pointer; -webkit-tap-highlight-color:transparent;}
   .btn-social:active{transform:scale(.98);}
   .soc-ic{width:22px; height:22px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:12px; font-weight:900; flex:0 0 auto; background:#fff;}
@@ -733,6 +747,40 @@ function ddayBadge(dday){
   const color = closed ? 'var(--slate-light)' : urgent ? 'var(--danger)' : 'var(--cyan)';
   return `<span style="font-family:var(--mono); font-size:10.5px; font-weight:700; color:${color};">${esc(dday)}</span>`;
 }
+// 업무(직무)별 아이콘 — 역할의 성격을 직관적으로 나타냅니다.
+const DUTY_ICON = {
+  PM:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 19V6M4 6l7-2 6 2 3-1v11l-3 1-6-2-7 2" stroke-linejoin="round"/></svg>`,
+  PL:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 3l2.5 5.5L20 9l-4 4 1 6-5-3-5 3 1-6-4-4 5.5-.5z" stroke-linejoin="round"/></svg>`,
+  TA:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><path d="M7 7h.01M7 17h.01" stroke-linecap="round"/></svg>`,
+  SA:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 3l8 4v6c0 5-3.5 7.5-8 8-4.5-.5-8-3-8-8V7l8-4z" stroke-linejoin="round"/></svg>`,
+  DBA:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg>`,
+  개발자:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 7l-5 5 5 5M15 7l5 5-5 5" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  QA:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5L21 21M8.5 11l2 2 4-4.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  보안:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="5" y="10" width="14" height="10" rx="2.5"/><path d="M8.5 10V7a3.5 3.5 0 0 1 7 0v3" stroke-linecap="round"/></svg>`,
+  감리:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="5" y="3" width="14" height="18" rx="2.5"/><path d="M9 8h6M9 12h6M9 16h3" stroke-linecap="round"/></svg>`,
+  기타:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="6" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="18" cy="12" r="1.6" fill="currentColor"/></svg>`,
+};
+function dutyBadge(duty){
+  if(!duty) return '';
+  // 정확히 일치하지 않아도(예: "DBA / 튜닝 담당") 키워드가 포함되면 해당 아이콘을 붙입니다.
+  let icon = DUTY_ICON[duty];
+  if(!icon){
+    const upper = String(duty).toUpperCase();
+    const key = Object.keys(DUTY_ICON).find(k => upper.includes(k.toUpperCase()));
+    icon = key ? DUTY_ICON[key] : DUTY_ICON['기타'];
+  }
+  return `<span class="dbadge">${icon}${esc(duty)}</span>`;
+}
+
+// 등급 배지 — 등급이 높을수록 진한 색 + 채워진 점(●●●●)이 늘어납니다.
+const GRADE_RANK = { 초급:1, 중급:2, 고급:3, 특급:4 };
+function gradeBadge(grade){
+  if(!grade) return '';
+  const rank = GRADE_RANK[grade] || 1;
+  const pips = [1,2,3,4].map(n=>`<i class="${n<=rank?'on':''}"></i>`).join('');
+  return `<span class="gbadge g${rank}"><span class="pips">${pips}</span>${esc(grade)}</span>`;
+}
+
 function ratingBadge(avg, count){
   if(!avg || !count) return `<span style="font-family:var(--mono); font-size:10.5px; color:var(--slate-light);">아직 리뷰 없음</span>`;
   return `<span style="font-family:var(--mono); font-size:10.5px; color:var(--amber-deep); font-weight:700;">★ ${avg.toFixed(1)} <span style="color:var(--slate); font-weight:400;">(${count})</span></span>`;
@@ -741,7 +789,7 @@ function jobCard(j){
   return `<div class="card clickable ${j.applied?'is-applied':''}" onclick="go('jobDetail', ${j.id})">
     <div class="card-top">
       <div style="min-width:0;">
-        <div class="card-title">${esc(j.title)}${j.duty?` <span style="font-family:var(--mono); font-size:10.5px; font-weight:700; color:var(--cyan);">${esc(j.duty)}</span>`:''}${j.grade?` <span style="font-family:var(--mono); font-size:10.5px; font-weight:700; color:var(--amber-deep);">${esc(j.grade)}</span>`:''}</div>
+        <div class="card-title">${esc(j.title)} ${dutyBadge(j.duty)} ${gradeBadge(j.grade)}</div>
         <div class="card-org">${esc(j.org)}</div>
         ${j.applied?`<div style="margin-top:6px;"><span class="sbadge applied">${I.checkCircle}지원완료</span></div>`:''}
       </div>
@@ -773,7 +821,7 @@ function recoTalentCard(t){
     <div class="card-top">
       <div style="display:flex; gap:12px; align-items:center;">
         ${autoAvatar(t.name)}
-        <div><div class="card-title">${esc(t.name)}${t.grade?` <span style="font-family:var(--mono); font-size:10.5px; font-weight:700; color:var(--amber-deep);">${esc(t.grade)}</span>`:''}</div>
+        <div><div class="card-title">${esc(t.name)} ${gradeBadge(t.grade)}</div>
         <div class="card-org">${esc(t.role_title||'')}</div></div>
       </div>
       <span class="reco-badge">추천 ${t.score}%</span>
@@ -787,7 +835,7 @@ function talentCard(t){
     <div class="card-top">
       <div style="display:flex; gap:12px; align-items:center;">
         ${autoAvatar(t.name)}
-        <div><div class="card-title">${esc(t.name)} <span style="font-family:var(--mono); font-weight:400; font-size:11px; color:var(--slate);">· ${esc(t.years)}</span>${t.grade?` <span style="font-family:var(--mono); font-size:10.5px; font-weight:700; color:var(--amber-deep);">${esc(t.grade)}</span>`:''}</div>
+        <div><div class="card-title">${esc(t.name)} ${gradeBadge(t.grade)}</div>
         <div class="card-org">${esc(t.role_title)}${t.verified?' · 인증됨':''}${t.proposed?' · <span style="color:var(--cyan)">제안완료</span>':''}</div></div>
       </div>
     </div>
@@ -1462,8 +1510,8 @@ async function screenJobDetail(){
       <div class="kv-box"><div class="kv-lbl">기간</div><div class="kv-val">${esc(j.period)}</div></div>
       <div class="kv-box"><div class="kv-lbl">근무형태</div><div class="kv-val">${esc(j.work_type)}</div></div>
       <div class="kv-box"><div class="kv-lbl">근무지</div><div class="kv-val">${esc(j.location)}</div></div>
-      ${j.duty?`<div class="kv-box"><div class="kv-lbl">업무</div><div class="kv-val">${esc(j.duty)}</div></div>`:''}
-      ${j.grade?`<div class="kv-box"><div class="kv-lbl">등급</div><div class="kv-val">${esc(j.grade)}</div></div>`:''}
+      ${j.duty?`<div class="kv-box"><div class="kv-lbl">업무</div><div class="kv-val">${dutyBadge(j.duty)}</div></div>`:''}
+      ${j.grade?`<div class="kv-box"><div class="kv-lbl">등급</div><div class="kv-val">${gradeBadge(j.grade)}</div></div>`:''}
       <div class="kv-box"><div class="kv-lbl">지원마감</div><div class="kv-val">${ddayBadge(j.d_day) || esc(j.d_day)}</div></div>
     </div>
     <div class="section-label with-ic">${I.layers}요구 기술스택</div>
@@ -1512,9 +1560,9 @@ async function screenTalentDetail(){
       <div style="margin-top:6px;">${ratingBadge(t.rating_avg, t.rating_count)}</div></div>
     </div>
     <div class="kv-grid">
-      <div class="kv-box"><div class="kv-lbl">업무</div><div class="kv-val">${esc(t.role_title)}</div></div>
+      <div class="kv-box"><div class="kv-lbl">업무</div><div class="kv-val">${t.role_title ? dutyBadge(t.role_title) : '-'}</div></div>
       <div class="kv-box"><div class="kv-lbl">희망단가</div><div class="kv-val">${esc(t.rate)}</div></div>
-      ${t.grade?`<div class="kv-box"><div class="kv-lbl">등급</div><div class="kv-val">${esc(t.grade)}</div></div>`:''}
+      ${t.grade?`<div class="kv-box"><div class="kv-lbl">등급</div><div class="kv-val">${gradeBadge(t.grade)}</div></div>`:''}
     </div>
     <div class="section-label with-ic">${I.layers}기술스택</div>
     <div class="tag-row">${t.stack.map(s=>`<span class="tag on">${esc(s)}</span>`).join('')}</div>
