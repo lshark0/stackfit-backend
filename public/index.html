@@ -248,6 +248,24 @@
   .hero-stat .hs-spark{display:flex; align-items:flex-end; justify-content:center; gap:2px; height:18px; margin-top:7px;}
   .hero-stat .hs-spark i{width:4px; border-radius:2px; background:var(--amber-soft); display:block;}
   .hero-stat .hs-spark i.on{background:var(--amber);}
+
+  /* 상태 배지 (지원완료/합격/불합격 등) — 눈에 잘 띄도록 */
+  .sbadge{display:inline-flex; align-items:center; gap:4px; font-size:10.5px; font-weight:700; padding:4px 9px 4px 7px; border-radius:999px; line-height:1; white-space:nowrap;}
+  .sbadge svg{flex:0 0 auto;}
+  .sbadge.applied{background:var(--cyan-soft); color:#177C70;}
+  .sbadge.pending{background:#FDF0D9; color:var(--amber-deep);}
+  .sbadge.pass{background:var(--ink); color:var(--amber-soft);}
+  .sbadge.fail{background:var(--paper-dim); color:var(--slate);}
+  /* 지원완료 공고 카드는 왼쪽에 컬러 띠로 구분 */
+  .card.is-applied{border-left:4px solid var(--cyan);}
+  /* 아이콘이 붙은 메타 정보 줄 */
+  .icon-meta{display:flex; flex-wrap:wrap; gap:10px 14px; margin-top:9px;}
+  .icon-meta .im{display:inline-flex; align-items:center; gap:5px; font-size:11.5px; color:var(--slate);}
+  .icon-meta .im svg{color:var(--slate-light); flex:0 0 auto;}
+  .icon-meta .im b{font-weight:700; color:var(--ink); font-family:var(--mono); font-size:11.5px;}
+  /* 섹션 제목 앞 아이콘 */
+  .section-label.with-ic{display:flex; align-items:center; gap:6px;}
+  .section-label.with-ic svg{color:var(--amber-deep); width:14px; height:14px;}
   .btn-social{width:100%; height:54px; border-radius:999px; border:1px solid var(--line); background:#fff; display:flex; align-items:center; justify-content:center; gap:10px; font-size:15px; font-weight:700; cursor:pointer; -webkit-tap-highlight-color:transparent;}
   .btn-social:active{transform:scale(.98);}
   .soc-ic{width:22px; height:22px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:12px; font-weight:900; flex:0 0 auto; background:#fff;}
@@ -378,6 +396,14 @@ async function unreadCount(){
 /* ---------------- Icons ---------------- */
 const I = {
   menu:`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M4 6.5H20M4 12H20M4 17.5H20" stroke-linecap="round"/></svg>`,
+  checkCircle:`<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" fill="currentColor"/><path d="M7.5 12.5l3 3 6-6.5" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  clockSm:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5.5l3.5 2" stroke-linecap="round"/></svg>`,
+  xCircle:`<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" fill="currentColor"/><path d="M9 9l6 6M15 9l-6 6" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg>`,
+  trophy:`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M7 4h10v6a5 5 0 0 1-10 0V4z" stroke-linejoin="round"/><path d="M7 6H4.5a2.5 2.5 0 0 0 2.5 4M17 6h2.5a2.5 2.5 0 0 1-2.5 4" stroke-linecap="round"/><path d="M12 15v4M9 21h6" stroke-linecap="round"/></svg>`,
+  wallet:`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3" y="6" width="18" height="13" rx="3"/><path d="M3 10h18M16.5 14.5h.01" stroke-linecap="round"/></svg>`,
+  calendar:`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3.5" y="5" width="17" height="16" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4" stroke-linecap="round"/></svg>`,
+  layers:`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 3l9 5-9 5-9-5 9-5z" stroke-linejoin="round"/><path d="M3.5 12.5L12 17l8.5-4.5M3.5 16.5L12 21l8.5-4.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  badgeCheck:`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 3l2.2 1.7 2.7-.3 1 2.6 2.4 1.3-.7 2.7.7 2.7-2.4 1.3-1 2.6-2.7-.3L12 21l-2.2-1.7-2.7.3-1-2.6L3.7 15.7l.7-2.7-.7-2.7 2.4-1.3 1-2.6 2.7.3L12 3z" stroke-linejoin="round"/><path d="M9 12l2 2 4-4.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   checklist:`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 9l1.5 1.5L12.5 7.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 15h8" stroke-linecap="round"/></svg>`,
   trash:`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 11v6M14 11v6" stroke-linecap="round"/></svg>`,
   eye:`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="2.8"/></svg>`,
@@ -712,14 +738,22 @@ function ratingBadge(avg, count){
   return `<span style="font-family:var(--mono); font-size:10.5px; color:var(--amber-deep); font-weight:700;">★ ${avg.toFixed(1)} <span style="color:var(--slate); font-weight:400;">(${count})</span></span>`;
 }
 function jobCard(j){
-  return `<div class="card clickable" onclick="go('jobDetail', ${j.id})">
+  return `<div class="card clickable ${j.applied?'is-applied':''}" onclick="go('jobDetail', ${j.id})">
     <div class="card-top">
-      <div><div class="card-title">${esc(j.title)}${j.duty?` <span style="font-family:var(--mono); font-size:10.5px; font-weight:700; color:var(--cyan);">${esc(j.duty)}</span>`:''}${j.grade?` <span style="font-family:var(--mono); font-size:10.5px; font-weight:700; color:var(--amber-deep);">${esc(j.grade)}</span>`:''}</div><div class="card-org">${esc(j.org)}${j.applied?' · <span style="color:var(--cyan)">지원완료</span>':''}</div></div>
+      <div style="min-width:0;">
+        <div class="card-title">${esc(j.title)}${j.duty?` <span style="font-family:var(--mono); font-size:10.5px; font-weight:700; color:var(--cyan);">${esc(j.duty)}</span>`:''}${j.grade?` <span style="font-family:var(--mono); font-size:10.5px; font-weight:700; color:var(--amber-deep);">${esc(j.grade)}</span>`:''}</div>
+        <div class="card-org">${esc(j.org)}</div>
+        ${j.applied?`<div style="margin-top:6px;"><span class="sbadge applied">${I.checkCircle}지원완료</span></div>`:''}
+      </div>
       <div class="star-btn ${j.saved?'filled':''}" onclick="toggleSaveJob(${j.id}, event)">${I.star}</div>
     </div>
     <div class="tag-row">${j.stack.map(s=>`<span class="tag">${esc(s)}</span>`).join('')}</div>
-    <div class="meta-row"><span>${I.pin}${esc(j.location)}</span><span class="rate">${esc(j.rate)}</span>${ddayBadge(j.d_day)}</div>
-    <div class="meta-row" style="margin-top:4px;">${ratingBadge(j.rating_avg, j.rating_count)}</div>
+    <div class="icon-meta">
+      <span class="im">${I.pin}${esc(j.location)}</span>
+      <span class="im">${I.wallet}<b>${esc(j.rate)}</b></span>
+      <span class="im">${I.clockSm}${esc(j.period)}</span>
+    </div>
+    <div class="meta-row" style="margin-top:6px;">${ddayBadge(j.d_day)}${ratingBadge(j.rating_avg, j.rating_count)}</div>
     ${state.role==='freelancer' ? gauge(j.match) : ''}
   </div>`;
 }
@@ -1307,18 +1341,18 @@ async function screenHome(){
           </div>
         </div>
       </div>
-      <div class="section-label">바로가기</div>
+      <div class="section-label with-ic">${I.layers}바로가기</div>
       <div class="quick-grid">
         <div class="quick-item" onclick="go('jobs')"><div class="qi-ic">${I.jobs}</div><div class="qi-lbl">공고 탐색</div></div>
         <div class="quick-item" onclick="go('projects')"><div class="qi-ic">${I.proj}</div><div class="qi-lbl">프로젝트 관리</div></div>
         <div class="quick-item" onclick="go('savedJobs')"><div class="qi-ic">${I.jobs}</div><div class="qi-lbl">관심프로젝트</div></div>
         <div class="quick-item" onclick="go('profileViews')"><div class="qi-ic">${I.eye}</div><div class="qi-lbl">내 프로필 열람현황</div></div>
       </div>
-      <div class="section-label">나에게 맞는 프로젝트</div>
+      <div class="section-label with-ic">${I.badgeCheck}나에게 맞는 프로젝트</div>
       ${recoData.jobs.length
         ? recoData.jobs.map(recoJobCard).join('')
         : `<div class="reco-empty">프로필에 기술스택·업무·등급을 채우면<br>딱 맞는 프로젝트를 추천해드려요.<br><b onclick="go('profileEdit')" style="color:var(--ink); text-decoration:underline; cursor:pointer;">프로필 채우러 가기</b></div>`}
-      <div class="section-label">전체 공고</div>
+      <div class="section-label with-ic">${I.jobs}전체 공고</div>
       ${jobs.slice(0,3).map(jobCard).join('') || emptyArt(ART.noJobs, '등록된 공고가 없어요')}
     </div>${tabbar('home')}`;
   }
@@ -1346,20 +1380,20 @@ async function screenHome(){
       <div class="hero-art">${ART.heroPattern}</div>
       <div class="banner-eyebrow">Job Posting</div><div class="banner-title">새 공고를 등록해보세요</div><div class="banner-sub">등록 즉시 인재풀과 매칭이 시작돼요</div>
     </div>
-    <div class="section-label">바로가기</div>
+    <div class="section-label with-ic">${I.layers}바로가기</div>
     <div class="quick-grid">
       <div class="quick-item" onclick="go('jobPost')"><div class="qi-ic">${I.plus}</div><div class="qi-lbl">공고 등록</div></div>
       <div class="quick-item" onclick="go('talent')"><div class="qi-ic">${I.talent}</div><div class="qi-lbl">인재풀 검색</div></div>
       <div class="quick-item" onclick="go('jobs')"><div class="qi-ic">${I.jobs}</div><div class="qi-lbl">공고 관리</div></div>
       <div class="quick-item" onclick="go('chatList')"><div class="qi-ic">${I.chat}</div><div class="qi-lbl">채팅</div></div>
     </div>
-    <div class="section-label">${recoData.job ? `"${esc(recoData.job.title)}"에 맞는 인재` : '맞춤 인재 추천'}</div>
+    <div class="section-label with-ic">${I.badgeCheck}${recoData.job ? `"${esc(recoData.job.title)}"에 맞는 인재` : '맞춤 인재 추천'}</div>
     ${recoData.talents.length
       ? recoData.talents.map(recoTalentCard).join('')
       : `<div class="reco-empty">${recoData.job
           ? '아직 조건에 맞는 인재가 없어요.<br>공고의 기술스택·업무·등급을 채우면 정확도가 올라가요.'
           : '공고를 등록하면 딱 맞는 인재를<br>자동으로 추천해드려요.<br><b onclick="go(\'jobPost\')" style="color:var(--ink); text-decoration:underline; cursor:pointer;">공고 등록하러 가기</b>'}</div>`}
-    <div class="section-label">전체 인재풀</div>
+    <div class="section-label with-ic">${I.talent}전체 인재풀</div>
     ${talentsData.talents.slice(0,3).map(talentCard).join('') || emptyArt(ART.noTalents, '등록된 인재가 없어요')}
   </div>${tabbar('home')}`;
 }
@@ -1407,7 +1441,10 @@ async function screenJobDetail(){
     <div class="detail-hero">
       <div class="org">${esc(j.org)}</div>
       <h2>${esc(j.title)}</h2>
-      <div style="margin-top:8px;">${ratingBadge(j.rating_avg, j.rating_count)}</div>
+      <div style="margin-top:8px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+        ${j.applied?`<span class="sbadge applied">${I.checkCircle}지원완료</span>`:''}
+        ${ratingBadge(j.rating_avg, j.rating_count)}
+      </div>
     </div>
     ${!isCompany ? `
     <div class="card">
@@ -1429,9 +1466,9 @@ async function screenJobDetail(){
       ${j.grade?`<div class="kv-box"><div class="kv-lbl">등급</div><div class="kv-val">${esc(j.grade)}</div></div>`:''}
       <div class="kv-box"><div class="kv-lbl">지원마감</div><div class="kv-val">${ddayBadge(j.d_day) || esc(j.d_day)}</div></div>
     </div>
-    <div class="section-label">요구 기술스택</div>
+    <div class="section-label with-ic">${I.layers}요구 기술스택</div>
     <div class="tag-row">${j.stack.map(s=>`<span class="tag on">${esc(s)}</span>`).join('')}</div>
-    <div class="section-label">상세 내용</div>
+    <div class="section-label with-ic">${I.checklist}상세 내용</div>
     <div class="para">${esc(j.description) || "상세 설명이 아직 등록되지 않았어요."}</div>
     <div style="height:90px;"></div>
   </div>
@@ -1479,10 +1516,10 @@ async function screenTalentDetail(){
       <div class="kv-box"><div class="kv-lbl">희망단가</div><div class="kv-val">${esc(t.rate)}</div></div>
       ${t.grade?`<div class="kv-box"><div class="kv-lbl">등급</div><div class="kv-val">${esc(t.grade)}</div></div>`:''}
     </div>
-    <div class="section-label">기술스택</div>
+    <div class="section-label with-ic">${I.layers}기술스택</div>
     <div class="tag-row">${t.stack.map(s=>`<span class="tag on">${esc(s)}</span>`).join('')}</div>
-    <div class="section-label">자기 소개</div><div class="para">${esc(t.summary) || '자기 소개가 아직 등록되지 않았어요.'}</div>
-    <div class="section-label">포트폴리오 ${(t.portfolios||[]).length ? `(${t.portfolios.length}건)` : ''}</div>
+    <div class="section-label with-ic">${I.user}자기 소개</div><div class="para">${esc(t.summary) || '자기 소개가 아직 등록되지 않았어요.'}</div>
+    <div class="section-label with-ic">${I.checklist}포트폴리오 ${(t.portfolios||[]).length ? `(${t.portfolios.length}건)` : ''}</div>
     ${(t.portfolios||[]).length
       ? t.portfolios.map(p=>`
         <div class="card">
@@ -1493,7 +1530,7 @@ async function screenTalentDetail(){
           ${p.link_url?`<a href="${esc(p.link_url)}" target="_blank" rel="noopener noreferrer" class="page-sub" style="display:inline-block; margin-top:8px; color:var(--ink); text-decoration:underline;">🔗 관련 링크 열기</a>`:''}
         </div>`).join('')
       : `<div class="page-sub">아직 등록된 포트폴리오가 없어요.</div>`}
-    <div class="section-label">경력기술서</div>
+    <div class="section-label with-ic">${I.checklist}경력기술서</div>
     ${t.resume_url ? `
       <div style="display:flex; gap:8px;">
         <a href="${viewerUrl(t.resume_url)}" target="_blank" class="btn btn-outline" style="flex:1;">📄 경력기술서 열기</a>
@@ -1657,19 +1694,25 @@ async function deletePortfolio(id){
 async function screenMyApplications(){
   const nc = await unreadCount();
   const data = await apiFetch('/me/applications');
-  const statusLabel = { submitted:'검토중', accepted:'합격', rejected:'불합격' };
-  const statusColor = { submitted:'var(--cyan)', accepted:'var(--amber-deep)', rejected:'var(--slate-light)' };
+  const badge = {
+    submitted: `<span class="sbadge pending">${I.clockSm}검토중</span>`,
+    accepted: `<span class="sbadge pass">${I.trophy}합격</span>`,
+    rejected: `<span class="sbadge fail">${I.xCircle}불합격</span>`,
+  };
   return `${statusbar()}${header("내 지원 현황", `${data.applications.length}건 지원`, {back:'home'}, nc)}
   <div class="content">
     ${data.applications.map(a=>`
       <div class="card clickable" onclick="go('jobDetail', ${a.id})">
         <div class="card-top">
-          <div><div class="card-title">${esc(a.title)}</div><div class="card-org">${esc(a.org||'')}</div></div>
-          <span class="tag" style="border-radius:999px; color:${statusColor[a.status]||'var(--slate)'}; border-color:${statusColor[a.status]||'var(--line)'};">${statusLabel[a.status]||a.status}</span>
+          <div style="min-width:0;"><div class="card-title">${esc(a.title)}</div><div class="card-org">${esc(a.org||'')}</div></div>
+          ${badge[a.status] || `<span class="sbadge fail">${esc(a.status)}</span>`}
         </div>
         <div class="tag-row">${a.stack.map(s=>`<span class="tag">${esc(s)}</span>`).join('')}</div>
-        <div class="meta-row"><span>${I.pin}${esc(a.location)}</span><span class="rate">${esc(a.rate)}</span></div>
-        <div class="page-sub" style="margin-top:8px;">${new Date(a.created_at).toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric'})} 지원</div>
+        <div class="icon-meta">
+          <span class="im">${I.pin}${esc(a.location)}</span>
+          <span class="im">${I.wallet}<b>${esc(a.rate)}</b></span>
+          <span class="im">${I.calendar}${new Date(a.created_at).toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric'})} 지원</span>
+        </div>
       </div>`).join('') || emptyArt(ART.noJobs, '아직 지원한 공고가 없어요', '마음에 드는 공고에 지원해보세요.')}
   </div>${tabbar('home')}`;
 }
@@ -1744,17 +1787,17 @@ async function screenMypage(){
       <div><div class="card-title">${esc(profile.name)}</div><div class="card-org">${isCompany?esc(profile.contact_person||''):esc(profile.role_title||'')+' · '+esc(profile.years||'')}</div></div>
     </div>
     ${!isCompany?`<div class="banner" onclick="go('profileEdit')"><div class="banner-eyebrow">Profile</div><div class="banner-title">프로필 완성도 ${profile.completion}%</div><div class="profile-bar"><div class="profile-bar-fill" style="width:${profile.completion}%"></div></div></div>`:''}
-    <div class="section-label">계정</div>
+    <div class="section-label with-ic">${I.user}계정</div>
     <div class="list-item" onclick="go('${isCompany?'companyProfileEdit':'profileEdit'}')"><div class="li-l"><div class="li-icon">${I.user}</div><div class="li-tt">프로필 ${isCompany?'/ 회사 정보':'수정'}</div></div>${I.back}</div>
     ${!isCompany?`
     <div class="list-item" onclick="go('myApplications')"><div class="li-l"><div class="li-icon">${I.checklist}</div><div class="li-tt">내 지원 현황</div></div>${I.back}</div>
     <div class="list-item" onclick="go('receivedProposals')"><div class="li-l"><div class="li-icon">${I.bell}</div><div class="li-tt">받은 제안</div></div>${I.back}</div>
     <div class="list-item" onclick="go('portfolios')"><div class="li-l"><div class="li-icon">${I.checklist}</div><div class="li-tt">포트폴리오</div></div>${I.back}</div>` : ''}
     ${me.user.hasPassword ? `<div class="list-item" onclick="go('changePassword')"><div class="li-l"><div class="li-icon">${I.gear}</div><div class="li-tt">비밀번호 변경</div></div>${I.back}</div>` : ''}
-    <div class="section-label">약관 및 정책</div>
+    <div class="section-label with-ic">${I.building}약관 및 정책</div>
     <div class="list-item" onclick="window.open('/terms.html','_blank')"><div class="li-l"><div class="li-icon">${I.building}</div><div class="li-tt">이용약관</div></div>${I.back}</div>
     <div class="list-item" onclick="window.open('/privacy.html','_blank')"><div class="li-l"><div class="li-icon">${I.eye}</div><div class="li-tt">개인정보처리방침</div></div>${I.back}</div>
-    <div class="section-label">설정</div>
+    <div class="section-label with-ic">${I.gear}설정</div>
     <div class="list-item" onclick="logout()"><div class="li-l"><div class="li-icon">${I.logout}</div><div class="li-tt">로그아웃</div></div></div>
     <div class="list-item" onclick="go('deleteAccount')"><div class="li-l"><div class="li-icon" style="color:var(--danger);">${I.trash}</div><div class="li-tt" style="color:var(--danger);">회원탈퇴</div></div>${I.back}</div>
   </div>${tabbar('mypage')}`;
