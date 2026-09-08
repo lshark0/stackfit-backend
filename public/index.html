@@ -1726,7 +1726,7 @@ async function screenPortfolioEdit(){
     <div class="form-field"><label class="form-label">프로젝트명</label><input id="pf2-title" class="form-input" placeholder="예: 대형 유통사 클라우드 전환" value="${esc(p.title)}"></div>
     <div class="form-field"><label class="form-label">고객사 / 발주처</label><input id="pf2-client" class="form-input" placeholder="예: ○○그룹" value="${esc(p.client)}"></div>
     <div class="form-field"><label class="form-label">담당 업무</label><input id="pf2-role" class="form-input" placeholder="예: DBA, 인프라 설계" value="${esc(p.role_title)}"></div>
-    <div class="form-field"><label class="form-label">참여 기간</label><input id="pf2-period" class="form-input" placeholder="예: 2024.03 ~ 2024.09 (7개월)" value="${esc(p.period)}"></div>
+    <div class="form-field"><label class="form-label">참여 기간</label><input id="pf2-period" class="form-input" placeholder="예: 2024.03 ~ 2024.09 (7개월)" value="${esc(p.period)}"><div class="page-sub" style="margin-top:5px;">연도를 포함해 입력하면 최신 프로젝트가 위로 정렬돼요. (진행 중이면 "2025.06 ~ 진행중")</div></div>
     <div class="form-field"><label class="form-label">사용 기술 (콤마로 구분)</label><input id="pf2-stack" class="form-input" placeholder="예: AWS, Kubernetes, Oracle" value="${esc(p.stack.join(', '))}"></div>
     <div class="form-field"><label class="form-label">상세 내용 / 성과</label><textarea id="pf2-desc" class="form-input" placeholder="맡았던 역할과 성과를 구체적으로 적어주세요">${esc(p.description)}</textarea></div>
     <div class="form-field"><label class="form-label">관련 링크 (선택)</label><input id="pf2-link" class="form-input" placeholder="https://..." value="${esc(p.link_url)}"></div>

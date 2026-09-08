@@ -2,6 +2,7 @@ const express = require('express');
 const { run, get, all } = require('../db');
 const { requireAuth, requireRole } = require('../middleware/requireAuth');
 const { wrapAllRoutes } = require('../middleware/asyncHandler');
+const { sortPortfoliosByPeriod } = require('../periodSort');
 
 const router = express.Router();
 wrapAllRoutes(router);
@@ -32,7 +33,8 @@ router.get('/', requireAuth, requireRole('freelancer'), async (req, res) => {
     'SELECT * FROM portfolios WHERE freelancer_id = ? ORDER BY created_at DESC, id DESC',
     [req.user.id]
   );
-  res.json({ portfolios: rows.map(withStack) });
+  // 등록 순서가 아니라, 실제 프로젝트 참여 기간 기준 최신순으로 보여줍니다.
+  res.json({ portfolios: sortPortfoliosByPeriod(rows).map(withStack) });
 });
 
 // 포트폴리오 추가

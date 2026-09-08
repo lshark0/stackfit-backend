@@ -5,6 +5,7 @@ const { requireAuth, requireRole } = require('../middleware/requireAuth');
 const { wrapAllRoutes } = require('../middleware/asyncHandler');
 const { computeMatch } = require('../match');
 const { getRatingSummary, getRatingSummaries } = require('../ratings');
+const { sortPortfoliosByPeriod } = require('../periodSort');
 
 const router = express.Router();
 wrapAllRoutes(router);
@@ -84,7 +85,7 @@ router.get('/:userId', requireAuth, requireRole('company'), async (req, res) => 
     stack: JSON.parse(t.stack_json),
     proposed,
     resume_url: signedFileUrl(t.resume_filename),
-    portfolios: portfolioRows.map((p) => ({ ...p, stack: JSON.parse(p.stack_json) })),
+    portfolios: sortPortfoliosByPeriod(portfolioRows).map((p) => ({ ...p, stack: JSON.parse(p.stack_json) })),
     ...rating,
   });
 });
