@@ -1135,6 +1135,12 @@ async function proposeTalent(userId){
   try{ await apiFetch(`/talents/${userId}/propose`, {method:'POST', body:{}}); toast('제안을 보냈어요'); go('talentDetail', userId); }
   catch(e){ toast(e.message); }
 }
+async function cancelProposal(userId){
+  showConfirm('보낸 제안을 취소할까요?', async () => {
+    try{ await apiFetch(`/talents/${userId}/propose`, {method:'DELETE'}); toast('제안을 취소했어요'); go('talentDetail', userId); }
+    catch(e){ toast(e.message); }
+  });
+}
 async function markAlertRead(id, tag){
   try{ await apiFetch(`/notifications/${id}/read`, {method:'PATCH'}); }catch(e){ toast(e.message); return; }
   if(tag==='제안') go('receivedProposals');
@@ -1675,7 +1681,9 @@ async function screenTalentDetail(){
   </div>
   <div style="position:absolute; left:0; right:0; bottom:0; padding:14px 20px 22px; background:var(--paper); border-top:1px solid var(--line); display:flex; gap:10px;">
     <button class="btn btn-outline" onclick="startChatWithTalent(${t.user_id})">메시지 보내기</button>
-    <button class="btn btn-primary" ${t.proposed?'disabled':''} onclick="proposeTalent(${t.user_id})" style="display:flex; align-items:center; justify-content:center; gap:7px;">${I.sent}${t.proposed?'제안 완료':'제안 보내기'}</button>
+    ${t.proposed
+      ? `<button class="btn btn-outline" onclick="cancelProposal(${t.user_id})" style="display:flex; align-items:center; justify-content:center; gap:7px;">${I.xCircle}제안 취소</button>`
+      : `<button class="btn btn-primary" onclick="proposeTalent(${t.user_id})" style="display:flex; align-items:center; justify-content:center; gap:7px;">${I.sent}제안 보내기</button>`}
   </div>`;
 }
 

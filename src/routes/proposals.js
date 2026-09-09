@@ -37,6 +37,28 @@ router.post('/talents/:userId/propose', requireAuth, requireRole('company'), asy
   res.status(201).json({ proposed: true });
 });
 
+// 제안 취소 (기업 전용, 본인이 보낸 제안만)
+router.delete('/talents/:userId/propose', requireAuth, requireRole('company'), async (req, res) => {
+  const freelancerId = Number(req.params.userId);
+  if (!Number.isInteger(freelancerId)) return res.status(400).json({ error: '올바르지 않은 사용자 ID입니다.' });
+
+  const existing = await get('SELECT id FROM proposals WHERE company_id=? AND freelancer_id=?', [req.user.id, freelancerId]);
+  if (!existing) return res.status(404).json({ error: '보낸 제안을 찾을 수 없습니다.' });
+
+  await run('DELETE FROM proposals WHERE id = ?', [existing.id]);
+
+  // 상대가 아직 읽지 않은 제안 알림이 남아있다면 함께 지웁니다.
+  // (이미 읽은 알림은 상대가 본 기록이므로 남겨둡니다.)
+  const company = await get('SELECT name FROM companies WHERE user_id = ?', [req.user.id]);
+  const companyName = company ? company.name : '한 기업';
+  await run(
+    "DELETE FROM notifications WHERE user_id = ? AND tag = '제안' AND is_read = 0 AND body = ?",
+    [freelancerId, `${companyName}에서 포지션을 제안했습니다.`]
+  );
+
+  res.json({ proposed: false });
+});
+
 // 내가(프리랜서) 받은 제안 목록
 router.get('/proposals/received', requireAuth, requireRole('freelancer'), async (req, res) => {
   const rows = await all(
