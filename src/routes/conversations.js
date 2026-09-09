@@ -148,10 +148,7 @@ router.post('/:id/messages', requireAuth, async (req, res) => {
   res.status(201).json({ messages: msgs });
 });
 
-// 메시지 취소 — 본인이 보낸 메시지를 5분 이내에만 삭제할 수 있습니다.
-// (오래된 대화 기록까지 마음대로 지우면 상대가 대화 맥락을 잃기 때문에 시간 제한을 둡니다.)
-const CANCEL_WINDOW_MS = 5 * 60 * 1000;
-
+// 메시지 취소 — 본인이 보낸 메시지는 시간 제한 없이 언제든 삭제할 수 있습니다.
 router.delete('/:id/messages/:messageId', requireAuth, async (req, res) => {
   const conv = await get('SELECT * FROM conversations WHERE id = ?', [req.params.id]);
   if (!conv || (conv.company_id !== req.user.id && conv.freelancer_id !== req.user.id)) {
@@ -165,12 +162,6 @@ router.delete('/:id/messages/:messageId', requireAuth, async (req, res) => {
   if (!msg) return res.status(404).json({ error: '메시지를 찾을 수 없습니다.' });
   if (msg.sender_id !== req.user.id) {
     return res.status(403).json({ error: '본인이 보낸 메시지만 취소할 수 있어요.' });
-  }
-
-  // DB에 저장된 시각은 UTC 기준이므로 Z를 붙여 정확히 비교합니다.
-  const sentAt = new Date(String(msg.created_at).replace(' ', 'T') + 'Z').getTime();
-  if (Number.isFinite(sentAt) && Date.now() - sentAt > CANCEL_WINDOW_MS) {
-    return res.status(400).json({ error: '보낸 지 5분이 지난 메시지는 취소할 수 없어요.' });
   }
 
   await run('DELETE FROM messages WHERE id = ?', [msgId]);

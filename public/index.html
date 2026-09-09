@@ -451,8 +451,12 @@ function jsAttrStr(s){
 }
 async function unreadCount(){
   if(!state.token) return 0;
-  try{ const d = await apiFetch('/notifications'); return d.notifications.filter(n=>!n.is_read).length; }
-  catch(e){ return 0; }
+  try{
+    const d = await apiFetch('/notifications');
+    // 채팅 메시지는 하단 '채팅' 탭 배지가 따로 알려주므로, 종 아이콘에서는 제외해
+    // 두 숫자가 서로 어긋나 보이지 않게 합니다.
+    return d.notifications.filter(n=>!n.is_read && n.tag !== '메시지').length;
+  }catch(e){ return 0; }
 }
 
 // 안 읽은 채팅 메시지 수. 화면을 그릴 때마다 매번 서버에 묻지 않도록 아주 짧게(8초) 캐시합니다.
@@ -1175,17 +1179,13 @@ function parseServerTime(s){
   const d = new Date(String(s).includes('T') ? s : String(s).replace(' ', 'T') + 'Z');
   return isNaN(d.getTime()) ? null : d;
 }
-const CANCEL_WINDOW_MS = 5 * 60 * 1000;
-
 function chatBubblesHtml(messages){
-  const now = Date.now();
   return messages.map(m=>{
     const t = parseServerTime(m.created_at);
     const mine = m.sender_id === state.userId;
-    const canCancel = mine && t && (now - t.getTime() <= CANCEL_WINDOW_MS);
     return `
       <div class="bubble-line ${mine?'me':'them'}">
-        ${canCancel?`<button class="bubble-cancel" onclick="cancelMessage(${m.id})" title="메시지 취소">${I.xCircle}</button>`:''}
+        ${mine?`<button class="bubble-cancel" onclick="cancelMessage(${m.id})" title="메시지 취소">${I.xCircle}</button>`:''}
         <div class="bubble ${mine?'me':'them'}">${esc(m.body)}<div class="bubble-time">${t? t.toLocaleString('ko-KR',{hour:'numeric',minute:'2-digit'}) : ''}</div></div>
       </div>`;
   }).join('') || `<div class="empty"><div class="ic">${I.chat}</div><div class="tt">첫 메시지를 보내보세요</div></div>`;
@@ -1795,7 +1795,7 @@ async function screenReceivedProposals(){
       <div class="card">
         <div class="card-top"><div><div class="card-title">${esc(p.company_name)}</div><div class="card-org">${p.job_title? esc(p.job_title)+' 포지션 제안' : '포지션 제안'}</div></div></div>
         ${p.company_description? `<div class="para" style="margin-top:6px;">${esc(p.company_description)}</div>` : ''}
-        <div class="page-sub" style="margin-top:10px;">${new Date(p.created_at).toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric'})} 도착</div>
+        <div class="page-sub" style="margin-top:10px;">${(parseServerTime(p.created_at)||new Date()).toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric'})} 도착</div>
         <button class="btn btn-primary" style="margin-top:10px;" onclick="startChatWithCompany(${p.company_id}${p.job_id?`, ${p.job_id}`:''})">채팅으로 답장하기</button>
       </div>`).join('') || emptyArt(ART.noAlerts, '아직 받은 제안이 없어요', '프로필을 채우면 기업의 제안을 받을 확률이 높아져요.')}
   </div>`;
@@ -1896,7 +1896,7 @@ async function screenMyApplications(){
         <div class="icon-meta">
           <span class="im">${I.pin}${esc(a.location)}</span>
           <span class="im">${I.wallet}<b>${esc(a.rate)}</b></span>
-          <span class="im">${I.calendar}${new Date(a.created_at).toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric'})} 지원</span>
+          <span class="im">${I.calendar}${(parseServerTime(a.created_at)||new Date()).toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric'})} 지원</span>
         </div>
       </div>`).join('') || emptyArt(ART.noJobs, '아직 지원한 공고가 없어요', '마음에 드는 공고에 지원해보세요.')}
   </div>${tabbar('home')}`;
@@ -1952,7 +1952,7 @@ async function screenChatList(){
     ${data.conversations.map(c=>`
       <div class="chat-row ${c.unread?'is-unread':''}" onclick="go('chatRoom', ${c.id})">
         ${autoAvatar(c.name)}
-        <div class="chat-body"><div class="chat-name">${esc(c.name)}${c.jobTitle?` <span style="font-family:var(--mono); font-weight:400; font-size:11px; color:var(--slate);">· ${esc(c.jobTitle)}</span>`:''}<span class="chat-time">${c.lastMessage? new Date(c.lastMessage.created_at).toLocaleString('ko-KR',{hour:'numeric',minute:'2-digit'}) : ''}</span></div>
+        <div class="chat-body"><div class="chat-name">${esc(c.name)}${c.jobTitle?` <span style="font-family:var(--mono); font-weight:400; font-size:11px; color:var(--slate);">· ${esc(c.jobTitle)}</span>`:''}<span class="chat-time">${c.lastMessage? (parseServerTime(c.lastMessage.created_at)||new Date()).toLocaleString('ko-KR',{hour:'numeric',minute:'2-digit'}) : ''}</span></div>
         <div class="chat-preview">${c.lastMessage? esc(c.lastMessage.body) : '대화를 시작해보세요'}</div></div>
         ${c.unread? `<div class="unread">${c.unread}</div>`:''}
       </div>`).join('') || emptyArt(ART.noChat, '아직 채팅이 없어요', '공고나 인재 상세에서 대화를 시작할 수 있어요.')}
@@ -2080,7 +2080,7 @@ async function screenProfileViews(){
     ${data.views.map(v=>`
       <div class="chat-row" style="cursor:default;">
         ${autoAvatar(v.company_name)}
-        <div class="chat-body"><div class="chat-name">${esc(v.company_name)}<span class="chat-time">${new Date(v.created_at).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'numeric',minute:'2-digit'})}</span></div>
+        <div class="chat-body"><div class="chat-name">${esc(v.company_name)}<span class="chat-time">${(parseServerTime(v.created_at)||new Date()).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'numeric',minute:'2-digit'})}</span></div>
         <div class="chat-preview">회원님의 프로필을 열람했어요</div></div>
       </div>`).join('') || emptyArt(ART.noTalents, '아직 프로필을 열람한 기업이 없어요', '프로필을 채우면 기업 노출이 늘어나요.')}
   </div>`;
@@ -2164,7 +2164,7 @@ async function screenAlerts(){
   <div class="content">
     ${data.notifications.map(a=>`
       <div class="card" style="cursor:pointer; ${a.is_read?'opacity:.6;':''}" onclick="markAlertRead(${a.id}, '${esc(a.tag)}')">
-        <div class="card-top"><span class="tag on" style="border-radius:999px;">${esc(a.tag)}</span><span class="chat-time">${new Date(a.created_at).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'numeric',minute:'2-digit'})}</span></div>
+        <div class="card-top"><span class="tag on" style="border-radius:999px;">${esc(a.tag)}</span><span class="chat-time">${(()=>{const d=parseServerTime(a.created_at); return d? d.toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'numeric',minute:'2-digit'}) : '';})()}</span></div>
         <div class="card-title" style="margin-top:9px; font-size:13.5px;">${esc(a.title)}${!a.is_read?' <span style="color:var(--amber-deep)">●</span>':''}</div>
         <div class="page-sub" style="font-family:var(--sans); color:var(--slate); margin-top:3px;">${esc(a.body)}</div>
       </div>`).join('') || emptyArt(ART.noAlerts, '아직 알림이 없어요', '지원·제안·메시지가 오면 여기에 표시돼요.')}
