@@ -2005,6 +2005,7 @@ async function screenMypage(){
       <label class="switch"><input type="checkbox" ${pushOn?'checked':''} onchange="togglePush(this)"><span class="slider"></span></label>
     </div>
     ${pushOn ? `<div class="list-item" onclick="testPush()"><div class="li-l"><div class="li-icon">${I.checkCircle}</div><div class="li-tt">알림 테스트 보내기</div></div>${I.back}</div>` : ''}
+    ${canPush ? `<div class="list-item" onclick="repairPush()"><div class="li-l"><div class="li-icon">${I.gear}</div><div><div class="li-tt">알림이 안 오면 여기를 눌러주세요</div><div class="page-sub" style="margin-top:2px;">알림 기능을 처음부터 다시 설치해요</div></div></div>${I.back}</div>` : ''}
     ${!pushOn && Notification.permission === 'denied' ? `<div class="reco-empty" style="margin-top:8px; text-align:left;">알림이 <b>차단</b>되어 있어요.<br>브라우저 주소창 왼쪽 자물쇠 → 알림 → 허용으로 바꿔주세요.</div>` : ''}` :
     `<div class="reco-empty" style="margin-top:8px; text-align:left;">이 브라우저에서는 푸시 알림을 쓸 수 없어요.<br><b>아이폰</b>은 Safari에서 공유 → "홈 화면에 추가"로 앱을 설치한 뒤 열면 사용할 수 있어요.</div>`}
     <div class="list-item" onclick="logout()"><div class="li-l"><div class="li-icon">${I.logout}</div><div class="li-tt">로그아웃</div></div></div>
@@ -2345,6 +2346,37 @@ async function testPush(){
     toast('테스트 알림을 보냈어요. 잠시 후 알림창을 확인해주세요.');
   }catch(e){ toast(e.message); }
 }
+// 낡은 서비스워커가 남아 알림이 안 오는 경우를 위한 복구 기능.
+// 기존 등록을 모두 지우고 최신 버전으로 다시 설치한 뒤 알림을 재등록합니다.
+async function repairPush(){
+  showConfirm('알림 기능을 다시 설치할까요?', async () => {
+    try{
+      toast('다시 설치하는 중...');
+      // 1) 이 기기의 기존 구독 해제
+      try{
+        const sub = await getPushSubscription();
+        if(sub){
+          await apiFetch('/push/unsubscribe', {method:'POST', body:{ endpoint: sub.endpoint }}).catch(()=>{});
+          await sub.unsubscribe().catch(()=>{});
+        }
+      }catch(e){}
+      // 2) 낡은 서비스워커 전부 제거
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister().catch(()=>{})));
+      // 3) 캐시도 비움
+      if(window.caches){
+        const names = await caches.keys();
+        await Promise.all(names.map(n => caches.delete(n).catch(()=>{})));
+      }
+      // 4) 최신 서비스워커 재설치 후 알림 재등록
+      const reg = await navigator.serviceWorker.register('/service-worker.js', { updateViaCache: 'none' });
+      await navigator.serviceWorker.ready;
+      await enablePush();
+      toast('다시 설치했어요. 알림 테스트를 눌러보세요.');
+      render();
+    }catch(e){ toast('복구 실패: ' + e.message); }
+  });
+}
 // 로그인 직후, 알림을 켠 적 있는 기기라면 서버 구독을 조용히 최신화합니다.
 async function syncPushSubscription(){
   if(!pushSupported() || Notification.permission !== 'granted') return;
@@ -2359,12 +2391,31 @@ async function syncPushSubscription(){
 if('serviceWorker' in navigator){
   window.addEventListener('load', async () => {
     try{
-      const reg = await navigator.serviceWorker.register('/service-worker.js');
-      // 새 버전이 배포됐는지 즉시 한 번, 이후 주기적으로 확인합니다.
-      // (푸시 알림처럼 서비스워커에 담긴 기능이 낡은 채로 남지 않도록)
+      // updateViaCache:'none' → 서비스워커 파일을 항상 서버에서 새로 받아옵니다.
+      // (낡은 버전이 캐시에 남아 푸시 같은 새 기능이 동작하지 않는 것을 방지)
+      const reg = await navigator.serviceWorker.register('/service-worker.js', { updateViaCache: 'none' });
       reg.update().catch(()=>{});
-      setInterval(() => reg.update().catch(()=>{}), 60 * 60 * 1000);
+      setInterval(() => reg.update().catch(()=>{}), 30 * 60 * 1000);
+
+      // 새 버전이 설치되면 기다리지 않고 바로 교체합니다.
+      reg.addEventListener('updatefound', () => {
+        const sw = reg.installing;
+        if(!sw) return;
+        sw.addEventListener('statechange', () => {
+          if(sw.state === 'installed' && navigator.serviceWorker.controller){
+            sw.postMessage({ type: 'SKIP_WAITING' });
+          }
+        });
+      });
     }catch(e){}
+  });
+
+  // 새 서비스워커가 실제로 제어권을 잡으면 화면을 한 번 새로고침해 최신 상태로 맞춥니다.
+  let swReloaded = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if(swReloaded) return;
+    swReloaded = true;
+    window.location.reload();
   });
 }
 </script>

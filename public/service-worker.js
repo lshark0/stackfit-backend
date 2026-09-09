@@ -1,4 +1,4 @@
-const CACHE_NAME = 'stackfit-shell-v4';
+const CACHE_NAME = 'stackfit-shell-v5';
 const SHELL_FILES = ['/manifest.json', '/icons/icon-192.png', '/icons/icon-512.png'];
 
 self.addEventListener('install', (event) => {
@@ -6,6 +6,11 @@ self.addEventListener('install', (event) => {
     caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL_FILES)).catch(() => {})
   );
   self.skipWaiting();
+});
+
+// 앱이 "새 버전으로 바로 바꿔줘"라고 보내는 신호를 받으면 즉시 교체합니다.
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
@@ -20,6 +25,9 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/uploads/')) return;
+  // 서비스워커 자신은 절대 캐시하지 않습니다.
+  // (캐시하면 낡은 버전이 스스로를 계속 되살려서 새 기능이 영영 적용되지 않습니다)
+  if (url.pathname === '/service-worker.js') return;
   if (event.request.method !== 'GET') return;
 
   // 앱의 HTML 화면(들어가는 첫 페이지)은 항상 네트워크를 먼저 시도합니다.
@@ -63,6 +71,10 @@ self.addEventListener('push', (event) => {
     data = event.data ? event.data.json() : {};
   } catch (e) {
     data = { title: '스택핏', body: event.data ? event.data.text() : '' };
+  }
+  // 내용이 비어 있어도 최소한 무슨 앱의 알림인지는 보이도록 기본값을 채웁니다.
+  if (!data.title && !data.body) {
+    data = { title: '스택핏', body: '새로운 소식이 있어요. 앱에서 확인해보세요.' };
   }
 
   // 알림창에서 어떤 종류의 소식인지 한눈에 알 수 있도록 제목 앞에 표시를 붙입니다.
