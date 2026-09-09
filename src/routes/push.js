@@ -2,7 +2,7 @@ const express = require('express');
 const { run, get } = require('../db');
 const { requireAuth } = require('../middleware/requireAuth');
 const { wrapAllRoutes } = require('../middleware/asyncHandler');
-const { getPublicKey } = require('../push');
+const { getPublicKey, sendPushToUser } = require('../push');
 
 const router = express.Router();
 wrapAllRoutes(router);
@@ -50,6 +50,19 @@ router.get('/status', requireAuth, async (req, res) => {
   if (!endpoint) return res.json({ subscribed: false });
   const row = await get('SELECT id FROM push_subscriptions WHERE endpoint = ? AND user_id = ?', [endpoint, req.user.id]);
   res.json({ subscribed: !!row });
+});
+
+// 내 기기로 테스트 알림을 보내봅니다 (설정이 제대로 됐는지 사용자가 직접 확인용).
+router.post('/test', requireAuth, async (req, res) => {
+  const row = await get('SELECT id FROM push_subscriptions WHERE user_id = ?', [req.user.id]);
+  if (!row) return res.status(400).json({ error: '이 계정에 등록된 기기가 없어요. 알림을 다시 켜주세요.' });
+  await sendPushToUser(req.user.id, {
+    title: '스택핏 알림 테스트',
+    body: '알림이 정상적으로 설정됐어요!',
+    url: '/',
+    tag: 'test',
+  });
+  res.json({ sent: true });
 });
 
 module.exports = router;

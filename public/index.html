@@ -2000,10 +2000,13 @@ async function screenMypage(){
     <div class="list-item" style="cursor:default;">
       <div class="li-l"><div class="li-icon">${I.bell}</div>
         <div><div class="li-tt">푸시 알림</div>
-        <div class="page-sub" style="margin-top:2px;">앱을 안 보고 있어도 새 메시지를 알려드려요</div></div>
+        <div class="page-sub" style="margin-top:2px;">${pushOn ? '켜짐 · 앱을 닫아도 알림이 와요' : '앱을 안 보고 있어도 새 메시지를 알려드려요'}</div></div>
       </div>
       <label class="switch"><input type="checkbox" ${pushOn?'checked':''} onchange="togglePush(this)"><span class="slider"></span></label>
-    </div>` : ''}
+    </div>
+    ${pushOn ? `<div class="list-item" onclick="testPush()"><div class="li-l"><div class="li-icon">${I.checkCircle}</div><div class="li-tt">알림 테스트 보내기</div></div>${I.back}</div>` : ''}
+    ${!pushOn && Notification.permission === 'denied' ? `<div class="reco-empty" style="margin-top:8px; text-align:left;">알림이 <b>차단</b>되어 있어요.<br>브라우저 주소창 왼쪽 자물쇠 → 알림 → 허용으로 바꿔주세요.</div>` : ''}` :
+    `<div class="reco-empty" style="margin-top:8px; text-align:left;">이 브라우저에서는 푸시 알림을 쓸 수 없어요.<br><b>아이폰</b>은 Safari에서 공유 → "홈 화면에 추가"로 앱을 설치한 뒤 열면 사용할 수 있어요.</div>`}
     <div class="list-item" onclick="logout()"><div class="li-l"><div class="li-icon">${I.logout}</div><div class="li-tt">로그아웃</div></div></div>
     <div class="list-item" onclick="go('deleteAccount')"><div class="li-l"><div class="li-icon" style="color:var(--danger);">${I.trash}</div><div class="li-tt" style="color:var(--danger);">회원탈퇴</div></div>${I.back}</div>
   </div>${tabbar('mypage')}`;
@@ -2159,10 +2162,13 @@ async function saveCompanyProfile(){
 
 async function screenAlerts(){
   const data = await apiFetch('/notifications');
+  // 채팅 메시지는 하단 '채팅' 탭에서 확인하므로 여기서는 제외합니다.
+  // (종 배지 숫자와 목록에 보이는 항목 수가 정확히 일치하도록)
+  const items = data.notifications.filter(a => a.tag !== '메시지');
   return `${statusbar()}
   <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go(state.prevScreen||'home')">${I.back}</div><div class="page-title">알림</div></div></div>
   <div class="content">
-    ${data.notifications.map(a=>`
+    ${items.map(a=>`
       <div class="card" style="cursor:pointer; ${a.is_read?'opacity:.6;':''}" onclick="markAlertRead(${a.id}, '${esc(a.tag)}')">
         <div class="card-top"><span class="tag on" style="border-radius:999px;">${esc(a.tag)}</span><span class="chat-time">${(()=>{const d=parseServerTime(a.created_at); return d? d.toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'numeric',minute:'2-digit'}) : '';})()}</span></div>
         <div class="card-title" style="margin-top:9px; font-size:13.5px;">${esc(a.title)}${!a.is_read?' <span style="color:var(--amber-deep)">●</span>':''}</div>
@@ -2321,6 +2327,12 @@ async function togglePush(el){
   const ok = on ? await enablePush() : await disablePush();
   if(!ok) el.checked = !on; // 실패하면 스위치를 원래대로 되돌립니다
 }
+async function testPush(){
+  try{
+    await apiFetch('/push/test', {method:'POST'});
+    toast('테스트 알림을 보냈어요. 잠시 후 알림창을 확인해주세요.');
+  }catch(e){ toast(e.message); }
+}
 // 로그인 직후, 알림을 켠 적 있는 기기라면 서버 구독을 조용히 최신화합니다.
 async function syncPushSubscription(){
   if(!pushSupported() || Notification.permission !== 'granted') return;
@@ -2333,8 +2345,14 @@ async function syncPushSubscription(){
 }
 
 if('serviceWorker' in navigator){
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/service-worker.js').catch(()=>{});
+  window.addEventListener('load', async () => {
+    try{
+      const reg = await navigator.serviceWorker.register('/service-worker.js');
+      // 새 버전이 배포됐는지 즉시 한 번, 이후 주기적으로 확인합니다.
+      // (푸시 알림처럼 서비스워커에 담긴 기능이 낡은 채로 남지 않도록)
+      reg.update().catch(()=>{});
+      setInterval(() => reg.update().catch(()=>{}), 60 * 60 * 1000);
+    }catch(e){}
   });
 }
 </script>

@@ -108,9 +108,11 @@ app.get('/uploads/:filename', async (req, res) => {
 });
 app.use(express.static(path.join(__dirname, 'public'), {
   setHeaders: (res, filePath) => {
-    // HTML은 절대 캐시되면 안 됨 (통신사 프록시/브라우저가 예전 버전을 계속 보여주는 문제 방지).
+    // HTML과 서비스워커는 절대 캐시되면 안 됩니다.
+    // (통신사 프록시/브라우저가 예전 버전을 계속 보여주는 문제 방지.
+    //  특히 서비스워커가 낡은 채로 남으면 푸시 알림 같은 새 기능이 아예 동작하지 않습니다.)
     // 아이콘 등 정적 자산은 기존처럼 캐시 허용.
-    if (filePath.endsWith('.html')) {
+    if (filePath.endsWith('.html') || filePath.endsWith('service-worker.js')) {
       res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');
