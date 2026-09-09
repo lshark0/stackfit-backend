@@ -1,4 +1,4 @@
-const CACHE_NAME = 'stackfit-shell-v3';
+const CACHE_NAME = 'stackfit-shell-v4';
 const SHELL_FILES = ['/manifest.json', '/icons/icon-192.png', '/icons/icon-512.png'];
 
 self.addEventListener('install', (event) => {
@@ -65,17 +65,30 @@ self.addEventListener('push', (event) => {
     data = { title: '스택핏', body: event.data ? event.data.text() : '' };
   }
 
-  const title = data.title || '스택핏';
+  // 알림창에서 어떤 종류의 소식인지 한눈에 알 수 있도록 제목 앞에 표시를 붙입니다.
+  const kindLabel = {
+    chat: '💬 새 메시지',
+    proposal: '📨 포지션 제안',
+    applicant: '🙋 새 지원자',
+    result: '📢 지원 결과',
+    test: '🔔 알림 테스트',
+  };
+  const kind = data.kind || 'chat';
+  const heading = data.title || kindLabel[kind] || '스택핏';
+
   const options = {
+    // 본문에는 실제 내용을, 그 아래엔 앱 이름을 표시해 출처를 분명히 합니다.
     body: data.body || '',
     icon: '/icons/icon-192.png',
     badge: '/icons/icon-192.png',
     // 같은 대화의 알림은 하나로 덮어써서 알림창이 도배되지 않게 합니다.
     tag: data.tag || 'stackfit',
     renotify: true,
+    requireInteraction: false,
+    vibrate: [120, 60, 120],
     data: { url: data.url || '/' },
   };
-  event.waitUntil(self.registration.showNotification(title, options));
+  event.waitUntil(self.registration.showNotification(heading, options));
 });
 
 // 알림을 탭하면 이미 열려있는 앱 창으로 이동하고, 없으면 새로 엽니다.

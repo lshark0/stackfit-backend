@@ -57,8 +57,9 @@ router.post('/test', requireAuth, async (req, res) => {
   const row = await get('SELECT id FROM push_subscriptions WHERE user_id = ?', [req.user.id]);
   if (!row) return res.status(400).json({ error: '이 계정에 등록된 기기가 없어요. 알림을 다시 켜주세요.' });
   await sendPushToUser(req.user.id, {
-    title: '스택핏 알림 테스트',
-    body: '알림이 정상적으로 설정됐어요!',
+    kind: 'test',
+    title: '🔔 스택핏 알림 테스트',
+    body: '알림이 정상적으로 설정됐어요! 이제 새 메시지·제안이 오면 바로 알려드릴게요.',
     url: '/',
     tag: 'test',
   });

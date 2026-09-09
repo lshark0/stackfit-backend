@@ -138,8 +138,9 @@ router.post('/:id/messages', requireAuth, async (req, res) => {
   // 앱을 보고 있지 않아도 알 수 있도록 휴대폰 알림(푸시)을 보냅니다.
   // 실패해도 메시지 전송 자체는 성공 처리합니다.
   sendPushToUser(counterpartId, {
-    title: `${senderName}님의 새 메시지`,
-    body: body.trim().slice(0, 80),
+    kind: 'chat',
+    title: `💬 ${senderName}님의 메시지`,
+    body: body.trim().slice(0, 100),
     url: '/',
     tag: `chat-${conv.id}`,
   }).catch(() => {});

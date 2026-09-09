@@ -32,8 +32,9 @@ router.post('/jobs/:id/apply', requireAuth, requireRole('freelancer'), async (re
     job.company_id, '지원', '새 지원자가 있어요', `${profile.name}님이 "${job.title}" 공고에 지원했습니다.`,
   ]);
   sendPushToUser(job.company_id, {
-    title: '새 지원자가 있어요',
-    body: `${profile.name}님이 "${job.title}" 공고에 지원했습니다.`,
+    kind: 'applicant',
+    title: '🙋 새 지원자 도착',
+    body: `${profile.name}님이 "${job.title}" 공고에 지원했어요.`,
     url: '/',
     tag: `applicant-${job.id}`,
   }).catch(() => {});
@@ -126,7 +127,11 @@ router.patch('/jobs/:jobId/applicants/:applicationId', requireAuth, requireRole(
     resultBody,
   ]);
   sendPushToUser(application.freelancer_id, {
-    title: resultTitle, body: resultBody, url: '/', tag: `result-${job.id}`,
+    kind: 'result',
+    title: status === 'accepted' ? '🎉 지원이 수락됐어요' : '📢 지원 결과 도착',
+    body: resultBody,
+    url: '/',
+    tag: `result-${job.id}`,
   }).catch(() => {});
 
   if (status === 'accepted') {

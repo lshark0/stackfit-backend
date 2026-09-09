@@ -36,8 +36,9 @@ router.post('/talents/:userId/propose', requireAuth, requireRole('company'), asy
   ]);
 
   sendPushToUser(freelancerId, {
-    title: '새로운 제안이 도착했어요',
-    body: `${company ? company.name : '한 기업'}에서 포지션을 제안했습니다.`,
+    kind: 'proposal',
+    title: '📨 새 포지션 제안',
+    body: `${company ? company.name : '한 기업'}에서 포지션을 제안했어요. 앱에서 확인해보세요.`,
     url: '/',
     tag: 'proposal',
   }).catch(() => {});
