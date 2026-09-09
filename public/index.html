@@ -179,6 +179,13 @@
   .bubble-line.them{justify-content:flex-start; align-self:flex-start;}
   .bubble-cancel{background:none; border:none; padding:4px; cursor:pointer; color:var(--slate-light); opacity:.55; flex:0 0 auto; line-height:0; -webkit-tap-highlight-color:transparent;}
   .bubble-cancel:active{opacity:1; color:var(--danger);}
+  /* 켜기/끄기 토글 스위치 */
+  .switch{position:relative; display:inline-block; width:44px; height:25px; flex:0 0 auto;}
+  .switch input{opacity:0; width:0; height:0;}
+  .switch .slider{position:absolute; inset:0; background:var(--line); border-radius:99px; transition:.22s; cursor:pointer;}
+  .switch .slider::before{content:""; position:absolute; width:19px; height:19px; left:3px; top:3px; background:#fff; border-radius:50%; transition:.22s; box-shadow:0 1px 3px rgba(0,0,0,.2);}
+  .switch input:checked + .slider{background:var(--cyan);}
+  .switch input:checked + .slider::before{transform:translateX(19px);}
   .bubble-time{font-family:var(--mono); font-size:9.5px; color:var(--slate-light); margin-top:3px;}
   .chat-input-bar{display:flex; gap:8px; padding:10px 20px 16px; border-top:1px solid var(--line); background:var(--paper); flex:0 0 auto;}
   .chat-input{flex:1; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:11px 14px; font-size:13px; color:var(--ink); font-family:var(--sans); outline:none;}
@@ -1058,6 +1065,7 @@ async function restoreSession(){
     const me = await apiFetch('/auth/me');
     state.role = me.user.role; state.userId = me.user.id;
     go('home');
+    syncPushSubscription(); // 알림을 켜둔 기기라면 서버 구독을 최신 상태로 유지
     return true;
   }catch(e){
     clearToken();
@@ -1967,6 +1975,9 @@ async function screenChatRoom(){
 async function screenMypage(){
   const isCompany = state.role==='company';
   const [profile, me] = await Promise.all([apiFetch('/profile'), apiFetch('/auth/me')]);
+  // 이 기기에서 알림이 켜져 있는지 확인 (브라우저 권한 + 실제 구독 여부 둘 다 확인)
+  const canPush = pushSupported();
+  const pushOn = canPush && Notification.permission === 'granted' && !!(await getPushSubscription());
   return `${statusbar()}${header("마이페이지","",{bell:false})}
   <div class="content">
     <div class="mypage-head">
@@ -1985,6 +1996,14 @@ async function screenMypage(){
     <div class="list-item" onclick="window.open('/terms.html','_blank')"><div class="li-l"><div class="li-icon">${I.building}</div><div class="li-tt">이용약관</div></div>${I.back}</div>
     <div class="list-item" onclick="window.open('/privacy.html','_blank')"><div class="li-l"><div class="li-icon">${I.eye}</div><div class="li-tt">개인정보처리방침</div></div>${I.back}</div>
     <div class="section-label with-ic">${I.gear}설정</div>
+    ${canPush ? `
+    <div class="list-item" style="cursor:default;">
+      <div class="li-l"><div class="li-icon">${I.bell}</div>
+        <div><div class="li-tt">푸시 알림</div>
+        <div class="page-sub" style="margin-top:2px;">앱을 안 보고 있어도 새 메시지를 알려드려요</div></div>
+      </div>
+      <label class="switch"><input type="checkbox" ${pushOn?'checked':''} onchange="togglePush(this)"><span class="slider"></span></label>
+    </div>` : ''}
     <div class="list-item" onclick="logout()"><div class="li-l"><div class="li-icon">${I.logout}</div><div class="li-tt">로그아웃</div></div></div>
     <div class="list-item" onclick="go('deleteAccount')"><div class="li-l"><div class="li-icon" style="color:var(--danger);">${I.trash}</div><div class="li-tt" style="color:var(--danger);">회원탈퇴</div></div>${I.back}</div>
   </div>${tabbar('mypage')}`;
@@ -2236,6 +2255,82 @@ setInterval(() => {
 document.addEventListener('visibilitychange', () => {
   if(!document.hidden && state.token) refreshChatBadge();
 });
+
+/* ---------------- 푸시 알림 ---------------- */
+// 브라우저가 요구하는 형식(Uint8Array)으로 공개키를 변환합니다.
+function urlBase64ToUint8Array(base64String){
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(base64);
+  const arr = new Uint8Array(raw.length);
+  for(let i=0;i<raw.length;i++) arr[i] = raw.charCodeAt(i);
+  return arr;
+}
+function pushSupported(){
+  return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+}
+async function getPushSubscription(){
+  if(!pushSupported()) return null;
+  try{
+    const reg = await navigator.serviceWorker.ready;
+    return await reg.pushManager.getSubscription();
+  }catch(e){ return null; }
+}
+async function enablePush(){
+  if(!pushSupported()){
+    toast('이 브라우저에서는 알림을 지원하지 않아요');
+    return false;
+  }
+  try{
+    const permission = await Notification.requestPermission();
+    if(permission !== 'granted'){
+      toast('알림이 차단되어 있어요. 브라우저 설정에서 허용해주세요.');
+      return false;
+    }
+    const { publicKey } = await apiFetch('/push/public-key');
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if(!sub){
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(publicKey),
+      });
+    }
+    const json = sub.toJSON();
+    await apiFetch('/push/subscribe', {method:'POST', body:{ endpoint: json.endpoint, keys: json.keys }});
+    toast('알림이 켜졌어요');
+    return true;
+  }catch(e){
+    toast('알림 설정에 실패했어요: ' + e.message);
+    return false;
+  }
+}
+async function disablePush(){
+  try{
+    const sub = await getPushSubscription();
+    if(sub){
+      await apiFetch('/push/unsubscribe', {method:'POST', body:{ endpoint: sub.endpoint }});
+      await sub.unsubscribe();
+    }
+    toast('알림을 껐어요');
+    return true;
+  }catch(e){ toast(e.message); return false; }
+}
+async function togglePush(el){
+  const on = el.checked;
+  const ok = on ? await enablePush() : await disablePush();
+  if(!ok) el.checked = !on; // 실패하면 스위치를 원래대로 되돌립니다
+}
+// 로그인 직후, 알림을 켠 적 있는 기기라면 서버 구독을 조용히 최신화합니다.
+async function syncPushSubscription(){
+  if(!pushSupported() || Notification.permission !== 'granted') return;
+  try{
+    const sub = await getPushSubscription();
+    if(!sub) return;
+    const json = sub.toJSON();
+    await apiFetch('/push/subscribe', {method:'POST', body:{ endpoint: json.endpoint, keys: json.keys }});
+  }catch(e){}
+}
 
 if('serviceWorker' in navigator){
   window.addEventListener('load', () => {

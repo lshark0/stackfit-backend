@@ -172,3 +172,21 @@ CREATE INDEX IF NOT EXISTS idx_reviews_reviewee ON reviews(reviewee_id);
 CREATE INDEX IF NOT EXISTS idx_profile_views_freelancer ON profile_views(freelancer_id);
 CREATE INDEX IF NOT EXISTS idx_followed_companies_freelancer ON followed_companies(freelancer_id);
 CREATE INDEX IF NOT EXISTS idx_portfolios_freelancer ON portfolios(freelancer_id);
+
+-- 웹 푸시 알림 구독 정보 (기기별로 하나씩 저장됨)
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  endpoint      TEXT NOT NULL UNIQUE,
+  p256dh        TEXT NOT NULL,
+  auth          TEXT NOT NULL,
+  created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- 서버 설정 저장소 (푸시 인증키 등을 환경변수 없이 DB에 보관)
+CREATE TABLE IF NOT EXISTS app_settings (
+  key           TEXT PRIMARY KEY,
+  value         TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_push_user ON push_subscriptions(user_id);

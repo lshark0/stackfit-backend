@@ -4,6 +4,7 @@ const { signedFileUrl } = require('../fileAccess');
 const { computeMatch } = require('../match');
 const { requireAuth, requireRole } = require('../middleware/requireAuth');
 const { wrapAllRoutes } = require('../middleware/asyncHandler');
+const { sendPushToUser } = require('../push');
 
 const router = express.Router();
 wrapAllRoutes(router);
@@ -30,6 +31,12 @@ router.post('/jobs/:id/apply', requireAuth, requireRole('freelancer'), async (re
   await run('INSERT INTO notifications (user_id, tag, title, body) VALUES (?,?,?,?)', [
     job.company_id, '지원', '새 지원자가 있어요', `${profile.name}님이 "${job.title}" 공고에 지원했습니다.`,
   ]);
+  sendPushToUser(job.company_id, {
+    title: '새 지원자가 있어요',
+    body: `${profile.name}님이 "${job.title}" 공고에 지원했습니다.`,
+    url: '/',
+    tag: `applicant-${job.id}`,
+  }).catch(() => {});
   await run('INSERT INTO notifications (user_id, tag, title, body) VALUES (?,?,?,?)', [
     req.user.id, '지원', '지원이 접수되었어요', `"${job.title}" 공고에 지원이 완료됐습니다.`,
   ]);
@@ -108,14 +115,19 @@ router.patch('/jobs/:jobId/applicants/:applicationId', requireAuth, requireRole(
 
   await run('UPDATE applications SET status = ? WHERE id = ?', [status, application.id]);
 
+  const resultTitle = status === 'accepted' ? '지원이 수락됐어요!' : '지원 결과가 도착했어요';
+  const resultBody = status === 'accepted'
+    ? `"${job.title}" 공고에 합격하셨습니다. 프로젝트가 생성됐어요.`
+    : `"${job.title}" 공고에는 아쉽게도 채용이 어려워요.`;
   await run('INSERT INTO notifications (user_id, tag, title, body) VALUES (?,?,?,?)', [
     application.freelancer_id,
     status === 'accepted' ? '합격' : '지원결과',
-    status === 'accepted' ? '지원이 수락됐어요!' : '지원 결과가 도착했어요',
-    status === 'accepted'
-      ? `"${job.title}" 공고에 합격하셨습니다. 프로젝트가 생성됐어요.`
-      : `"${job.title}" 공고에는 아쉽게도 채용이 어려워요.`,
+    resultTitle,
+    resultBody,
   ]);
+  sendPushToUser(application.freelancer_id, {
+    title: resultTitle, body: resultBody, url: '/', tag: `result-${job.id}`,
+  }).catch(() => {});
 
   if (status === 'accepted') {
     const existingProject = await get('SELECT id FROM projects WHERE job_id=? AND freelancer_id=?', [job.id, application.freelancer_id]);

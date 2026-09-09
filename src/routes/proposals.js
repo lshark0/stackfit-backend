@@ -2,6 +2,7 @@ const express = require('express');
 const { run, get, all } = require('../db');
 const { requireAuth, requireRole } = require('../middleware/requireAuth');
 const { wrapAllRoutes } = require('../middleware/asyncHandler');
+const { sendPushToUser } = require('../push');
 
 const router = express.Router();
 wrapAllRoutes(router);
@@ -33,6 +34,13 @@ router.post('/talents/:userId/propose', requireAuth, requireRole('company'), asy
   await run('INSERT INTO notifications (user_id, tag, title, body) VALUES (?,?,?,?)', [
     freelancerId, '제안', '새로운 제안이 도착했어요', `${company ? company.name : '한 기업'}에서 포지션을 제안했습니다.`,
   ]);
+
+  sendPushToUser(freelancerId, {
+    title: '새로운 제안이 도착했어요',
+    body: `${company ? company.name : '한 기업'}에서 포지션을 제안했습니다.`,
+    url: '/',
+    tag: 'proposal',
+  }).catch(() => {});
 
   res.status(201).json({ proposed: true });
 });

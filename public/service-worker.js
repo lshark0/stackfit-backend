@@ -1,4 +1,4 @@
-const CACHE_NAME = 'stackfit-shell-v2';
+const CACHE_NAME = 'stackfit-shell-v3';
 const SHELL_FILES = ['/manifest.json', '/icons/icon-192.png', '/icons/icon-512.png'];
 
 self.addEventListener('install', (event) => {
@@ -50,6 +50,45 @@ self.addEventListener('fetch', (event) => {
         })
         .catch(() => cached);
       return cached || fetchPromise;
+    })
+  );
+});
+
+// ── 웹 푸시 알림 ─────────────────────────────────
+// 앱을 보고 있지 않을 때(브라우저를 닫아둔 상태 포함) 서버가 보낸 알림을 받아
+// 휴대폰 알림창에 띄웁니다.
+self.addEventListener('push', (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch (e) {
+    data = { title: '스택핏', body: event.data ? event.data.text() : '' };
+  }
+
+  const title = data.title || '스택핏';
+  const options = {
+    body: data.body || '',
+    icon: '/icons/icon-192.png',
+    badge: '/icons/icon-192.png',
+    // 같은 대화의 알림은 하나로 덮어써서 알림창이 도배되지 않게 합니다.
+    tag: data.tag || 'stackfit',
+    renotify: true,
+    data: { url: data.url || '/' },
+  };
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+// 알림을 탭하면 이미 열려있는 앱 창으로 이동하고, 없으면 새로 엽니다.
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const targetUrl = (event.notification.data && event.notification.data.url) || '/';
+
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if ('focus' in client) return client.focus();
+      }
+      if (self.clients.openWindow) return self.clients.openWindow(targetUrl);
     })
   );
 });
