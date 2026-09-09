@@ -138,4 +138,58 @@ router.post('/:id/messages', requireAuth, async (req, res) => {
   res.status(201).json({ messages: msgs });
 });
 
+// 메시지 취소 — 본인이 보낸 메시지를 5분 이내에만 삭제할 수 있습니다.
+// (오래된 대화 기록까지 마음대로 지우면 상대가 대화 맥락을 잃기 때문에 시간 제한을 둡니다.)
+const CANCEL_WINDOW_MS = 5 * 60 * 1000;
+
+router.delete('/:id/messages/:messageId', requireAuth, async (req, res) => {
+  const conv = await get('SELECT * FROM conversations WHERE id = ?', [req.params.id]);
+  if (!conv || (conv.company_id !== req.user.id && conv.freelancer_id !== req.user.id)) {
+    return res.status(404).json({ error: '대화를 찾을 수 없습니다.' });
+  }
+
+  const msgId = Number(req.params.messageId);
+  if (!Number.isInteger(msgId)) return res.status(400).json({ error: '올바르지 않은 메시지 ID입니다.' });
+
+  const msg = await get('SELECT * FROM messages WHERE id = ? AND conversation_id = ?', [msgId, conv.id]);
+  if (!msg) return res.status(404).json({ error: '메시지를 찾을 수 없습니다.' });
+  if (msg.sender_id !== req.user.id) {
+    return res.status(403).json({ error: '본인이 보낸 메시지만 취소할 수 있어요.' });
+  }
+
+  // DB에 저장된 시각은 UTC 기준이므로 Z를 붙여 정확히 비교합니다.
+  const sentAt = new Date(String(msg.created_at).replace(' ', 'T') + 'Z').getTime();
+  if (Number.isFinite(sentAt) && Date.now() - sentAt > CANCEL_WINDOW_MS) {
+    return res.status(400).json({ error: '보낸 지 5분이 지난 메시지는 취소할 수 없어요.' });
+  }
+
+  await run('DELETE FROM messages WHERE id = ?', [msgId]);
+
+  // 상대에게 이 메시지로 보낸 알림이 아직 안 읽힌 상태라면, 최신 메시지 내용으로 되돌립니다.
+  const counterpartId = req.user.id === conv.company_id ? conv.freelancer_id : conv.company_id;
+  const senderRow = req.user.id === conv.company_id
+    ? await get('SELECT name FROM companies WHERE user_id = ?', [req.user.id])
+    : await get('SELECT name FROM freelancer_profiles WHERE user_id = ?', [req.user.id]);
+  const senderName = senderRow ? senderRow.name : '상대방';
+  const notif = await get(
+    "SELECT id FROM notifications WHERE user_id = ? AND tag = '메시지' AND is_read = 0 AND title = ? ORDER BY id DESC LIMIT 1",
+    [counterpartId, `${senderName}님의 새 메시지`]
+  );
+  if (notif) {
+    const latestMine = await get(
+      'SELECT body FROM messages WHERE conversation_id = ? AND sender_id = ? ORDER BY id DESC LIMIT 1',
+      [conv.id, req.user.id]
+    );
+    if (latestMine) {
+      await run('UPDATE notifications SET body = ? WHERE id = ?', [latestMine.body.slice(0, 40), notif.id]);
+    } else {
+      // 내가 보낸 메시지가 하나도 안 남았으면 알림 자체를 없앱니다.
+      await run('DELETE FROM notifications WHERE id = ?', [notif.id]);
+    }
+  }
+
+  const msgs = await all('SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at ASC, id ASC', [conv.id]);
+  res.json({ messages: msgs });
+});
+
 module.exports = router;
