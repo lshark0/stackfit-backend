@@ -2024,6 +2024,13 @@ async function screenMypage(){
     <div class="list-item" onclick="window.open('/terms.html','_blank')"><div class="li-l"><div class="li-icon">${I.building}</div><div class="li-tt">이용약관</div></div>${I.back}</div>
     <div class="list-item" onclick="window.open('/privacy.html','_blank')"><div class="li-l"><div class="li-icon">${I.eye}</div><div class="li-tt">개인정보처리방침</div></div>${I.back}</div>
     <div class="section-label with-ic">${I.gear}설정</div>
+    ${!isInstalledApp() ? `
+    <div class="list-item" onclick="installApp()">
+      <div class="li-l"><div class="li-icon">${I.plus}</div>
+        <div><div class="li-tt">홈 화면에 앱 추가</div>
+        <div class="page-sub" style="margin-top:2px;">아이콘으로 바로 열고 알림도 받을 수 있어요</div></div>
+      </div>${I.back}
+    </div>` : ''}
     ${canPush ? `
     <div class="list-item" style="cursor:default;">
       <div class="li-l"><div class="li-icon">${I.bell}</div>
@@ -2420,6 +2427,37 @@ async function syncPushSubscription(){
     const json = sub.toJSON();
     await apiFetch('/push/subscribe', {method:'POST', body:{ endpoint: json.endpoint, keys: json.keys }});
   }catch(e){}
+}
+
+/* ---------------- 홈 화면에 추가(앱 설치) ---------------- */
+// 크롬이 "설치 가능" 신호를 보내면 붙잡아 뒀다가, 사용자가 버튼을 눌렀을 때 설치창을 띄웁니다.
+let deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  // 마이페이지가 열려 있으면 설치 버튼이 바로 보이도록 다시 그립니다.
+  if(state.screen === 'mypage') render();
+});
+window.addEventListener('appinstalled', () => {
+  deferredInstallPrompt = null;
+  toast('홈 화면에 추가됐어요');
+});
+function isInstalledApp(){
+  return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+}
+async function installApp(){
+  if(!deferredInstallPrompt){
+    showConfirm(
+      '이미 설치되어 있거나, 브라우저가 설치를 지원하지 않는 상태예요.\n\n' +
+      '휴대폰 설정 → 애플리케이션에서 "김프리"를 찾아 삭제한 뒤 다시 시도해주세요.',
+      () => {}
+    );
+    return;
+  }
+  deferredInstallPrompt.prompt();
+  try{ await deferredInstallPrompt.userChoice; }catch(e){}
+  deferredInstallPrompt = null;
+  render();
 }
 
 if('serviceWorker' in navigator){
