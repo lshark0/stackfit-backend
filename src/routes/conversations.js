@@ -35,9 +35,11 @@ router.get('/', requireAuth, async (req, res) => {
   const result = convs.map((c) => {
     const msgs = allMsgs.filter((m) => m.conversation_id === c.id);
     const last = msgs.length ? msgs[msgs.length - 1] : null;
-    // 내가 마지막으로 보낸 시각 이후에 상대가 보낸 메시지를 안 읽은 것으로 계산합니다.
-    const myLastSentAt = msgs.filter((m) => m.sender_id === req.user.id).map((m) => m.created_at).pop() || '1970-01-01';
-    const unread = msgs.filter((m) => m.sender_id !== req.user.id && m.created_at > myLastSentAt).length;
+    // 내가 마지막으로 보낸 메시지 '이후'에 상대가 보낸 메시지를 안 읽은 것으로 계산합니다.
+    // 시각(created_at)은 초 단위라 빠르게 주고받으면 값이 같아져 비교가 어긋나므로,
+    // 항상 증가하는 메시지 id를 기준으로 판단합니다.
+    const myLastSentId = msgs.filter((m) => m.sender_id === req.user.id).map((m) => m.id).pop() || 0;
+    const unread = msgs.filter((m) => m.sender_id !== req.user.id && m.id > myLastSentId).length;
     const counterpartId = req.user.role === 'freelancer' ? c.company_id : c.freelancer_id;
     return {
       ...c,
@@ -109,9 +111,28 @@ router.post('/:id/messages', requireAuth, async (req, res) => {
 
   await run('INSERT INTO messages (conversation_id, sender_id, body) VALUES (?,?,?)', [conv.id, req.user.id, body.trim()]);
   const counterpartId = req.user.id === conv.company_id ? conv.freelancer_id : conv.company_id;
-  await run('INSERT INTO notifications (user_id, tag, title, body) VALUES (?,?,?,?)', [
-    counterpartId, '메시지', '새 메시지가 도착했어요', body.trim().slice(0, 40),
-  ]);
+
+  // 보낸 사람 이름을 알림에 담아 누구에게서 온 메시지인지 바로 알 수 있게 합니다.
+  const senderRow = req.user.id === conv.company_id
+    ? await get('SELECT name FROM companies WHERE user_id = ?', [req.user.id])
+    : await get('SELECT name FROM freelancer_profiles WHERE user_id = ?', [req.user.id]);
+  const senderName = senderRow ? senderRow.name : '상대방';
+
+  // 같은 대화에서 연달아 메시지를 보내면 알림이 여러 개 쌓이므로,
+  // 아직 읽지 않은 같은 대화의 메시지 알림이 있으면 최신 내용으로 갱신만 합니다.
+  const existing = await get(
+    "SELECT id FROM notifications WHERE user_id = ? AND tag = '메시지' AND is_read = 0 AND title = ? ORDER BY id DESC LIMIT 1",
+    [counterpartId, `${senderName}님의 새 메시지`]
+  );
+  if (existing) {
+    await run('UPDATE notifications SET body = ?, created_at = ? WHERE id = ?', [
+      body.trim().slice(0, 40), new Date().toISOString().slice(0, 19).replace('T', ' '), existing.id,
+    ]);
+  } else {
+    await run('INSERT INTO notifications (user_id, tag, title, body) VALUES (?,?,?,?)', [
+      counterpartId, '메시지', `${senderName}님의 새 메시지`, body.trim().slice(0, 40),
+    ]);
+  }
 
   const msgs = await all('SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at ASC, id ASC', [conv.id]);
   res.status(201).json({ messages: msgs });

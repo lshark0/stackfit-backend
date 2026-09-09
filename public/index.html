@@ -332,7 +332,11 @@
   .tab-btn.active{color:var(--ink);}
   .tab-btn.active::before{content:""; position:absolute; top:-8px; left:50%; transform:translateX(-50%); width:16px; height:3px; border-radius:2px; background:var(--amber);}
   .tab-lbl{font-family:var(--mono); font-size:9.5px; letter-spacing:.02em;}
-  .tab-badge{position:absolute; top:-2px; right:22%; width:7px; height:7px; border-radius:50%; background:var(--danger);}
+  .tab-badge{position:absolute; top:-3px; right:18%; background:var(--danger); color:#fff; font-family:var(--mono); font-size:9px; font-weight:700; min-width:16px; height:16px; border-radius:9px; display:flex; align-items:center; justify-content:center; padding:0 4px; box-shadow:0 0 0 2px var(--card);}
+  /* 안 읽은 메시지가 있는 대화는 배경과 굵기로 강조 */
+  .chat-row.is-unread{background:#FFFBF3; border-left:4px solid var(--danger); padding-left:12px;}
+  .chat-row.is-unread .chat-name{font-weight:800;}
+  .chat-row.is-unread .chat-preview{color:var(--ink); font-weight:600;}
   .jump-strip{display:flex; flex-wrap:wrap; gap:8px; max-width:460px; justify-content:center;}
   .jump-chip{font-family:var(--mono); font-size:11px; color:#C7CCD4; background:#1E232B; border:1px solid var(--ink-line); padding:7px 12px; border-radius:999px; cursor:pointer; transition:.15s;}
   .jump-chip:hover{border-color:var(--amber); color:var(--amber-soft);}
@@ -436,6 +440,34 @@ async function unreadCount(){
   if(!state.token) return 0;
   try{ const d = await apiFetch('/notifications'); return d.notifications.filter(n=>!n.is_read).length; }
   catch(e){ return 0; }
+}
+
+// 안 읽은 채팅 메시지 수. 화면을 그릴 때마다 매번 서버에 묻지 않도록 아주 짧게(8초) 캐시합니다.
+let _chatUnread = { value: 0, at: 0 };
+async function chatUnreadCount(force){
+  if(!state.token) return 0;
+  const now = Date.now();
+  if(!force && now - _chatUnread.at < 8000) return _chatUnread.value;
+  try{
+    const d = await apiFetch('/conversations');
+    const total = d.conversations.reduce((sum, c) => sum + (c.unread || 0), 0);
+    _chatUnread = { value: total, at: now };
+    return total;
+  }catch(e){ return _chatUnread.value; }
+}
+// 탭바를 다시 그리지 않고 채팅 배지만 갱신합니다.
+async function refreshChatBadge(){
+  const n = await chatUnreadCount(true);
+  const btn = document.querySelector('.tab-btn[data-tab="chatList"]');
+  if(!btn) return;
+  const old = btn.querySelector('.tab-badge');
+  if(old) old.remove();
+  if(n > 0){
+    const span = document.createElement('span');
+    span.className = 'tab-badge';
+    span.textContent = n > 99 ? '99+' : String(n);
+    btn.appendChild(span);
+  }
 }
 
 /* ---------------- Icons ---------------- */
@@ -755,10 +787,12 @@ function tabs(nc){
   }
   return [{k:"home",l:"홈",i:I.home},{k:"talent",l:"인재풀",i:I.talent},{k:"jobs",l:"공고관리",i:I.jobs},{k:"projects",l:"프로젝트 관리",i:I.proj},{k:"chatList",l:"채팅",i:I.chat},{k:"mypage",l:"MY",i:I.user}];
 }
-function tabbar(active){
+function tabbar(active, chatUnread){
+  const n = Number(chatUnread || 0);
   return `<div class="tabbar">${tabs().map(t=>{
     const onclick = t.k==='jobs' ? "jobQuery=''; jobCat='전체'; jobGrade='전체'; jobDuty=''; go('jobs')" : `go('${t.k}')`;
-    return `<button class="tab-btn ${t.k===active?'active':''}" onclick="${onclick}">${t.i}<span class="tab-lbl">${t.l}</span></button>`;
+    const badge = (t.k==='chatList' && n>0) ? `<span class="tab-badge">${n>99?'99+':n}</span>` : '';
+    return `<button class="tab-btn ${t.k===active?'active':''}" data-tab="${t.k}" onclick="${onclick}">${t.i}${badge}<span class="tab-lbl">${t.l}</span></button>`;
   }).join('')}</div>`;
 }
 function header(title, sub, opts={}, nc=0){
@@ -1103,7 +1137,9 @@ async function proposeTalent(userId){
 }
 async function markAlertRead(id, tag){
   try{ await apiFetch(`/notifications/${id}/read`, {method:'PATCH'}); }catch(e){ toast(e.message); return; }
-  if(tag==='제안') go('receivedProposals'); else render();
+  if(tag==='제안') go('receivedProposals');
+  else if(tag==='메시지') go('chatList');
+  else render();
 }
 async function startChatWithTalent(freelancerId){
   try{ const conv = await apiFetch('/conversations', {method:'POST', body:{freelancerId}}); go('chatRoom', conv.id); }
@@ -1860,16 +1896,17 @@ async function screenApplicants(){
 
 async function screenChatList(){
   const data = await apiFetch('/conversations');
+  const totalUnread = data.conversations.reduce((s,c)=>s+(c.unread||0), 0);
   return `${statusbar()}${header("채팅","", {bell:false})}
   <div class="content">
     ${data.conversations.map(c=>`
-      <div class="chat-row" onclick="go('chatRoom', ${c.id})">
+      <div class="chat-row ${c.unread?'is-unread':''}" onclick="go('chatRoom', ${c.id})">
         ${autoAvatar(c.name)}
         <div class="chat-body"><div class="chat-name">${esc(c.name)}${c.jobTitle?` <span style="font-family:var(--mono); font-weight:400; font-size:11px; color:var(--slate);">· ${esc(c.jobTitle)}</span>`:''}<span class="chat-time">${c.lastMessage? new Date(c.lastMessage.created_at).toLocaleString('ko-KR',{hour:'numeric',minute:'2-digit'}) : ''}</span></div>
         <div class="chat-preview">${c.lastMessage? esc(c.lastMessage.body) : '대화를 시작해보세요'}</div></div>
         ${c.unread? `<div class="unread">${c.unread}</div>`:''}
       </div>`).join('') || emptyArt(ART.noChat, '아직 채팅이 없어요', '공고나 인재 상세에서 대화를 시작할 수 있어요.')}
-  </div>${tabbar('chatList')}`;
+  </div>${tabbar('chatList', totalUnread)}`;
 }
 
 async function screenChatRoom(){
@@ -2130,6 +2167,8 @@ async function render(){
       const box = document.getElementById('chatScroll');
       if(box) box.scrollTop = box.scrollHeight;
     }
+    // 화면이 바뀔 때마다 채팅 안읽음 배지를 최신 상태로 맞춥니다.
+    if(state.token) refreshChatBadge();
   }catch(e){
     el.innerHTML = errorShell(e.message);
   }
@@ -2142,6 +2181,19 @@ async function render(){
   }
   history.replaceState({screen: state.screen, param: state.param}, '', location.pathname);
 })();
+
+// 앱을 켜둔 상태에서도 새 메시지를 알아챌 수 있도록 주기적으로 확인합니다.
+// 화면이 가려져 있을 땐(다른 앱 사용 중) 배터리·데이터 절약을 위해 건너뜁니다.
+setInterval(() => {
+  if(!state.token || document.hidden) return;
+  if(state.screen === 'chatRoom') return; // 대화방 안에서는 이미 읽는 중
+  refreshChatBadge();
+}, 20000);
+
+// 다른 앱 갔다가 돌아왔을 때 즉시 갱신
+document.addEventListener('visibilitychange', () => {
+  if(!document.hidden && state.token) refreshChatBadge();
+});
 
 if('serviceWorker' in navigator){
   window.addEventListener('load', () => {
