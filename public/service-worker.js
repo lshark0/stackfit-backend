@@ -1,5 +1,7 @@
-const CACHE_NAME = 'kimfree-shell-v6';
-const SHELL_FILES = ['/manifest.json', '/icons/icon-192.png', '/icons/icon-512.png'];
+const CACHE_NAME = 'kimfree-shell-v7';
+// manifest.json은 캐시하지 않습니다. 낡은 앱 이름/아이콘 정보가 남아
+// 브라우저가 예전 앱으로 잘못 인식하는 것을 막기 위함입니다.
+const SHELL_FILES = ['/icons/icon-192.png', '/icons/icon-512.png'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -28,6 +30,8 @@ self.addEventListener('fetch', (event) => {
   // 서비스워커 자신은 절대 캐시하지 않습니다.
   // (캐시하면 낡은 버전이 스스로를 계속 되살려서 새 기능이 영영 적용되지 않습니다)
   if (url.pathname === '/service-worker.js') return;
+  // 앱 정보(manifest)도 항상 최신을 받아야 이름·아이콘 변경이 제대로 반영됩니다.
+  if (url.pathname === '/manifest.json') return;
   if (event.request.method !== 'GET') return;
 
   // 앱의 HTML 화면(들어가는 첫 페이지)은 항상 네트워크를 먼저 시도합니다.

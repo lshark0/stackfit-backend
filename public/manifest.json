@@ -1,9 +1,9 @@
 {
-  "id": "/",
+  "id": "/?app=kimfree",
   "name": "김프리",
   "short_name": "김프리",
   "description": "최적의 IT 매칭 솔루션 — IT 프리랜서와 기업을 기술스택으로 연결합니다",
-  "start_url": "/",
+  "start_url": "/?src=pwa",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",

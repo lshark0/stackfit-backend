@@ -112,7 +112,7 @@ app.use(express.static(path.join(__dirname, 'public'), {
     // (통신사 프록시/브라우저가 예전 버전을 계속 보여주는 문제 방지.
     //  특히 서비스워커가 낡은 채로 남으면 푸시 알림 같은 새 기능이 아예 동작하지 않습니다.)
     // 아이콘 등 정적 자산은 기존처럼 캐시 허용.
-    if (filePath.endsWith('.html') || filePath.endsWith('service-worker.js')) {
+    if (filePath.endsWith('.html') || filePath.endsWith('service-worker.js') || filePath.endsWith('manifest.json')) {
       res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');

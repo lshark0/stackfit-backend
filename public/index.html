@@ -1088,6 +1088,10 @@ async function consumeOAuthHash(){
     const params = new URLSearchParams(search.slice(1));
     history.replaceState(null, '', window.location.pathname);
 
+    // 로그인과 무관한 파라미터(예: 홈화면 앱 실행 시 붙는 ?src=pwa)는 그냥 무시합니다.
+    const isOAuthCallback = ['oauth_error','token','oauth_pending'].some(k => params.has(k));
+    if(!isOAuthCallback) return false;
+
     if(params.get('oauth_error')){
       lastAuthError = '소셜 로그인 실패 (코드: ' + params.get('oauth_error') + ')';
       return false;
