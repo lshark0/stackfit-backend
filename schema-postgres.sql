@@ -97,6 +97,8 @@ CREATE TABLE IF NOT EXISTS conversations (
   company_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   freelancer_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   job_id        INTEGER REFERENCES jobs(id) ON DELETE SET NULL,
+  company_last_read_id    INTEGER NOT NULL DEFAULT 0,
+  freelancer_last_read_id INTEGER NOT NULL DEFAULT 0,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE(company_id, freelancer_id, job_id)
 );

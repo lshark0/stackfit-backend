@@ -159,11 +159,11 @@ async function main() {
   await initDb(); // 스키마 준비 + (필요 시) 데모 데이터 시드까지 끝난 뒤에 요청을 받기 시작
   await initPush(); // 푸시 인증키 준비 (실패해도 서버는 정상 동작)
   app.listen(PORT, () => {
-    console.log(`[stackfit] API 서버 실행 중 → http://localhost:${PORT} (DB: ${USE_POSTGRES ? 'PostgreSQL' : 'SQLite'})`);
+    console.log(`[김프리] API 서버 실행 중 → http://localhost:${PORT} (DB: ${USE_POSTGRES ? 'PostgreSQL' : 'SQLite'})`);
   });
 }
 
 main().catch((err) => {
-  console.error('[stackfit] 서버 시작 실패:', err);
+  console.error('[김프리] 서버 시작 실패:', err);
   process.exit(1);
 });

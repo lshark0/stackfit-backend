@@ -5,7 +5,7 @@ const SECRET = process.env.JWT_SECRET || DEFAULT_SECRET;
 
 if (SECRET === DEFAULT_SECRET) {
   console.warn(
-    '[stackfit] 경고: JWT_SECRET 환경변수가 설정되지 않아 기본값을 사용 중입니다. ' +
+    '[김프리] 경고: JWT_SECRET 환경변수가 설정되지 않아 기본값을 사용 중입니다. ' +
     '운영 배포 시 반드시 무작위 값으로 설정하세요 (토큰이 위조될 수 있습니다).'
   );
 }

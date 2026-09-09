@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>스택핏 STACKFIT — IT 프리랜서 · 기업 매칭</title>
+<title>김프리 — 최적의 IT 매칭 솔루션</title>
 <meta name="description" content="기술스택으로 정확하게 연결하는 IT 프리랜서 매칭 플랫폼. 자동 매칭 추천, 포트폴리오, 실시간 채팅, 상호 평가까지.">
 
 <!-- 카카오톡·문자·SNS로 링크를 공유할 때 표시되는 미리보기 카드 -->
 <meta property="og:type" content="website">
-<meta property="og:site_name" content="스택핏 STACKFIT">
-<meta property="og:title" content="스택핏 — IT 프리랜서와 기업을 기술스택으로 연결">
+<meta property="og:site_name" content="김프리">
+<meta property="og:title" content="김프리 — IT 프리랜서와 기업을 기술스택으로 연결">
 <meta property="og:description" content="자동 매칭 추천 · 포트폴리오 · 실시간 채팅 · 상호 평가. 지금 무료로 시작하세요.">
 <meta property="og:url" content="https://stackfit-backend.onrender.com">
 <meta property="og:image" content="https://stackfit-backend.onrender.com/icons/og-image.png">
@@ -17,17 +17,17 @@
 <meta property="og:image:height" content="630">
 <meta property="og:locale" content="ko_KR">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="스택핏 — IT 프리랜서와 기업을 기술스택으로 연결">
+<meta name="twitter:title" content="김프리 — IT 프리랜서와 기업을 기술스택으로 연결">
 <meta name="twitter:description" content="자동 매칭 추천 · 포트폴리오 · 실시간 채팅 · 상호 평가.">
 <meta name="twitter:image" content="https://stackfit-backend.onrender.com/icons/og-image.png">
 
 <link rel="manifest" href="/manifest.json">
 <link rel="icon" href="/icons/favicon-32.png" sizes="32x32">
 <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
-<meta name="theme-color" content="#14171C">
+<meta name="theme-color" content="#0A1633">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="스택핏">
+<meta name="apple-mobile-web-app-title" content="김프리">
 <meta name="mobile-web-app-capable" content="yes">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -407,7 +407,12 @@ async function apiFetch(path, opts={}){
   let data = null;
   try{ data = await res.json(); }catch(e){ /* no body */ }
   if(!res.ok){
-    throw new Error((data && data.error) || `요청 실패 (${res.status})`);
+    const err = new Error((data && data.error) || `요청 실패 (${res.status})`);
+    // 서버가 알려준 코드/부가정보를 화면에서 활용할 수 있게 함께 담아 보냅니다.
+    if(data && data.code) err.code = data.code;
+    if(data && data.missing) err.missing = data.missing;
+    err.status = res.status;
+    throw err;
   }
   return data;
 }
@@ -574,7 +579,7 @@ function drawerMenuContent(){
   return `
     <div class="drawer-head">
       <div class="brand-mark"><div class="sq"><span class="mid"></span></div></div>
-      <div class="nm">스택핏</div>
+      <div class="nm">김프리</div>
       <div class="rl">${roleLabel}</div>
     </div>
     <div class="drawer-sec"><div class="drawer-sec-label">탐색</div>${exploreItems}</div>
@@ -786,7 +791,7 @@ function loadingShell(){
         <path d="M7 3.3c0 4.2 3.1 5.6 5 6.7 1.9-1.1 5-2.5 5-6.7M7 20.7c0-4.2 3.1-5.6 5-6.7 1.9 1.1 5 2.5 5 6.7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
         <circle class="hg-sand" cx="12" cy="12" r="1"/>
       </svg>
-      <div class="loading-name">스택핏</div>
+      <div class="loading-name">김프리</div>
     </div>
   </div></div>`;
 }
@@ -1125,8 +1130,21 @@ function saveServerUrl(){
 }
 
 async function applyToJob(id){
-  try{ await apiFetch(`/jobs/${id}/apply`, {method:'POST'}); toast('지원이 완료됐어요'); go('jobDetail', id); }
-  catch(e){ toast(e.message); }
+  try{
+    await apiFetch(`/jobs/${id}/apply`, {method:'POST'});
+    toast('지원이 완료됐어요');
+    go('jobDetail', id);
+  }catch(e){
+    if(e.code === 'PROFILE_INCOMPLETE'){
+      // 프로필을 다 채워야 지원할 수 있으므로 바로 수정 화면으로 안내합니다.
+      // 저장을 마치면 원래 보던 공고로 돌아가도록 기억해둡니다.
+      pendingApplyJobId = id;
+      profileMissingFields = e.missing || [];
+      showConfirm(e.message + '\n\n지금 프로필을 채우러 갈까요?', () => go('profileEdit'));
+      return;
+    }
+    toast(e.message);
+  }
 }
 async function cancelApplication(id){
   if(!confirm('지원을 취소하시겠어요?')) return;
@@ -1317,6 +1335,9 @@ function setTalentCat(cat, el){
 
 /* ---- Profile edit (local pending stack, partial refresh) ---- */
 let pendingStack = [];
+// 프로필 미완성으로 지원이 막혔을 때, 어떤 공고로 돌아갈지와 부족한 항목을 기억합니다.
+let pendingApplyJobId = null;
+let profileMissingFields = [];
 function refreshTagsUI(){
   const el = document.getElementById('pf-tags');
   if(!el) return;
@@ -1340,6 +1361,13 @@ async function saveProfile(){
       stack: pendingStack,
     }});
     toast('프로필이 저장됐어요');
+    // 지원하려다 프로필 때문에 막혔던 경우, 저장 후 그 공고로 돌아갑니다.
+    if(pendingApplyJobId){
+      const jobId = pendingApplyJobId;
+      pendingApplyJobId = null; profileMissingFields = [];
+      go('jobDetail', jobId);
+      return;
+    }
     go('mypage');
   }catch(e){ toast(e.message); }
 }
@@ -1400,7 +1428,7 @@ async function screenOnboarding(){
     </div>` : '';
   return `${statusbar()}
   <div class="onb-wrap">
-    <div class="brand-mark"><div class="sq"><span class="mid"></span></div><div><div class="brand-name">스택핏</div><div class="brand-tag">STACKFIT · IT Matching</div></div></div>
+    <div class="brand-mark"><div class="sq"><span class="mid"></span></div><div><div class="brand-name">김프리</div><div class="brand-tag">최적의 IT 매칭 솔루션</div></div></div>
     <div class="onb-headline">기술 스택으로<br><em>가장 정확하게</em><br>연결합니다.</div>
     ${errorBanner}
     <div style="display:flex; flex-direction:column; gap:12px;">
@@ -2096,6 +2124,12 @@ async function screenProfileEdit(){
   return `${statusbar()}
   <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('mypage')">${I.back}</div><div class="page-title">프로필 수정</div></div></div>
   <div class="content">
+    ${pendingApplyJobId ? `
+    <div class="reco-empty" style="text-align:left; border-color:var(--amber); background:#FDF6E9;">
+      <b style="color:var(--ink);">지원하려면 아래 항목을 채워주세요</b>
+      ${profileMissingFields.length ? `<div style="margin-top:6px; display:flex; flex-wrap:wrap; gap:5px;">${profileMissingFields.map(f=>`<span class="reco-reason" style="border-color:var(--amber); color:var(--amber-deep);">${esc(f)}</span>`).join('')}</div>` : ''}
+      <div style="margin-top:6px; font-size:11.5px;">저장하면 보던 공고로 다시 돌아가요.</div>
+    </div>` : ''}
     <div class="form-field"><label class="form-label">이름</label><input id="pf-name" class="form-input" value="${esc(p.name)}"></div>
     <div class="form-field"><label class="form-label">업무</label><input id="pf-role" class="form-input" value="${esc(p.role_title)}"></div>
     <div class="form-field"><label class="form-label">등급</label><select id="pf-grade" class="form-input">

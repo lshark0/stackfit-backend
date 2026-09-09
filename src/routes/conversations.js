@@ -39,8 +39,12 @@ router.get('/', requireAuth, async (req, res) => {
     // 내가 마지막으로 보낸 메시지 '이후'에 상대가 보낸 메시지를 안 읽은 것으로 계산합니다.
     // 시각(created_at)은 초 단위라 빠르게 주고받으면 값이 같아져 비교가 어긋나므로,
     // 항상 증가하는 메시지 id를 기준으로 판단합니다.
+    // 내가 이 대화를 어디까지 읽었는지(대화방을 열면 갱신됨)와,
+    // 내가 마지막으로 보낸 메시지 중 더 최근 것을 기준으로 안 읽은 메시지를 셉니다.
+    const myLastReadId = (req.user.role === 'freelancer' ? c.freelancer_last_read_id : c.company_last_read_id) || 0;
     const myLastSentId = msgs.filter((m) => m.sender_id === req.user.id).map((m) => m.id).pop() || 0;
-    const unread = msgs.filter((m) => m.sender_id !== req.user.id && m.id > myLastSentId).length;
+    const baseline = Math.max(Number(myLastReadId), Number(myLastSentId));
+    const unread = msgs.filter((m) => m.sender_id !== req.user.id && m.id > baseline).length;
     const counterpartId = req.user.role === 'freelancer' ? c.company_id : c.freelancer_id;
     return {
       ...c,
@@ -97,6 +101,26 @@ router.get('/:id/messages', requireAuth, async (req, res) => {
     return res.status(404).json({ error: '대화를 찾을 수 없습니다.' });
   }
   const msgs = await all('SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at ASC, id ASC', [req.params.id]);
+
+  // 대화방을 열었으니 '여기까지 읽음'으로 표시합니다 → 안 읽은 개수가 실제로 줄어듭니다.
+  const lastId = msgs.length ? msgs[msgs.length - 1].id : 0;
+  const column = req.user.id === conv.company_id ? 'company_last_read_id' : 'freelancer_last_read_id';
+  if (lastId > (Number(conv[column]) || 0)) {
+    await run(`UPDATE conversations SET ${column} = ? WHERE id = ?`, [lastId, conv.id]);
+  }
+
+  // 이 대화 때문에 쌓인 안 읽은 메시지 알림도 함께 정리합니다.
+  const counterpartId = req.user.id === conv.company_id ? conv.freelancer_id : conv.company_id;
+  const senderRow = req.user.id === conv.company_id
+    ? await get('SELECT name FROM freelancer_profiles WHERE user_id = ?', [counterpartId])
+    : await get('SELECT name FROM companies WHERE user_id = ?', [counterpartId]);
+  if (senderRow) {
+    await run(
+      "DELETE FROM notifications WHERE user_id = ? AND tag = '메시지' AND is_read = 0 AND title = ?",
+      [req.user.id, `${senderRow.name}님의 새 메시지`]
+    ).catch(() => {});
+  }
+
   res.json({ messages: msgs });
 });
 

@@ -55,6 +55,8 @@ if (USE_POSTGRES) {
     await ensureColumnPg('freelancer_profiles', 'resume_filename', 'TEXT');
     await ensureColumnPg('freelancer_profiles', 'resume_original_name', 'TEXT');
     await ensureColumnPg('freelancer_profiles', 'resume_data', 'BYTEA');
+    await ensureColumnPg('conversations', 'company_last_read_id', 'INTEGER NOT NULL DEFAULT 0');
+    await ensureColumnPg('conversations', 'freelancer_last_read_id', 'INTEGER NOT NULL DEFAULT 0');
     await ensureColumnPg('jobs', 'deadline', 'TEXT');
     await ensureColumnPg('jobs', 'duty', 'TEXT');
     await ensureColumnPg('jobs', 'grade', 'TEXT');
@@ -66,7 +68,7 @@ if (USE_POSTGRES) {
     );
     await removeDemoAccounts();
     await fixRoleToCompany('454145@hanmail.net');
-    console.log('[stackfit] PostgreSQL 연결 및 스키마 준비 완료 (영구 저장)');
+    console.log('[김프리] PostgreSQL 연결 및 스키마 준비 완료 (영구 저장)');
   };
 
   async function ensureColumnPg(table, column, ddl) {
@@ -94,6 +96,8 @@ if (USE_POSTGRES) {
     try { db.exec('ALTER TABLE freelancer_profiles ADD COLUMN resume_filename TEXT'); } catch (e) {}
     try { db.exec('ALTER TABLE freelancer_profiles ADD COLUMN resume_original_name TEXT'); } catch (e) {}
     try { db.exec('ALTER TABLE freelancer_profiles ADD COLUMN resume_data BLOB'); } catch (e) {}
+    try { db.exec('ALTER TABLE conversations ADD COLUMN company_last_read_id INTEGER NOT NULL DEFAULT 0'); } catch (e) {}
+    try { db.exec('ALTER TABLE conversations ADD COLUMN freelancer_last_read_id INTEGER NOT NULL DEFAULT 0'); } catch (e) {}
     try { db.exec('ALTER TABLE jobs ADD COLUMN deadline TEXT'); } catch (e) {}
     try { db.exec('ALTER TABLE jobs ADD COLUMN duty TEXT'); } catch (e) {}
     try { db.exec('ALTER TABLE jobs ADD COLUMN grade TEXT'); } catch (e) {}
@@ -105,7 +109,7 @@ if (USE_POSTGRES) {
     } catch (e) {}
     await removeDemoAccounts();
     await fixRoleToCompany('454145@hanmail.net');
-    console.log('[stackfit] SQLite 로컬 DB 준비 완료 (data/stackfit.db, 로컬 개발 전용)');
+    console.log('[김프리] SQLite 로컬 DB 준비 완료 (data/stackfit.db, 로컬 개발 전용)');
   };
 }
 
@@ -118,7 +122,7 @@ async function removeDemoAccounts() {
     const user = await get('SELECT id FROM users WHERE email = ?', [email]);
     if (user) {
       await run('DELETE FROM users WHERE id = ?', [user.id]); // 연관 데이터는 CASCADE로 함께 삭제됨
-      console.log(`[stackfit] 데모 계정 삭제: ${email}`);
+      console.log(`[김프리] 데모 계정 삭제: ${email}`);
     }
   }
 }
@@ -136,7 +140,7 @@ async function fixRoleToCompany(email) {
   }
   await run('DELETE FROM freelancer_profiles WHERE user_id = ?', [user.id]);
   await run("UPDATE users SET role = 'company' WHERE id = ?", [user.id]);
-  console.log(`[stackfit] 계정 역할 보정: ${email} → company`);
+  console.log(`[김프리] 계정 역할 보정: ${email} → company`);
 }
 
 module.exports = { run, get, all, initDb, USE_POSTGRES };

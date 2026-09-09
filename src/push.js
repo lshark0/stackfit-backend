@@ -18,7 +18,7 @@ async function initPush() {
       await run('INSERT INTO app_settings (key, value) VALUES (?,?)', ['vapid_public_key', keys.publicKey]);
       await run('INSERT INTO app_settings (key, value) VALUES (?,?)', ['vapid_private_key', keys.privateKey]);
       vapid = keys;
-      console.log('[stackfit] 푸시 알림 인증키를 새로 생성했습니다.');
+      console.log('[김프리] 푸시 알림 인증키를 새로 생성했습니다.');
     }
 
     webpush.setVapidDetails(
@@ -26,9 +26,9 @@ async function initPush() {
       vapid.publicKey,
       vapid.privateKey
     );
-    console.log('[stackfit] 푸시 알림 준비 완료');
+    console.log('[김프리] 푸시 알림 준비 완료');
   } catch (e) {
-    console.warn('[stackfit] 푸시 알림 초기화 실패 (푸시 없이 계속 동작합니다):', e.message);
+    console.warn('[김프리] 푸시 알림 초기화 실패 (푸시 없이 계속 동작합니다):', e.message);
     vapid = null;
   }
 }
