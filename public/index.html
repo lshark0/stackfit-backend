@@ -584,12 +584,6 @@ function drawerMenuContent(){
     </div>
     <div class="drawer-sec"><div class="drawer-sec-label">탐색</div>${exploreItems}</div>
     <div class="drawer-sec"><div class="drawer-sec-label">내 활동</div>${activityItems}${item(I.bell,'알림','alerts')}${item(I.user,'마이페이지','mypage')}</div>
-    <div class="drawer-sec"><div class="drawer-sec-label">설정 및 정책</div>
-      <div class="drawer-item" onclick="closeDrawer(); window.open('/terms.html','_blank');"><span class="ic">${I.building}</span>이용약관</div>
-      <div class="drawer-item" onclick="closeDrawer(); window.open('/privacy.html','_blank');"><span class="ic">${I.eye}</span>개인정보처리방침</div>
-      <div class="drawer-item" onclick="closeDrawer(); logout();"><span class="ic">${I.logout}</span>로그아웃</div>
-      ${item(I.trash,'회원탈퇴','deleteAccount', true)}
-    </div>
     <div style="height:20px;"></div>
   `;
 }
