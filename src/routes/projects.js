@@ -8,7 +8,11 @@ wrapAllRoutes(router);
 
 router.get('/', requireAuth, async (req, res) => {
   const col = req.user.role === 'freelancer' ? 'freelancer_id' : 'company_id';
-  const rows = await all(`SELECT * FROM projects WHERE ${col} = ? ORDER BY created_at DESC, id DESC`, [req.user.id]);
+  // 진행 중인 프로젝트를 항상 위에 보여줍니다 (완료된 건에 새 계약이 묻히지 않도록).
+  const rows = await all(
+    `SELECT * FROM projects WHERE ${col} = ? ORDER BY (CASE WHEN status = '완료' THEN 1 ELSE 0 END), created_at DESC, id DESC`,
+    [req.user.id]
+  );
 
   // 각 프로젝트에 내가 이미 리뷰를 남겼는지, 그리고 상대방이 나에게 남긴 평가도 함께 내려줍니다.
   // 프로젝트 수만큼 쿼리를 반복하지 않도록, 관련된 리뷰를 한 번에 가져와 메모리에서 매칭합니다.

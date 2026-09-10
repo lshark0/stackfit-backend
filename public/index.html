@@ -964,7 +964,13 @@ function closeConfirm(){
 }
 function logout(){
   showConfirm('로그아웃 하시겠어요?', () => {
-    clearToken(); state.role=null; state.userId=null; go('onboarding');
+    clearToken(); state.role=null; state.userId=null;
+    // 화면 밖에 있는 전체메뉴는 자동으로 지워지지 않으므로 직접 비웁니다.
+    // (안 비우면 다른 계정으로 로그인해도 이전 역할의 메뉴가 남아 보입니다)
+    const dw = document.getElementById('drawer');
+    if(dw) dw.innerHTML = '';
+    closeDrawer();
+    go('onboarding');
   });
 }
 

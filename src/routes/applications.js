@@ -152,8 +152,13 @@ router.patch('/jobs/:jobId/applicants/:applicationId', requireAuth, requireRole(
   }).catch(() => {});
 
   if (status === 'accepted') {
-    const existingProject = await get('SELECT id FROM projects WHERE job_id=? AND freelancer_id=?', [job.id, application.freelancer_id]);
-    if (!existingProject) {
+    // 같은 공고·같은 사람이라도 이전 계약이 이미 '완료'됐다면 재계약이므로 새 프로젝트를 만듭니다.
+    // (진행 중인 프로젝트가 있을 때만 중복 생성을 막습니다.)
+    const activeProject = await get(
+      "SELECT id FROM projects WHERE job_id=? AND freelancer_id=? AND status != '완료'",
+      [job.id, application.freelancer_id]
+    );
+    if (!activeProject) {
       await run(
         'INSERT INTO projects (job_id, company_id, freelancer_id, title, rate, period, status, stage) VALUES (?,?,?,?,?,?,?,?)',
         [job.id, req.user.id, application.freelancer_id, job.title, job.rate, job.period, '진행중', 1]
