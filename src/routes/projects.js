@@ -116,7 +116,7 @@ router.post('/:id/agree', requireAuth, async (req, res) => {
 
   const isCompany = req.user.id === project.company_id;
   const myCol = isCompany ? 'company_agreed' : 'freelancer_agreed';
-  if (project[myCol]) return res.status(400).json({ error: '이미 계약에 동의하셨어요. 상대방의 동의를 기다리는 중이에요.' });
+  if (project[myCol]) return res.json(project); // 이미 동의함 (중복 클릭)
 
   await run(`UPDATE projects SET ${myCol} = 1 WHERE id = ?`, [project.id]);
   const updated = await get('SELECT * FROM projects WHERE id = ?', [project.id]);
@@ -140,7 +140,13 @@ router.post('/:id/report-done', requireAuth, async (req, res) => {
   if (req.user.id !== project.freelancer_id) {
     return res.status(403).json({ error: '프로젝트 완료 요청은 프리랜서만 할 수 있어요.' });
   }
-  if (project.stage !== 2) return res.status(400).json({ error: '프로젝트 진행 단계에서만 완료 요청을 할 수 있어요.' });
+  // 이미 완료 요청을 보낸 상태라면(중복 클릭 등) 오류 대신 현재 상태를 그대로 돌려줍니다.
+  if (project.stage >= 3 || project.status === '완료') {
+    return res.json(project);
+  }
+  if (project.stage !== 2) {
+    return res.status(400).json({ error: '계약이 체결된 뒤에 완료 요청을 할 수 있어요.' });
+  }
 
   await run('UPDATE projects SET stage = 3 WHERE id = ?', [project.id]);
   await notify(project.company_id, '완료', '프리랜서가 프로젝트 완료를 요청했어요', `"${project.title}" 프로젝트 완료를 확인해주세요.`);
@@ -153,6 +159,9 @@ router.post('/:id/settle', requireAuth, async (req, res) => {
   if (!project) return;
   if (req.user.id !== project.company_id) {
     return res.status(403).json({ error: '프로젝트 완료 확인은 기업만 할 수 있어요.' });
+  }
+  if (project.status === '완료') {
+    return res.json(project); // 이미 완료된 프로젝트 (중복 클릭)
   }
   if (project.stage !== 3) return res.status(400).json({ error: '프리랜서가 완료를 요청한 뒤에 확인할 수 있어요.' });
 

@@ -1367,23 +1367,31 @@ async function uploadContract(projectId, input){
     go('projects');
   }catch(e){ toast(e.message); }
 }
+// 같은 요청이 연달아 나가지 않도록 진행 중인 동작을 기억합니다.
+// (버튼을 두 번 눌러 "이미 처리됨" 같은 메시지가 뜨는 것을 방지)
+const busyActions = new Set();
+async function runProjectAction(key, url, successMsg){
+  if(busyActions.has(key)) return;
+  busyActions.add(key);
+  try{
+    await apiFetch(url, {method:'POST'});
+    toast(successMsg);
+    go('projects');
+  }catch(e){ toast(e.message); }
+  finally{ busyActions.delete(key); }
+}
+
 async function agreeContract(id){
-  showConfirm('계약 조건에 동의할까요?\n양측이 모두 동의하면 프로젝트가 시작돼요.', async () => {
-    try{ await apiFetch(`/projects/${id}/agree`, {method:'POST'}); toast('계약에 동의했어요'); go('projects'); }
-    catch(e){ toast(e.message); }
-  });
+  showConfirm('계약 조건에 동의할까요?\n양측이 모두 동의하면 프로젝트가 시작돼요.',
+    () => runProjectAction(`agree-${id}`, `/projects/${id}/agree`, '계약에 동의했어요'));
 }
 async function reportDone(id){
-  showConfirm('프로젝트를 완료했나요?\n기업이 확인하면 최종 종료됩니다.', async () => {
-    try{ await apiFetch(`/projects/${id}/report-done`, {method:'POST'}); toast('완료 요청을 보냈어요'); go('projects'); }
-    catch(e){ toast(e.message); }
-  });
+  showConfirm('프로젝트를 완료했나요?\n기업이 확인하면 최종 종료됩니다.',
+    () => runProjectAction(`done-${id}`, `/projects/${id}/report-done`, '완료 요청을 보냈어요'));
 }
 async function settleProject(id){
-  showConfirm('프로젝트를 완료 처리할까요?\n확인하면 프로젝트가 최종 종료됩니다.', async () => {
-    try{ await apiFetch(`/projects/${id}/settle`, {method:'POST'}); toast('프로젝트가 완료됐어요'); go('projects'); }
-    catch(e){ toast(e.message); }
-  });
+  showConfirm('프로젝트를 완료 처리할까요?\n확인하면 프로젝트가 최종 종료됩니다.',
+    () => runProjectAction(`settle-${id}`, `/projects/${id}/settle`, '프로젝트가 완료됐어요'));
 }
 
 /* ---- Job search / filter (partial refresh, keeps input focus) ---- */
