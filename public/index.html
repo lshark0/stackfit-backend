@@ -1286,9 +1286,24 @@ async function deleteResume(){
   }catch(e){ toast(e.message); }
 }
 
-async function advanceStage(id, nextStage){
-  try{ await apiFetch(`/projects/${id}/stage`, {method:'PATCH', body:{stage:nextStage}}); toast('진행 단계가 업데이트됐어요'); go('projects'); }
-  catch(e){ toast(e.message); }
+// 프로젝트 단계는 정해진 쪽만 진행시킬 수 있습니다.
+async function agreeContract(id){
+  showConfirm('계약 조건에 동의할까요?\n양측이 모두 동의하면 프로젝트가 시작돼요.', async () => {
+    try{ await apiFetch(`/projects/${id}/agree`, {method:'POST'}); toast('계약에 동의했어요'); go('projects'); }
+    catch(e){ toast(e.message); }
+  });
+}
+async function reportDone(id){
+  showConfirm('업무를 완료했다고 보고할까요?\n기업이 최종 정산을 진행하게 돼요.', async () => {
+    try{ await apiFetch(`/projects/${id}/report-done`, {method:'POST'}); toast('완료 보고를 보냈어요'); go('projects'); }
+    catch(e){ toast(e.message); }
+  });
+}
+async function settleProject(id){
+  showConfirm('최종 정산을 완료 처리할까요?\n프로젝트가 완료 상태로 바뀌어요.', async () => {
+    try{ await apiFetch(`/projects/${id}/settle`, {method:'POST'}); toast('정산이 완료됐어요'); go('projects'); }
+    catch(e){ toast(e.message); }
+  });
 }
 
 /* ---- Job search / filter (partial refresh, keeps input focus) ---- */
@@ -1761,6 +1776,39 @@ async function screenTalentDetail(){
   </div>`;
 }
 
+// 프로젝트 단계별로 '지금 누가 무엇을 해야 하는지'를 보여줍니다.
+// 내 차례가 아니면 버튼 대신 대기 안내를 표시해, 한쪽이 임의로 단계를 넘길 수 없게 합니다.
+function projectActionHtml(p, isCompany){
+  if(p.status === '완료'){
+    return p.myReview
+      ? `<div class="page-sub" style="margin-top:10px;">내가 남긴 평점: ${'★'.repeat(p.myReview.rating)}${'☆'.repeat(5-p.myReview.rating)}</div>`
+      : `<button class="btn btn-primary" style="margin-top:10px;" onclick="go('reviewForm', ${p.id})">리뷰 남기기</button>`;
+  }
+  const wait = (msg) => `<div class="reco-empty" style="margin-top:10px; text-align:left;">${msg}</div>`;
+
+  if(p.stage === 1){
+    const iAgreed = isCompany ? p.company_agreed : p.freelancer_agreed;
+    const otherAgreed = isCompany ? p.freelancer_agreed : p.company_agreed;
+    const otherName = isCompany ? '프리랜서' : '기업';
+    if(iAgreed){
+      return wait(`계약에 동의하셨어요.<br><b>${otherName}의 동의를 기다리는 중</b>이에요.`);
+    }
+    return `${otherAgreed ? `<div class="page-sub" style="margin-top:10px;">${otherName}이(가) 이미 동의했어요.</div>` : ''}
+      <button class="btn btn-primary" style="margin-top:10px;" onclick="agreeContract(${p.id})">계약 조건에 동의하기</button>`;
+  }
+  if(p.stage === 2){
+    return isCompany
+      ? wait('프로젝트가 진행 중이에요.<br>프리랜서가 <b>업무 완료 보고</b>를 하면 정산 단계로 넘어가요.')
+      : `<button class="btn btn-primary" style="margin-top:10px;" onclick="reportDone(${p.id})">업무 완료 보고하기</button>`;
+  }
+  if(p.stage === 3){
+    return isCompany
+      ? `<button class="btn btn-primary" style="margin-top:10px;" onclick="settleProject(${p.id})">최종 정산 완료 처리</button>`
+      : wait('업무 완료를 보고했어요.<br>기업의 <b>최종 정산</b>을 기다리는 중이에요.');
+  }
+  return '';
+}
+
 async function screenProjects(){
   const nc = await unreadCount();
   const isCompany = state.role === 'company';
@@ -1769,7 +1817,7 @@ async function screenProjects(){
     apiFetch('/projects'),
     isCompany ? apiFetch('/jobs').catch(()=>({jobs:[]})) : Promise.resolve({jobs:[]}),
   ]);
-  const steps = ["계약 체결","계약금 정산","프로젝트 진행","최종 정산"];
+  const steps = ["계약 체결","프로젝트 진행","최종 정산"];
   return `${statusbar()}${header("프로젝트 관리","계약 · 정산 현황",{}, nc)}
   <div class="content">
     ${isCompany ? `<div class="reco-empty" style="text-align:left; margin-bottom:12px;">
@@ -1780,16 +1828,14 @@ async function screenProjects(){
       <div class="card">
         <div class="card-top"><div><div class="card-title">${esc(p.title)}</div></div><span class="tag ${p.status==='진행중'?'on':''}" style="border-radius:999px;">${p.status}</span></div>
         <div class="meta-row"><span>${I.clock}${esc(p.period)}</span><span class="rate">${esc(p.rate)}</span></div>
-        ${stepsGraphic(p.stage, steps)}
-        ${p.stage<4? `<button class="btn btn-outline" style="margin-top:10px;" onclick="advanceStage(${p.id}, ${p.stage+1})">다음 단계로 진행</button>`
-        : p.myReview ? `<div class="page-sub" style="margin-top:10px;">내가 남긴 평점: ${'★'.repeat(p.myReview.rating)}${'☆'.repeat(5-p.myReview.rating)}</div>`
-        : `<button class="btn btn-primary" style="margin-top:10px;" onclick="go('reviewForm', ${p.id})">리뷰 남기기</button>`}
+        ${stepsGraphic(p.status==='완료' ? 4 : p.stage, steps)}
+        ${projectActionHtml(p, isCompany)}
         ${p.receivedReview? `
           <div style="margin-top:10px; padding:12px; background:var(--card); border:1px solid var(--line); border-radius:12px;">
             <div style="font-size:11.5px; font-weight:700; color:var(--slate); margin-bottom:4px;">상대방이 남긴 평가</div>
             <div style="color:var(--amber-deep); font-size:14px;">${'★'.repeat(p.receivedReview.rating)}${'☆'.repeat(5-p.receivedReview.rating)}</div>
             ${p.receivedReview.comment? `<div class="page-sub" style="margin-top:6px; line-height:1.6;">${esc(p.receivedReview.comment)}</div>` : ''}
-          </div>` : (p.stage>=4? `<div class="page-sub" style="margin-top:10px;">아직 상대방의 평가가 등록되지 않았어요.</div>` : '')}
+          </div>` : (p.status==='완료'? `<div class="page-sub" style="margin-top:10px;">아직 상대방의 평가가 등록되지 않았어요.</div>` : '')}
       </div>`).join('') || (isCompany
         ? `${emptyArt(ART.noProjects, '아직 계약된 프로젝트가 없어요', myJobs.jobs.length
             ? `등록한 공고 <b>${myJobs.jobs.length}건</b>에서 지원자를 수락하면<br>프로젝트가 자동으로 생성돼요.`

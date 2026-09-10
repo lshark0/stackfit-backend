@@ -57,6 +57,9 @@ if (USE_POSTGRES) {
     await ensureColumnPg('freelancer_profiles', 'resume_data', 'BYTEA');
     await ensureColumnPg('conversations', 'company_last_read_id', 'INTEGER NOT NULL DEFAULT 0');
     await ensureColumnPg('conversations', 'freelancer_last_read_id', 'INTEGER NOT NULL DEFAULT 0');
+    await ensureColumnPg('projects', 'company_agreed', 'INTEGER NOT NULL DEFAULT 0');
+    await ensureColumnPg('projects', 'freelancer_agreed', 'INTEGER NOT NULL DEFAULT 0');
+    await migrateProjectStages();
     await ensureColumnPg('jobs', 'deadline', 'TEXT');
     await ensureColumnPg('jobs', 'duty', 'TEXT');
     await ensureColumnPg('jobs', 'grade', 'TEXT');
@@ -98,6 +101,9 @@ if (USE_POSTGRES) {
     try { db.exec('ALTER TABLE freelancer_profiles ADD COLUMN resume_data BLOB'); } catch (e) {}
     try { db.exec('ALTER TABLE conversations ADD COLUMN company_last_read_id INTEGER NOT NULL DEFAULT 0'); } catch (e) {}
     try { db.exec('ALTER TABLE conversations ADD COLUMN freelancer_last_read_id INTEGER NOT NULL DEFAULT 0'); } catch (e) {}
+    try { db.exec('ALTER TABLE projects ADD COLUMN company_agreed INTEGER NOT NULL DEFAULT 0'); } catch (e) {}
+    try { db.exec('ALTER TABLE projects ADD COLUMN freelancer_agreed INTEGER NOT NULL DEFAULT 0'); } catch (e) {}
+    await migrateProjectStages();
     try { db.exec('ALTER TABLE jobs ADD COLUMN deadline TEXT'); } catch (e) {}
     try { db.exec('ALTER TABLE jobs ADD COLUMN duty TEXT'); } catch (e) {}
     try { db.exec('ALTER TABLE jobs ADD COLUMN grade TEXT'); } catch (e) {}
@@ -111,6 +117,26 @@ if (USE_POSTGRES) {
     await fixRoleToCompany('454145@hanmail.net');
     console.log('[김프리] SQLite 로컬 DB 준비 완료 (data/stackfit.db, 로컬 개발 전용)');
   };
+}
+
+// 프로젝트 단계를 4단계(계약체결/계약금정산/진행/최종정산)에서
+// 3단계(계약체결/프로젝트진행/최종정산)로 한 번만 변환합니다.
+// 계약금은 실제로 지급되지 않고 다음 달부터 월 정산이 시작되므로 '계약금 정산' 단계를 없앴습니다.
+async function migrateProjectStages() {
+  try {
+    const done = await get("SELECT value FROM app_settings WHERE key = 'stage_v3_migrated'");
+    if (done) return;
+    // 1,2 → 1(계약 체결) / 3 → 2(프로젝트 진행) / 4 → 3(최종 정산)
+    await run('UPDATE projects SET stage = 1 WHERE stage <= 2');
+    await run('UPDATE projects SET stage = 2 WHERE stage = 3');
+    await run('UPDATE projects SET stage = 3 WHERE stage = 4');
+    // 이미 완료된 프로젝트는 양측이 계약에 동의한 것으로 간주합니다.
+    await run("UPDATE projects SET company_agreed = 1, freelancer_agreed = 1 WHERE stage >= 2 OR status = '완료'");
+    await run('INSERT INTO app_settings (key, value) VALUES (?,?)', ['stage_v3_migrated', '1']);
+    console.log('[김프리] 프로젝트 단계를 3단계 체계로 변환했습니다.');
+  } catch (e) {
+    console.warn('[김프리] 프로젝트 단계 변환 건너뜀:', e.message);
+  }
 }
 
 async function removeDemoAccounts() {

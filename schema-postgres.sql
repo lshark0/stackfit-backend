@@ -88,7 +88,9 @@ CREATE TABLE IF NOT EXISTS projects (
   rate          TEXT NOT NULL DEFAULT '협의',
   period        TEXT NOT NULL DEFAULT '',
   status        TEXT NOT NULL DEFAULT '진행중' CHECK (status IN ('진행중','완료','중단')),
-  stage         INTEGER NOT NULL DEFAULT 1,
+  stage         INTEGER NOT NULL DEFAULT 1,   -- 1:계약체결 2:프로젝트진행 3:최종정산
+  company_agreed    INTEGER NOT NULL DEFAULT 0,
+  freelancer_agreed INTEGER NOT NULL DEFAULT 0,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
