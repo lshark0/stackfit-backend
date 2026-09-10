@@ -42,7 +42,7 @@ router.get('/', requireAuth, async (req, res) => {
   res.json({ projects: withReview });
 });
 
-// 진행 단계는 3단계입니다: 1) 계약 체결  2) 프로젝트 진행  3) 최종 정산
+// 진행 단계는 3단계입니다: 1) 계약 체결  2) 프로젝트 진행  3) 프로젝트 완료
 // 각 단계는 정해진 쪽만 진행시킬 수 있어, 한쪽이 임의로 전체를 넘길 수 없습니다.
 async function loadMyProject(req, res) {
   const col = req.user.role === 'freelancer' ? 'freelancer_id' : 'company_id';
@@ -131,31 +131,31 @@ router.post('/:id/agree', requireAuth, async (req, res) => {
   res.json(await get('SELECT * FROM projects WHERE id = ?', [project.id]));
 });
 
-// [2단계] 업무 완료 보고 — 실제로 일한 프리랜서만 할 수 있습니다.
+// [2단계] 프로젝트 완료 요청 — 실제로 일한 프리랜서가 먼저 완료를 알립니다.
 router.post('/:id/report-done', requireAuth, async (req, res) => {
   const project = await loadMyProject(req, res);
   if (!project) return;
   if (req.user.id !== project.freelancer_id) {
-    return res.status(403).json({ error: '업무 완료 보고는 프리랜서만 할 수 있어요.' });
+    return res.status(403).json({ error: '프로젝트 완료 요청은 프리랜서만 할 수 있어요.' });
   }
-  if (project.stage !== 2) return res.status(400).json({ error: '프로젝트 진행 단계에서만 완료 보고를 할 수 있어요.' });
+  if (project.stage !== 2) return res.status(400).json({ error: '프로젝트 진행 단계에서만 완료 요청을 할 수 있어요.' });
 
   await run('UPDATE projects SET stage = 3 WHERE id = ?', [project.id]);
-  await notify(project.company_id, '정산', '업무 완료 보고가 도착했어요', `"${project.title}" 프로젝트의 최종 정산을 진행해주세요.`);
+  await notify(project.company_id, '완료', '프리랜서가 프로젝트 완료를 요청했어요', `"${project.title}" 프로젝트 완료를 확인해주세요.`);
   res.json(await get('SELECT * FROM projects WHERE id = ?', [project.id]));
 });
 
-// [3단계] 최종 정산 완료 — 대금을 지급하는 기업만 할 수 있습니다.
+// [3단계] 프로젝트 완료 확인 — 기업이 최종 확인해야 프로젝트가 종료됩니다.
 router.post('/:id/settle', requireAuth, async (req, res) => {
   const project = await loadMyProject(req, res);
   if (!project) return;
   if (req.user.id !== project.company_id) {
-    return res.status(403).json({ error: '최종 정산은 기업만 처리할 수 있어요.' });
+    return res.status(403).json({ error: '프로젝트 완료 확인은 기업만 할 수 있어요.' });
   }
-  if (project.stage !== 3) return res.status(400).json({ error: '최종 정산 단계에서만 처리할 수 있어요.' });
+  if (project.stage !== 3) return res.status(400).json({ error: '프리랜서가 완료를 요청한 뒤에 확인할 수 있어요.' });
 
   await run("UPDATE projects SET status = '완료' WHERE id = ?", [project.id]);
-  await notify(project.freelancer_id, '정산', '최종 정산이 완료됐어요', `"${project.title}" 프로젝트가 완료됐습니다. 리뷰를 남겨보세요.`);
+  await notify(project.freelancer_id, '완료', '프로젝트가 완료됐어요', `"${project.title}" 프로젝트가 최종 완료됐습니다. 리뷰를 남겨보세요.`);
   res.json(await get('SELECT * FROM projects WHERE id = ?', [project.id]));
 });
 
