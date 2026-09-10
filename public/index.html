@@ -954,13 +954,17 @@ async function loginAs(role){
   }
 }
 function showConfirm(message, onConfirm){
-  document.getElementById('confirmMsg').textContent = message;
+  // 줄바꿈을 반영해 표시합니다.
+  document.getElementById('confirmMsg').innerHTML = esc(message).replace(/\n/g, '<br>');
   const okBtn = document.getElementById('confirmOkBtn');
   okBtn.onclick = () => { closeConfirm(); onConfirm(); };
   document.getElementById('confirmOverlay').classList.add('open');
 }
 function closeConfirm(){
   document.getElementById('confirmOverlay').classList.remove('open');
+  // 사유 선택 등으로 확인 버튼을 숨겼다면 다시 보이도록 되돌립니다.
+  const ok = document.getElementById('confirmOkBtn');
+  if(ok) ok.style.display = '';
 }
 function logout(){
   showConfirm('로그아웃 하시겠어요?', () => {
@@ -1933,16 +1937,88 @@ async function submitReview(projectId){
 async function screenReceivedProposals(){
   const nc = await unreadCount();
   const data = await apiFetch('/proposals/received');
-  return `${statusbar()}${header("받은 제안", `${data.proposals.length}건`, {back:'home'}, nc)}
+  const pending = data.proposals.filter(p => p.status === 'sent').length;
+  const statusBadge = {
+    sent: `<span class="sbadge pending">${I.clockSm}응답 대기</span>`,
+    accepted: `<span class="sbadge pass">${I.trophy}수락함</span>`,
+    declined: `<span class="sbadge fail">${I.xCircle}거절함</span>`,
+  };
+  return `${statusbar()}${header("받은 제안", pending>0?`응답 대기 ${pending}건 · 전체 ${data.proposals.length}건`:`전체 ${data.proposals.length}건`, {back:'home'}, nc)}
   <div class="content">
     ${data.proposals.map(p=>`
-      <div class="card">
-        <div class="card-top"><div><div class="card-title">${esc(p.company_name)}</div><div class="card-org">${p.job_title? esc(p.job_title)+' 포지션 제안' : '포지션 제안'}</div></div></div>
-        ${p.company_description? `<div class="para" style="margin-top:6px;">${esc(p.company_description)}</div>` : ''}
-        <div class="page-sub" style="margin-top:10px;">${(parseServerTime(p.created_at)||new Date()).toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric'})} 도착</div>
-        <button class="btn btn-primary" style="margin-top:10px;" onclick="startChatWithCompany(${p.company_id}${p.job_id?`, ${p.job_id}`:''})">채팅으로 답장하기</button>
+      <div class="card ${p.status==='sent'?'is-proposed':''}">
+        <div class="card-top">
+          <div style="min-width:0;">
+            <div class="card-title">${p.job_title? esc(p.job_title) : '포지션 제안'}</div>
+            <div class="card-org">${esc(p.company_name)}</div>
+          </div>
+          ${statusBadge[p.status] || ''}
+        </div>
+
+        ${p.job_id ? `
+          <div style="margin-top:7px; display:flex; flex-wrap:wrap; gap:5px; align-items:center;">
+            ${dutyBadge(p.duty)} ${gradeBadge(p.grade)}
+          </div>
+          ${p.stack.length? `<div class="tag-row">${p.stack.map(x=>`<span class="tag">${esc(x)}</span>`).join('')}</div>` : ''}
+          <div class="icon-meta">
+            ${p.rate? `<span class="im">${I.wallet}<b>${esc(p.rate)}</b></span>`:''}
+            ${p.period? `<span class="im">${I.clockSm}${esc(p.period)}</span>`:''}
+            ${p.location? `<span class="im">${I.pin}${esc(p.location)}</span>`:''}
+            ${p.work_type? `<span class="im">${I.building}${esc(p.work_type)}</span>`:''}
+          </div>
+          ${p.job_description? `<div class="para" style="margin-top:9px;">${esc(p.job_description)}</div>` : ''}
+          <button class="btn btn-ghost" style="width:auto; padding:8px 12px; font-size:12px; margin-top:8px;" onclick="go('jobDetail', ${p.job_id})">공고 전체 보기 →</button>
+        ` : `<div class="page-sub" style="margin-top:8px;">특정 공고가 지정되지 않은 제안이에요. 채팅으로 조건을 확인해보세요.</div>`}
+
+        ${p.company_description? `<div class="page-sub" style="margin-top:9px;">🏢 ${esc(p.company_description)}</div>` : ''}
+        <div class="page-sub" style="margin-top:9px;">${(parseServerTime(p.created_at)||new Date()).toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric'})} 도착</div>
+
+        ${p.status === 'sent' ? `
+          <div style="display:flex; gap:8px; margin-top:12px;">
+            <button class="btn btn-outline" onclick="openDeclineProposal(${p.id})">거절</button>
+            <button class="btn btn-primary" onclick="acceptProposal(${p.id})">수락</button>
+          </div>`
+        : p.status === 'declined' ? `
+          <div class="reco-empty" style="margin-top:10px; text-align:left;">거절한 제안이에요.${p.decline_reason? `<br>사유: <b>${esc(p.decline_reason)}</b>` : ''}</div>`
+        : `<button class="btn btn-outline" style="margin-top:10px;" onclick="startChatWithCompany(${p.company_id}${p.job_id?`, ${p.job_id}`:''})">채팅으로 이어가기</button>`}
       </div>`).join('') || emptyArt(ART.noAlerts, '아직 받은 제안이 없어요', '프로필을 채우면 기업의 제안을 받을 확률이 높아져요.')}
   </div>`;
+}
+
+async function acceptProposal(id){
+  showConfirm('이 제안을 수락할까요?\n기업에게 알림이 가고 계약 단계가 시작돼요.', async () => {
+    try{
+      const r = await apiFetch(`/proposals/${id}/accept`, {method:'POST'});
+      toast(r.projectCreated ? '수락했어요! 프로젝트 관리에서 계약을 진행하세요' : '수락했어요! 채팅으로 조건을 논의해보세요');
+      go(r.projectCreated ? 'projects' : 'receivedProposals');
+    }catch(e){ toast(e.message); }
+  });
+}
+
+// 거절 사유를 고르는 화면을 띄웁니다.
+let decliningProposalId = null;
+async function openDeclineProposal(id){
+  decliningProposalId = id;
+  try{
+    const { reasons } = await apiFetch('/proposals/decline-reasons');
+    const box = document.getElementById('confirmOverlay');
+    document.getElementById('confirmMsg').innerHTML =
+      `<div style="font-size:15px; font-weight:700; margin-bottom:12px;">거절 사유를 선택해주세요</div>
+       <div style="display:flex; flex-direction:column; gap:7px; text-align:left;">
+         ${reasons.map(r=>`<button class="btn btn-outline" style="font-size:13px; padding:11px;" onclick="declineProposal('${jsAttrStr(r)}')">${esc(r)}</button>`).join('')}
+       </div>`;
+    document.getElementById('confirmOkBtn').style.display = 'none';
+    box.classList.add('open');
+  }catch(e){ toast(e.message); }
+}
+async function declineProposal(reason){
+  closeConfirm();
+  document.getElementById('confirmOkBtn').style.display = '';
+  try{
+    await apiFetch(`/proposals/${decliningProposalId}/decline`, {method:'POST', body:{reason}});
+    toast('제안을 거절했어요');
+    go('receivedProposals');
+  }catch(e){ toast(e.message); }
 }
 
 async function screenPortfolios(){
