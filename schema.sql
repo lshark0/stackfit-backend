@@ -92,6 +92,9 @@ CREATE TABLE IF NOT EXISTS projects (
   stage         INTEGER NOT NULL DEFAULT 1,   -- 1:계약체결 2:프로젝트진행 3:최종정산
   company_agreed    INTEGER NOT NULL DEFAULT 0,   -- 계약 조건에 기업이 동의했는지
   freelancer_agreed INTEGER NOT NULL DEFAULT 0,   -- 계약 조건에 프리랜서가 동의했는지
+  contract_filename      TEXT,                   -- 기업이 첨부한 계약서 (계약 체결 필수)
+  contract_original_name TEXT,
+  contract_data          BLOB,
   created_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

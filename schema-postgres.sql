@@ -91,6 +91,9 @@ CREATE TABLE IF NOT EXISTS projects (
   stage         INTEGER NOT NULL DEFAULT 1,   -- 1:계약체결 2:프로젝트진행 3:최종정산
   company_agreed    INTEGER NOT NULL DEFAULT 0,
   freelancer_agreed INTEGER NOT NULL DEFAULT 0,
+  contract_filename      TEXT,
+  contract_original_name TEXT,
+  contract_data          BYTEA,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

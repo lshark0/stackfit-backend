@@ -1287,6 +1287,28 @@ async function deleteResume(){
 }
 
 // 프로젝트 단계는 정해진 쪽만 진행시킬 수 있습니다.
+async function uploadContract(projectId, input){
+  const file = input.files && input.files[0];
+  if(!file) return;
+  const ext = '.' + (file.name.split('.').pop() || '').toLowerCase();
+  if(!['.pdf','.doc','.docx','.ppt','.pptx','.hwp'].includes(ext)){
+    toast('PDF, Word, PPT, 한글(HWP) 파일만 올릴 수 있어요'); return;
+  }
+  const fd = new FormData();
+  fd.append('contract', file);
+  try{
+    toast('계약서 업로드 중...');
+    const res = await fetch(`${API_BASE}/projects/${projectId}/contract`, {
+      method:'POST',
+      headers: state.token ? {Authorization:'Bearer '+state.token} : {},
+      body: fd,
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error || '업로드 실패');
+    toast('계약서를 첨부했어요');
+    go('projects');
+  }catch(e){ toast(e.message); }
+}
 async function agreeContract(id){
   showConfirm('계약 조건에 동의할까요?\n양측이 모두 동의하면 프로젝트가 시작돼요.', async () => {
     try{ await apiFetch(`/projects/${id}/agree`, {method:'POST'}); toast('계약에 동의했어요'); go('projects'); }
@@ -1790,11 +1812,38 @@ function projectActionHtml(p, isCompany){
     const iAgreed = isCompany ? p.company_agreed : p.freelancer_agreed;
     const otherAgreed = isCompany ? p.freelancer_agreed : p.company_agreed;
     const otherName = isCompany ? '프리랜서' : '기업';
-    if(iAgreed){
-      return wait(`계약에 동의하셨어요.<br><b>${otherName}의 동의를 기다리는 중</b>이에요.`);
+
+    // 계약서 영역 — 기업은 첨부/교체, 프리랜서는 열람만 가능합니다.
+    let contractBox;
+    if(p.contract_url){
+      contractBox = `<div class="card" style="margin:10px 0 0; padding:12px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+          <div style="min-width:0;"><div class="card-title" style="font-size:13px;">📄 ${esc(p.contract_original_name||'계약서')}</div>
+          <div class="card-org">첨부됨</div></div>
+          <div style="display:flex; gap:6px; flex:0 0 auto;">
+            <a href="${viewerUrl(p.contract_url)}" target="_blank" class="btn btn-outline" style="width:auto; padding:9px 12px; font-size:12px;">보기</a>
+            <button class="btn btn-outline" style="width:auto; padding:9px 12px; font-size:12px;" onclick="downloadResume('${jsAttrStr(p.contract_url)}', '${jsAttrStr(p.contract_original_name||'계약서')}')">⬇</button>
+          </div>
+        </div>
+        ${isCompany ? `<label class="btn btn-ghost" style="width:auto; padding:8px 12px; font-size:12px; margin-top:8px;">다른 계약서로 교체<input type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.hwp" style="display:none;" onchange="uploadContract(${p.id}, this)"></label>` : ''}
+      </div>`;
+    } else {
+      contractBox = isCompany
+        ? `<div class="reco-empty" style="margin-top:10px; text-align:left; border-color:var(--amber); background:#FDF6E9;">
+             <b style="color:var(--ink);">계약서를 첨부해야 계약을 체결할 수 있어요</b>
+             <div style="margin-top:6px;">계약서를 올리면 프리랜서가 확인 후 동의합니다.</div>
+             <label class="btn btn-primary" style="margin-top:10px;">계약서 첨부하기<input type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.hwp" style="display:none;" onchange="uploadContract(${p.id}, this)"></label>
+           </div>`
+        : wait('기업이 <b>계약서를 첨부하면</b> 확인 후 동의할 수 있어요.');
     }
-    return `${otherAgreed ? `<div class="page-sub" style="margin-top:10px;">${otherName}이(가) 이미 동의했어요.</div>` : ''}
-      <button class="btn btn-primary" style="margin-top:10px;" onclick="agreeContract(${p.id})">계약 조건에 동의하기</button>`;
+
+    if(iAgreed){
+      return `${contractBox}${wait(`계약에 동의하셨어요.<br><b>${otherName}의 동의를 기다리는 중</b>이에요.`)}`;
+    }
+    if(!p.contract_url) return contractBox;
+    return `${contractBox}
+      ${otherAgreed ? `<div class="page-sub" style="margin-top:10px;">${otherName}이(가) 이미 동의했어요.</div>` : ''}
+      <button class="btn btn-primary" style="margin-top:10px;" onclick="agreeContract(${p.id})">계약서 확인했고, 동의합니다</button>`;
   }
   if(p.stage === 2){
     return isCompany

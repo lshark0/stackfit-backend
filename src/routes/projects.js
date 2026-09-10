@@ -2,7 +2,12 @@ const express = require('express');
 const { run, get, all } = require('../db');
 const { requireAuth } = require('../middleware/requireAuth');
 const { wrapAllRoutes } = require('../middleware/asyncHandler');
+const crypto = require('crypto');
 const { sendPushToUser } = require('../push');
+const { signedFileUrl } = require('../fileAccess');
+const { EXT_LABEL, extOf, createDocUpload, isValidDocument, fixFilenameEncoding } = require('../docUpload');
+
+const upload = createDocUpload();
 
 const router = express.Router();
 wrapAllRoutes(router);
@@ -26,8 +31,10 @@ router.get('/', requireAuth, async (req, res) => {
   const withReview = rows.map((p) => {
     const mine = allReviews.find((r) => r.project_id === p.id && r.reviewer_id === req.user.id);
     const received = allReviews.find((r) => r.project_id === p.id && r.reviewee_id === req.user.id);
+    const { contract_data, ...rest } = p; // 파일 내용 자체는 목록에 담지 않습니다.
     return {
-      ...p,
+      ...rest,
+      contract_url: signedFileUrl(p.contract_filename),
       myReview: mine ? { rating: mine.rating } : null,
       receivedReview: received ? { rating: received.rating, comment: received.comment } : null,
     };
@@ -53,10 +60,57 @@ async function notify(userId, tag, title, body) {
 }
 
 // [1단계] 계약 조건에 동의 — 기업과 프리랜서가 각자 눌러야 하며, 둘 다 동의해야 다음 단계로 넘어갑니다.
+// [1단계 준비] 계약서 첨부 — 기업만 가능하며, 계약 체결 전에만 올리거나 교체할 수 있습니다.
+router.post('/:id/contract', requireAuth, (req, res) => {
+  upload.single('contract')(req, res, async (err) => {
+    if (err) return res.status(400).json({ error: err.message || '업로드에 실패했어요.' });
+    if (!req.file) return res.status(400).json({ error: '파일이 첨부되지 않았어요.' });
+
+    const project = await loadMyProject(req, res);
+    if (!project) return;
+    if (req.user.id !== project.company_id) {
+      return res.status(403).json({ error: '계약서는 기업만 첨부할 수 있어요.' });
+    }
+    if (project.stage !== 1) {
+      return res.status(400).json({ error: '이미 계약이 체결되어 계약서를 변경할 수 없어요.' });
+    }
+
+    const ext = extOf(req.file.originalname);
+    if (!isValidDocument(req.file.buffer, ext)) {
+      return res.status(400).json({ error: `올바른 ${EXT_LABEL} 파일이 아니에요.` });
+    }
+
+    const originalName = fixFilenameEncoding(req.file.originalname);
+    const filename = `contract_${crypto.randomBytes(12).toString('hex')}${ext}`;
+    // 계약서가 바뀌면 기존 동의는 무효가 되므로 양측 동의를 초기화합니다.
+    await run(
+      'UPDATE projects SET contract_filename=?, contract_original_name=?, contract_data=?, company_agreed=0, freelancer_agreed=0 WHERE id=?',
+      [filename, originalName.slice(0, 200), req.file.buffer, project.id]
+    );
+    await notify(project.freelancer_id, '계약', '계약서가 도착했어요',
+      `"${project.title}" 계약서를 확인하고 동의해주세요.`);
+
+    res.status(201).json({
+      contract_url: signedFileUrl(filename),
+      contract_original_name: originalName,
+    });
+  });
+});
+
 router.post('/:id/agree', requireAuth, async (req, res) => {
   const project = await loadMyProject(req, res);
   if (!project) return;
   if (project.stage !== 1) return res.status(400).json({ error: '이미 계약이 체결된 프로젝트예요.' });
+
+  // 계약서 없이는 어느 쪽도 동의할 수 없습니다.
+  if (!project.contract_filename) {
+    return res.status(400).json({
+      error: req.user.id === project.company_id
+        ? '계약서를 먼저 첨부해주세요.'
+        : '기업이 계약서를 첨부하면 동의할 수 있어요.',
+      code: 'CONTRACT_REQUIRED',
+    });
+  }
 
   const isCompany = req.user.id === project.company_id;
   const myCol = isCompany ? 'company_agreed' : 'freelancer_agreed';

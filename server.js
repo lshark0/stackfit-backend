@@ -95,16 +95,28 @@ app.get('/uploads/:filename', async (req, res) => {
     return res.status(403).json({ error: '파일에 접근할 수 없거나 링크가 만료됐어요.' });
   }
   const safeName = path.basename(filename); // 경로 탈출(path traversal) 방지
-  const row = await get(
-    'SELECT resume_data, resume_original_name FROM freelancer_profiles WHERE resume_filename = ?',
+
+  // 경력기술서와 계약서 두 곳에서 파일을 찾습니다.
+  let data = null;
+  const resumeRow = await get(
+    'SELECT resume_data FROM freelancer_profiles WHERE resume_filename = ?',
     [safeName]
   );
-  if (!row || !row.resume_data) {
+  if (resumeRow && resumeRow.resume_data) {
+    data = resumeRow.resume_data;
+  } else {
+    const contractRow = await get(
+      'SELECT contract_data FROM projects WHERE contract_filename = ?',
+      [safeName]
+    );
+    if (contractRow && contractRow.contract_data) data = contractRow.contract_data;
+  }
+  if (!data) {
     return res.status(404).json({ error: '파일을 찾을 수 없습니다.' });
   }
   const ext = path.extname(safeName).toLowerCase();
   res.setHeader('Content-Type', MIME_BY_EXT[ext] || 'application/octet-stream');
-  res.send(Buffer.from(row.resume_data));
+  res.send(Buffer.from(data));
 });
 app.use(express.static(path.join(__dirname, 'public'), {
   setHeaders: (res, filePath) => {
