@@ -1475,12 +1475,6 @@ function refreshTagsUI(){
   if(!el) return;
   el.innerHTML = pendingStack.map((s,i)=>`<span class="tag on rm" onclick="removeProfileTag(${i})">${esc(s)} ${I.x}</span>`).join('');
 }
-function addProfileTag(){
-  const input = document.getElementById('pf-newtag');
-  const v = input.value.trim();
-  if(!v) return;
-  pendingStack.push(v); input.value=''; refreshTagsUI();
-}
 function removeProfileTag(i){ pendingStack.splice(i,1); refreshTagsUI(); }
 
 // 자격증도 기술스택과 같은 방식으로 태그처럼 추가·삭제합니다.
@@ -1646,12 +1640,6 @@ function refreshCertsUI(){
   const el = document.getElementById('pf-certs');
   if(!el) return;
   el.innerHTML = pendingCerts.map((c,i)=>`<span class="tag on rm" onclick="removeProfileCert(${i})">${esc(c)} ${I.x}</span>`).join('');
-}
-function addProfileCert(){
-  const input = document.getElementById('pf-newcert');
-  const v = input.value.trim();
-  if(!v) return;
-  pendingCerts.push(v); input.value=''; refreshCertsUI();
 }
 function removeProfileCert(i){ pendingCerts.splice(i,1); refreshCertsUI(); }
 async function saveProfile(){
@@ -2623,13 +2611,11 @@ async function screenProfileEdit(){
       <label class="form-label">기술스택</label>
       <div class="tag-row" id="pf-tags">${pendingStack.map((s,i)=>`<span class="tag on rm" onclick="removeProfileTag(${i})">${esc(s)} ${I.x}</span>`).join('')}</div>
       <button class="btn btn-outline" style="margin-top:8px; display:flex; align-items:center; justify-content:center; gap:7px;" onclick="openPicker('stack')">${I.search}분류에서 찾아보기 · 직접 추가</button>
-      <div class="add-tag-row" style="margin-top:8px;"><input id="pf-newtag" class="form-input" placeholder="직접 입력 후 Enter" onkeydown="if(event.key==='Enter'){event.preventDefault();addProfileTag();}"><button class="btn btn-outline" style="width:auto; padding:12px 16px;" onclick="addProfileTag()">추가</button></div>
     </div>
     <div class="form-field">
       <label class="form-label">자격증</label>
       <div class="tag-row" id="pf-certs">${pendingCerts.map((c,i)=>`<span class="tag on rm" onclick="removeProfileCert(${i})">${esc(c)} ${I.x}</span>`).join('')}</div>
       <button class="btn btn-outline" style="margin-top:8px; display:flex; align-items:center; justify-content:center; gap:7px;" onclick="openPicker('cert')">${I.search}분류에서 찾아보기 · 직접 추가</button>
-      <div class="add-tag-row" style="margin-top:8px;"><input id="pf-newcert" class="form-input" placeholder="직접 입력 후 Enter (예: 정보처리기사)" onkeydown="if(event.key==='Enter'){event.preventDefault();addProfileCert();}"><button class="btn btn-outline" style="width:auto; padding:12px 16px;" onclick="addProfileCert()">추가</button></div>
       <div class="page-sub" style="margin-top:5px;">보유한 자격증을 입력하면 기업이 확인할 수 있어요.</div>
     </div>
     <div class="form-field">
