@@ -1,4 +1,4 @@
-const CACHE_NAME = 'kimfree-shell-v7';
+const CACHE_NAME = 'kimfree-shell-v8';
 // manifest.json은 캐시하지 않습니다. 낡은 앱 이름/아이콘 정보가 남아
 // 브라우저가 예전 앱으로 잘못 인식하는 것을 막기 위함입니다.
 const SHELL_FILES = ['/icons/icon-192.png', '/icons/icon-512.png'];
