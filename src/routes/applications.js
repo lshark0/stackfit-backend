@@ -119,19 +119,29 @@ router.get('/jobs/:id/applicants', requireAuth, requireRole('company'), async (r
 // 지원 수락/거절 (기업 전용, 본인 공고에 한함). 수락 시 프로젝트를 자동 생성합니다.
 router.patch('/jobs/:jobId/applicants/:applicationId', requireAuth, requireRole('company'), async (req, res) => {
   const { status } = req.body || {};
-  if (!['accepted', 'rejected'].includes(status)) {
-    return res.status(400).json({ error: "status는 'accepted' 또는 'rejected'여야 합니다." });
+  // submitted = 거절 취소(검토중으로 되돌리기)
+  if (!['accepted', 'rejected', 'submitted'].includes(status)) {
+    return res.status(400).json({ error: "status는 'accepted', 'rejected', 'submitted' 중 하나여야 합니다." });
   }
   const job = await get('SELECT * FROM jobs WHERE id = ? AND company_id = ?', [req.params.jobId, req.user.id]);
   if (!job) return res.status(404).json({ error: '공고를 찾을 수 없습니다.' });
 
   const application = await get('SELECT * FROM applications WHERE id = ? AND job_id = ?', [req.params.applicationId, job.id]);
   if (!application) return res.status(404).json({ error: '지원 내역을 찾을 수 없습니다.' });
-  if (application.status !== 'submitted') {
-    return res.status(400).json({ error: '이미 처리된 지원이에요.' });
+  // 거절은 언제든 되돌릴 수 있지만, 수락은 이미 프로젝트가 만들어졌으므로 되돌릴 수 없습니다.
+  if (application.status === 'accepted') {
+    return res.status(400).json({ error: '이미 수락한 지원이에요. 진행 중인 프로젝트가 있어 되돌릴 수 없어요.' });
+  }
+  if (application.status === status) {
+    return res.status(400).json({ error: '이미 같은 상태예요.' });
   }
 
   await run('UPDATE applications SET status = ? WHERE id = ?', [status, application.id]);
+
+  // 거절을 취소해 '검토중'으로 되돌린 경우에는 지원자에게 결과 알림을 보내지 않습니다.
+  if (status === 'submitted') {
+    return res.json({ status });
+  }
 
   const resultTitle = status === 'accepted' ? '지원이 수락됐어요!' : '지원 결과가 도착했어요';
   const resultBody = status === 'accepted'
