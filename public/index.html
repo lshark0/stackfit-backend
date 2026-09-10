@@ -1533,21 +1533,29 @@ function pickerItems(){
   return [...new Set(items)];
 }
 
+// 검색창은 고정해두고, 아래 목록만 다시 그립니다.
+// (한글 입력 중에 입력창이 새로 만들어지면 조합이 깨져 "데ㅇㅣㅌㅓ"처럼 입력되기 때문)
 function screenPicker(){
+  return `${statusbar()}
+  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('profileEdit')">${I.back}</div>
+    <div><div class="page-title">${pickerLabel()} 선택</div><div class="page-sub" id="picker-count">${pickerSelected().length}개 선택됨</div></div>
+  </div></div>
+  <div class="content">
+    <div class="search-box">${I.search}<input id="picker-q" value="${esc(pickerQuery)}" placeholder="${pickerLabel()} 검색" autocomplete="off" oninput="onPickerSearch(this.value)"></div>
+    <div id="picker-body">${pickerBodyHtml()}</div>
+    <div style="height:20px;"></div>
+  </div>`;
+}
+
+function pickerBodyHtml(){
   const cats = ['전체', ...Object.keys(pickerCatalog())];
   const items = pickerItems();
   const selected = pickerSelected();
   const q = pickerQuery.trim();
-  // 검색어가 카탈로그에 없으면 직접 추가할 수 있게 안내합니다.
+  // 검색어가 목록에 없으면 직접 추가할 수 있게 안내합니다.
   const canAddCustom = q && !items.some(v => v.toLowerCase() === q.toLowerCase());
 
-  return `${statusbar()}
-  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('profileEdit')">${I.back}</div>
-    <div><div class="page-title">${pickerLabel()} 선택</div><div class="page-sub">${selected.length}개 선택됨</div></div>
-  </div></div>
-  <div class="content">
-    <div class="search-box">${I.search}<input id="picker-q" value="${esc(pickerQuery)}" placeholder="${pickerLabel()} 검색" oninput="onPickerSearch(this.value)"></div>
-
+  return `
     ${selected.length ? `
       <div class="section-label with-ic">${I.checkCircle}선택한 ${pickerLabel()}</div>
       <div class="tag-row">${selected.map((v,i)=>`<span class="tag on rm" onclick="pickerRemove(${i})">${esc(v)} ${I.x}</span>`).join('')}</div>` : ''}
@@ -1571,12 +1579,28 @@ function screenPicker(){
       }).join('') || `<div class="page-sub">검색 결과가 없어요. 위에서 직접 추가해보세요.</div>`}
     </div>
 
-    <button class="btn btn-primary" style="margin-top:18px;" onclick="go('profileEdit')">선택 완료 (${selected.length}개)</button>
-    <div style="height:20px;"></div>
-  </div>`;
+    <button class="btn btn-primary" style="margin-top:18px;" onclick="go('profileEdit')">선택 완료 (${selected.length}개)</button>`;
 }
 
-const onPickerSearch = debounce(v => { pickerQuery = v; renderPickerBody(); }, 250);
+// 한글은 글자를 조합하는 중(예: ㄷ → 더 → 데이터)에도 input 이벤트가 계속 발생합니다.
+// 조합이 끝난 뒤 검색해야 어색한 중간 글자로 걸러지지 않습니다.
+let pickerComposing = false;
+const runPickerSearch = debounce(() => { renderPickerBody(); }, 250);
+function onPickerSearch(v){
+  pickerQuery = v;
+  if(pickerComposing) return; // 조합 중에는 목록을 다시 그리지 않음
+  runPickerSearch();
+}
+document.addEventListener('compositionstart', (e) => {
+  if(e.target && e.target.id === 'picker-q') pickerComposing = true;
+});
+document.addEventListener('compositionend', (e) => {
+  if(e.target && e.target.id === 'picker-q'){
+    pickerComposing = false;
+    pickerQuery = e.target.value;
+    runPickerSearch();
+  }
+});
 function setPickerCategory(c){ pickerCategory = c; renderPickerBody(); }
 function pickerToggle(v){
   const arr = pickerSelected();
@@ -1591,20 +1615,19 @@ function pickerAddCustom(){
   const arr = pickerSelected();
   if(!arr.includes(v)) arr.push(v);
   pickerQuery = '';
+  const input = document.getElementById('picker-q');
+  if(input) input.value = '';
   renderPickerBody();
   toast(`"${v}" 추가했어요`);
 }
-// 검색어 입력 포커스를 잃지 않도록 화면 전체가 아닌 내용만 다시 그립니다.
+// 검색창(input)은 그대로 두고 목록 영역만 교체합니다.
+// 입력창 자체를 다시 만들지 않으므로 한글 조합이 끊기지 않습니다.
 function renderPickerBody(){
-  const el = document.getElementById('screen');
-  if(!el) return;
-  const focused = document.activeElement && document.activeElement.id === 'picker-q';
-  const pos = focused ? document.activeElement.selectionStart : null;
-  el.innerHTML = screenPicker();
-  if(focused){
-    const input = document.getElementById('picker-q');
-    if(input){ input.focus(); try{ input.setSelectionRange(pos, pos); }catch(e){} }
-  }
+  const body = document.getElementById('picker-body');
+  if(!body) return;
+  body.innerHTML = pickerBodyHtml();
+  const cnt = document.getElementById('picker-count');
+  if(cnt) cnt.textContent = `${pickerSelected().length}개 선택됨`;
 }
 
 function refreshCertsUI(){
