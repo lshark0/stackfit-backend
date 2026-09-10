@@ -59,6 +59,8 @@ if (USE_POSTGRES) {
     await ensureColumnPg('conversations', 'freelancer_last_read_id', 'INTEGER NOT NULL DEFAULT 0');
     await ensureColumnPg('projects', 'company_agreed', 'INTEGER NOT NULL DEFAULT 0');
     await ensureColumnPg('projects', 'freelancer_agreed', 'INTEGER NOT NULL DEFAULT 0');
+    await ensureColumnPg('projects', 'contracted_at', 'TEXT');
+    await ensureColumnPg('projects', 'completed_at', 'TEXT');
     await ensureColumnPg('projects', 'contract_filename', 'TEXT');
     await ensureColumnPg('projects', 'contract_original_name', 'TEXT');
     await ensureColumnPg('projects', 'contract_data', 'BYTEA');
@@ -111,6 +113,8 @@ if (USE_POSTGRES) {
     try { db.exec('ALTER TABLE conversations ADD COLUMN freelancer_last_read_id INTEGER NOT NULL DEFAULT 0'); } catch (e) {}
     try { db.exec('ALTER TABLE projects ADD COLUMN company_agreed INTEGER NOT NULL DEFAULT 0'); } catch (e) {}
     try { db.exec('ALTER TABLE projects ADD COLUMN freelancer_agreed INTEGER NOT NULL DEFAULT 0'); } catch (e) {}
+    try { db.exec('ALTER TABLE projects ADD COLUMN contracted_at TEXT'); } catch (e) {}
+    try { db.exec('ALTER TABLE projects ADD COLUMN completed_at TEXT'); } catch (e) {}
     try { db.exec('ALTER TABLE projects ADD COLUMN contract_filename TEXT'); } catch (e) {}
     try { db.exec('ALTER TABLE projects ADD COLUMN contract_original_name TEXT'); } catch (e) {}
     try { db.exec('ALTER TABLE projects ADD COLUMN contract_data BLOB'); } catch (e) {}

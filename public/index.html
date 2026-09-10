@@ -1251,6 +1251,11 @@ async function startChatWithCompany(companyId, jobId){
   catch(e){ toast(e.message); }
 }
 // DB의 created_at은 UTC 기준 문자열이라, 'Z'를 붙여야 브라우저가 정확한 현지 시각으로 바꿔줍니다.
+// 날짜만 간단히 표시 (2026. 9. 10.)
+function fmtDate(s){
+  const d = parseServerTime(s);
+  return d ? d.toLocaleDateString('ko-KR', {year:'numeric', month:'long', day:'numeric'}) : '';
+}
 function parseServerTime(s){
   if(!s) return null;
   const d = new Date(String(s).includes('T') ? s : String(s).replace(' ', 'T') + 'Z');
@@ -1954,6 +1959,11 @@ async function screenProjects(){
       <div class="card">
         <div class="card-top"><div><div class="card-title">${esc(p.title)}</div></div><span class="tag ${p.status==='진행중'?'on':''}" style="border-radius:999px;">${p.status}</span></div>
         <div class="meta-row"><span>${I.clock}${esc(p.period)}</span><span class="rate">${esc(p.rate)}</span></div>
+        ${(p.contracted_at || p.completed_at) ? `
+          <div class="icon-meta" style="margin-top:8px;">
+            ${p.contracted_at ? `<span class="im">${I.calendar}계약 체결 <b>${fmtDate(p.contracted_at)}</b></span>` : ''}
+            ${p.completed_at ? `<span class="im">${I.checkCircle}완료 <b>${fmtDate(p.completed_at)}</b></span>` : ''}
+          </div>` : ''}
         ${stepsGraphic(p.status==='완료' ? 4 : p.stage, steps)}
         ${projectActionHtml(p, isCompany)}
         ${p.receivedReview? `

@@ -54,6 +54,8 @@ async function loadMyProject(req, res) {
   return project;
 }
 
+const nowStr = () => new Date().toISOString().slice(0, 19).replace('T', ' ');
+
 async function notify(userId, tag, title, body) {
   await run('INSERT INTO notifications (user_id, tag, title, body) VALUES (?,?,?,?)', [userId, tag, title, body]).catch(() => {});
   sendPushToUser(userId, { kind: 'result', title, body, url: '/', tag: 'project' }).catch(() => {});
@@ -121,8 +123,8 @@ router.post('/:id/agree', requireAuth, async (req, res) => {
 
   const counterpartId = isCompany ? project.freelancer_id : project.company_id;
   if (updated.company_agreed && updated.freelancer_agreed) {
-    // 양측 동의 완료 → 프로젝트 진행 단계로
-    await run('UPDATE projects SET stage = 2 WHERE id = ?', [project.id]);
+    // 양측 동의 완료 → 프로젝트 진행 단계로 (체결 시각 기록)
+    await run('UPDATE projects SET stage = 2, contracted_at = ? WHERE id = ?', [nowStr(), project.id]);
     await notify(counterpartId, '계약', '계약이 체결됐어요', `"${project.title}" 프로젝트가 시작됩니다.`);
     await notify(req.user.id, '계약', '계약이 체결됐어요', `"${project.title}" 프로젝트가 시작됩니다.`);
   } else {
@@ -154,7 +156,7 @@ router.post('/:id/settle', requireAuth, async (req, res) => {
   }
   if (project.stage !== 3) return res.status(400).json({ error: '프리랜서가 완료를 요청한 뒤에 확인할 수 있어요.' });
 
-  await run("UPDATE projects SET status = '완료' WHERE id = ?", [project.id]);
+  await run("UPDATE projects SET status = '완료', completed_at = ? WHERE id = ?", [nowStr(), project.id]);
   await notify(project.freelancer_id, '완료', '프로젝트가 완료됐어요', `"${project.title}" 프로젝트가 최종 완료됐습니다. 리뷰를 남겨보세요.`);
   res.json(await get('SELECT * FROM projects WHERE id = ?', [project.id]));
 });

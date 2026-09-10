@@ -95,6 +95,8 @@ CREATE TABLE IF NOT EXISTS projects (
   stage         INTEGER NOT NULL DEFAULT 1,   -- 1:계약체결 2:프로젝트진행 3:최종정산
   company_agreed    INTEGER NOT NULL DEFAULT 0,
   freelancer_agreed INTEGER NOT NULL DEFAULT 0,
+  contracted_at          TEXT,                   -- 양측 동의로 계약이 체결된 시각
+  completed_at           TEXT,                   -- 기업이 최종 완료 확인한 시각
   contract_filename      TEXT,
   contract_original_name TEXT,
   contract_data          BYTEA,
