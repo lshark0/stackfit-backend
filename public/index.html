@@ -1244,7 +1244,7 @@ function chatKeydown(ev, convId){ if(ev.key==='Enter'){ ev.preventDefault(); sen
 async function decideApplicant(jobId, applicationId, status){
   try{
     await apiFetch(`/jobs/${jobId}/applicants/${applicationId}`, {method:'PATCH', body:{status}});
-    toast(status==='accepted' ? '지원자를 수락했어요' : '지원자를 거절했어요');
+    toast(status==='accepted' ? '수락했어요! 프로젝트 관리에서 진행 상황을 확인하세요' : '지원자를 거절했어요');
     go('applicants', jobId);
   }catch(e){ toast(e.message); }
 }
@@ -1757,10 +1757,19 @@ async function screenTalentDetail(){
 
 async function screenProjects(){
   const nc = await unreadCount();
-  const data = await apiFetch('/projects');
+  const isCompany = state.role === 'company';
+  // 기업은 아직 계약된 프로젝트가 없을 때, 등록한 공고와 대기 중인 지원자를 함께 안내합니다.
+  const [data, myJobs] = await Promise.all([
+    apiFetch('/projects'),
+    isCompany ? apiFetch('/jobs').catch(()=>({jobs:[]})) : Promise.resolve({jobs:[]}),
+  ]);
   const steps = ["계약 체결","계약금 정산","프로젝트 진행","최종 정산"];
   return `${statusbar()}${header("프로젝트 관리","계약 · 정산 현황",{}, nc)}
   <div class="content">
+    ${isCompany ? `<div class="reco-empty" style="text-align:left; margin-bottom:12px;">
+      <b style="color:var(--ink);">프로젝트는 지원자를 수락하면 생성돼요</b>
+      <div style="margin-top:5px; line-height:1.7;">공고를 올린 것만으로는 아직 계약 전 단계예요.<br>지원자를 <b>수락</b>하면 이곳에서 계약·정산 단계를 관리할 수 있어요.</div>
+    </div>` : ''}
     ${data.projects.map(p=>`
       <div class="card">
         <div class="card-top"><div><div class="card-title">${esc(p.title)}</div></div><span class="tag ${p.status==='진행중'?'on':''}" style="border-radius:999px;">${p.status}</span></div>
@@ -1775,7 +1784,12 @@ async function screenProjects(){
             <div style="color:var(--amber-deep); font-size:14px;">${'★'.repeat(p.receivedReview.rating)}${'☆'.repeat(5-p.receivedReview.rating)}</div>
             ${p.receivedReview.comment? `<div class="page-sub" style="margin-top:6px; line-height:1.6;">${esc(p.receivedReview.comment)}</div>` : ''}
           </div>` : (p.stage>=4? `<div class="page-sub" style="margin-top:10px;">아직 상대방의 평가가 등록되지 않았어요.</div>` : '')}
-      </div>`).join('') || emptyArt(ART.noProjects, '진행 중인 프로젝트가 없어요', '지원이 수락되면 프로젝트가 자동으로 생성돼요.')}
+      </div>`).join('') || (isCompany
+        ? `${emptyArt(ART.noProjects, '아직 계약된 프로젝트가 없어요', myJobs.jobs.length
+            ? `등록한 공고 <b>${myJobs.jobs.length}건</b>에서 지원자를 수락하면<br>프로젝트가 자동으로 생성돼요.`
+            : '먼저 공고를 등록하고 지원자를 받아보세요.')}
+           <button class="btn btn-primary" onclick="jobQuery=''; jobCat='전체'; jobGrade='전체'; jobDuty=''; go('jobs')">${myJobs.jobs.length ? '공고 관리로 이동' : '공고 등록하러 가기'}</button>`
+        : emptyArt(ART.noProjects, '진행 중인 프로젝트가 없어요', '지원이 수락되면 프로젝트가 자동으로 생성돼요.'))}
   </div>${tabbar('projects')}`;
 }
 
