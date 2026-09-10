@@ -11,7 +11,7 @@ const router = express.Router();
 wrapAllRoutes(router);
 
 router.get('/', requireAuth, requireRole('company'), async (req, res) => {
-  const { q, category, jobId, grade } = req.query;
+  const { q, category, jobId, grade, duty } = req.query;
   const rows = await all('SELECT * FROM freelancer_profiles');
   let talents = rows.map(t => ({ ...t, stack: JSON.parse(t.stack_json) }));
 
@@ -28,6 +28,12 @@ router.get('/', requireAuth, requireRole('company'), async (req, res) => {
   }
   if (grade && grade !== '전체') {
     talents = talents.filter(t => t.grade === grade);
+  }
+  // 업무(직무)는 프리랜서가 자유롭게 입력하므로(예: "DBA / 튜닝 담당"),
+  // 정확히 같은 값이 아니라 해당 키워드가 포함되는지로 걸러줍니다.
+  if (duty && duty !== '전체') {
+    const needle = String(duty).toLowerCase();
+    talents = talents.filter(t => String(t.role_title || '').toLowerCase().includes(needle));
   }
 
   let jobStack = [];

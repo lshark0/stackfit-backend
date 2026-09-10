@@ -1418,7 +1418,7 @@ function setJobCat(cat, el){
   refreshJobList();
 }
 
-let talentQuery="", talentCat="전체", talentGrade="전체";
+let talentQuery="", talentCat="전체", talentGrade="전체", talentDuty="";
 async function refreshTalentList(){
   const el = document.getElementById('talentList');
   if(!el) return;
@@ -1428,6 +1428,7 @@ async function refreshTalentList(){
     if(talentQuery) qs.set('q', talentQuery);
     if(talentCat && talentCat!=='전체') qs.set('category', talentCat);
     if(talentGrade && talentGrade!=='전체') qs.set('grade', talentGrade);
+    if(talentDuty) qs.set('duty', talentDuty);
     const data = await apiFetch('/talents?' + qs.toString());
     el.innerHTML = data.talents.length ? data.talents.map(talentCard).join('') : emptyHtml('조건에 맞는 인재가 없어요', I.talent);
   }catch(e){ el.innerHTML = emptyHtml(e.message, I.talent); }
@@ -2033,18 +2034,25 @@ async function screenTalent(){
   if(talentQuery) qs.set('q', talentQuery);
   if(talentCat && talentCat!=='전체') qs.set('category', talentCat);
   if(talentGrade && talentGrade!=='전체') qs.set('grade', talentGrade);
+  if(talentDuty) qs.set('duty', talentDuty);
   const data = await apiFetch('/talents?' + qs.toString());
   const cats = ["전체","인프라","클라우드","DBA","보안"];
   const grades = ["전체","초급","중급","고급","특급"];
-  return `${statusbar()}${header("인재풀 검색","기술스택 · 경력으로 필터링",{}, nc)}
+  const duties = ["","PM","PL","TA","SA","DBA","개발자","QA","보안","감리","기타"];
+  return `${statusbar()}${header("인재풀 검색","업무 · 등급 · 기술스택으로 필터링",{}, nc)}
   <div class="content">
     <div class="search-box">${I.search}<input value="${esc(talentQuery)}" placeholder="이름, 직무, 기술스택 검색" oninput="onTalentSearch(this.value)"></div>
     <div class="chip-row" id="talentChips">${cats.map((c)=>`<div class="chip ${c===talentCat?'active':''}" onclick="setTalentCat('${c}', this)">${c}</div>`).join('')}</div>
-    <select id="talentGradeSel" class="form-input" style="margin:10px 0; padding:9px 10px; font-size:12.5px;" onchange="talentGrade=this.value; refreshTalentList();">
-      ${grades.map(g=>`<option value="${g}" ${g===talentGrade?'selected':''}>${g==='전체'?'등급 전체':g}</option>`).join('')}
-    </select>
+    <div style="display:flex; gap:8px; margin:10px 0;">
+      <select id="talentGradeSel" class="form-input" style="flex:1; padding:9px 10px; font-size:12.5px;" onchange="talentGrade=this.value; refreshTalentList();">
+        ${grades.map(g=>`<option value="${g}" ${g===talentGrade?'selected':''}>${g==='전체'?'등급 전체':g}</option>`).join('')}
+      </select>
+      <select id="talentDutySel" class="form-input" style="flex:1; padding:9px 10px; font-size:12.5px;" onchange="talentDuty=this.value; refreshTalentList();">
+        ${duties.map(d=>`<option value="${d}" ${d===talentDuty?'selected':''}>${d===''?'업무 전체':d}</option>`).join('')}
+      </select>
+    </div>
     <div class="section-label">매칭률 순</div>
-    <div id="talentList">${data.talents.map(talentCard).join('') || emptyArt(ART.noTalents, '조건에 맞는 인재가 없어요', '검색어나 등급 필터를 바꿔보세요.')}</div>
+    <div id="talentList">${data.talents.map(talentCard).join('') || emptyArt(ART.noTalents, '조건에 맞는 인재가 없어요', '검색어나 등급·업무 필터를 바꿔보세요.')}</div>
   </div>${tabbar('talent')}`;
 }
 
