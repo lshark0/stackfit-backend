@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS jobs (
   company_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   title       TEXT NOT NULL,
   stack_json  TEXT NOT NULL DEFAULT '[]',
+  certs_json    TEXT NOT NULL DEFAULT '[]',   -- 요구 자격증
   period      TEXT NOT NULL DEFAULT '협의',
   rate        TEXT NOT NULL DEFAULT '협의',
   work_type   TEXT NOT NULL DEFAULT '협의',

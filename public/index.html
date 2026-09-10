@@ -1485,9 +1485,26 @@ let pickerKind = 'stack';
 let pickerCategory = '전체';
 let pickerQuery = '';
 
-function pickerCatalog(){ return pickerKind === 'stack' ? STACK_CATALOG : CERT_CATALOG; }
-function pickerSelected(){ return pickerKind === 'stack' ? pendingStack : pendingCerts; }
-function pickerLabel(){ return pickerKind === 'stack' ? '기술스택' : '자격증'; }
+// 선택기는 프로필(stack/cert)과 공고(jobStack/jobCerts) 양쪽에서 함께 사용합니다.
+let pendingJobStack = [];
+let pendingJobCerts = [];
+let pickerReturn = 'profileEdit';   // 선택을 마치면 돌아갈 화면
+let pickerReturnParam = null;
+
+function pickerCatalog(){ return (pickerKind === 'stack' || pickerKind === 'jobStack') ? STACK_CATALOG : CERT_CATALOG; }
+function pickerSelected(){
+  if(pickerKind === 'stack') return pendingStack;
+  if(pickerKind === 'cert') return pendingCerts;
+  if(pickerKind === 'jobStack') return pendingJobStack;
+  return pendingJobCerts;
+}
+function pickerLabel(){
+  if(pickerKind === 'stack') return '기술스택';
+  if(pickerKind === 'cert') return '자격증';
+  if(pickerKind === 'jobStack') return '필요 기술스택';
+  return '요구 자격증';
+}
+function pickerGoBack(){ go(pickerReturn, pickerReturnParam); }
 
 // 선택기로 이동하면 화면이 바뀌므로, 입력 중이던 다른 항목들을 임시로 보관해둡니다.
 let profileDraft = null;
@@ -1500,10 +1517,26 @@ function captureProfileDraft(){
   if(Object.values(d).every(v => v === null)) return; // 폼이 없으면 저장하지 않음
   profileDraft = d;
 }
-function openPicker(kind){
-  captureProfileDraft();
+function openPicker(kind, returnScreen, returnParam){
+  if(kind === 'stack' || kind === 'cert') captureProfileDraft();
+  else captureJobDraft();
+  pickerReturn = returnScreen || 'profileEdit';
+  pickerReturnParam = returnParam === undefined ? null : returnParam;
   pickerKind = kind; pickerCategory = '전체'; pickerQuery = '';
   go('pickerScreen');
+}
+
+// 공고 작성 중이던 입력값도 선택기에 다녀와도 유지되도록 보관합니다.
+let jobDraft = null;
+function captureJobDraft(){
+  const val = (id) => { const el = document.getElementById(id); return el ? el.value : null; };
+  const d = {
+    title: val('pj-title'), period: val('pj-period'), rate: val('pj-rate'),
+    work_type: val('pj-type'), location: val('pj-location'), duty: val('pj-duty'),
+    grade: val('pj-grade'), deadline: val('pj-deadline'), description: val('pj-desc'),
+  };
+  if(Object.values(d).every(v => v === null)) return;
+  jobDraft = d;
 }
 
 // 현재 분류 · 검색어에 맞는 항목을 추립니다.
@@ -1531,7 +1564,7 @@ function pickerItems(){
 // (한글 입력 중에 입력창이 새로 만들어지면 조합이 깨져 "데ㅇㅣㅌㅓ"처럼 입력되기 때문)
 function screenPicker(){
   return `${statusbar()}
-  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('profileEdit')">${I.back}</div>
+  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="pickerGoBack()">${I.back}</div>
     <div><div class="page-title">${pickerLabel()} 선택</div><div class="page-sub" id="picker-count">${pickerSelected().length}개 선택됨</div></div>
   </div></div>
   <div class="content">
@@ -1573,7 +1606,7 @@ function pickerBodyHtml(){
         <button class="btn btn-primary" style="margin-top:10px;" onclick="pickerAddCustom()">"${esc(q)}" 추가하기</button>
       </div>` : ''}
 
-    <button class="btn btn-primary" style="margin-top:18px;" onclick="go('profileEdit')">선택 완료 (${selected.length}개)</button>`;
+    <button class="btn btn-primary" style="margin-top:18px;" onclick="pickerGoBack()">선택 완료 (${selected.length}개)</button>`;
 }
 
 // 한글은 글자 단위로 조합이 시작·완료를 반복합니다(데 → 이 → 터 …).
@@ -1642,6 +1675,18 @@ function refreshCertsUI(){
   el.innerHTML = pendingCerts.map((c,i)=>`<span class="tag on rm" onclick="removeProfileCert(${i})">${esc(c)} ${I.x}</span>`).join('');
 }
 function removeProfileCert(i){ pendingCerts.splice(i,1); refreshCertsUI(); }
+
+// 공고 폼의 기술스택 · 자격증 태그 삭제
+function removeJobStack(i){
+  pendingJobStack.splice(i,1);
+  const el = document.getElementById('pj-stack-tags');
+  if(el) el.innerHTML = pendingJobStack.map((v,idx)=>`<span class="tag on rm" onclick="removeJobStack(${idx})">${esc(v)} ${I.x}</span>`).join('');
+}
+function removeJobCert(i){
+  pendingJobCerts.splice(i,1);
+  const el = document.getElementById('pj-cert-tags');
+  if(el) el.innerHTML = pendingJobCerts.map((v,idx)=>`<span class="tag on rm" onclick="removeJobCert(${idx})">${esc(v)} ${I.x}</span>`).join('');
+}
 async function saveProfile(){
   try{
     await apiFetch('/profile', {method:'PUT', body:{
@@ -1668,12 +1713,13 @@ async function saveProfile(){
 async function postJob(){
   const title = document.getElementById('pj-title').value.trim();
   if(!title){ toast('공고 제목을 입력해주세요'); return; }
-  const stackRaw = document.getElementById('pj-stack').value.trim();
-  const stack = stackRaw ? stackRaw.split(',').map(s=>s.trim()).filter(Boolean) : [];
+  const stack = [...pendingJobStack];
+  const certs = [...pendingJobCerts];
   try{
     await apiFetch('/jobs', {method:'POST', body:{
       title,
       stack,
+      certs,
       period: document.getElementById('pj-period').value.trim(),
       rate: document.getElementById('pj-rate').value.trim(),
       work_type: document.getElementById('pj-type').value.trim(),
@@ -1691,12 +1737,13 @@ async function postJob(){
 async function updateJob(id){
   const title = document.getElementById('pj-title').value.trim();
   if(!title){ toast('공고 제목을 입력해주세요'); return; }
-  const stackRaw = document.getElementById('pj-stack').value.trim();
-  const stack = stackRaw ? stackRaw.split(',').map(s=>s.trim()).filter(Boolean) : [];
+  const stack = [...pendingJobStack];
+  const certs = [...pendingJobCerts];
   try{
     await apiFetch('/jobs/'+id, {method:'PUT', body:{
       title,
       stack,
+      certs,
       period: document.getElementById('pj-period').value.trim(),
       rate: document.getElementById('pj-rate').value.trim(),
       work_type: document.getElementById('pj-type').value.trim(),
@@ -1963,6 +2010,9 @@ async function screenJobDetail(){
       ${j.grade?`<div class="kv-box"><div class="kv-lbl">등급</div><div class="kv-val">${gradeBadge(j.grade)}</div></div>`:''}
       <div class="kv-box"><div class="kv-lbl">지원마감</div><div class="kv-val">${ddayBadge(j.d_day) || esc(j.d_day)}</div></div>
     </div>
+    ${(j.certs && j.certs.length) ? `
+      <div class="section-label with-ic">${I.badgeCheck}요구 자격증</div>
+      <div class="tag-row">${j.certs.map(c=>`<span class="tag on">${esc(c)}</span>`).join('')}</div>` : ''}
     <div class="section-label with-ic">${I.layers}요구 기술스택</div>
     <div class="tag-row">${j.stack.map(s=>`<span class="tag on">${esc(s)}</span>`).join('')}</div>
     <div class="section-label with-ic">${I.checklist}상세 내용</div>
@@ -2610,12 +2660,12 @@ async function screenProfileEdit(){
     <div class="form-field">
       <label class="form-label">기술스택</label>
       <div class="tag-row" id="pf-tags">${pendingStack.map((s,i)=>`<span class="tag on rm" onclick="removeProfileTag(${i})">${esc(s)} ${I.x}</span>`).join('')}</div>
-      <button class="btn btn-outline" style="margin-top:8px; display:flex; align-items:center; justify-content:center; gap:7px;" onclick="openPicker('stack')">${I.search}분류에서 찾아보기 · 직접 추가</button>
+      <button class="btn btn-outline" style="margin-top:8px; display:flex; align-items:center; justify-content:center; gap:7px;" onclick="openPicker('stack','profileEdit')">${I.search}분류에서 찾아보기 · 직접 추가</button>
     </div>
     <div class="form-field">
       <label class="form-label">자격증</label>
       <div class="tag-row" id="pf-certs">${pendingCerts.map((c,i)=>`<span class="tag on rm" onclick="removeProfileCert(${i})">${esc(c)} ${I.x}</span>`).join('')}</div>
-      <button class="btn btn-outline" style="margin-top:8px; display:flex; align-items:center; justify-content:center; gap:7px;" onclick="openPicker('cert')">${I.search}분류에서 찾아보기 · 직접 추가</button>
+      <button class="btn btn-outline" style="margin-top:8px; display:flex; align-items:center; justify-content:center; gap:7px;" onclick="openPicker('cert','profileEdit')">${I.search}분류에서 찾아보기 · 직접 추가</button>
       <div class="page-sub" style="margin-top:5px;">보유한 자격증을 입력하면 기업이 확인할 수 있어요.</div>
     </div>
     <div class="form-field">
@@ -2702,12 +2752,29 @@ async function markAllAlertsRead(){
 
 async function screenJobPost(){
   const isEdit = !!state.param;
-  const job = isEdit ? await apiFetch('/jobs/' + state.param) : null;
+  const server = isEdit ? await apiFetch('/jobs/' + state.param) : null;
+  // 선택기에 다녀온 경우 입력 중이던 값을 유지합니다.
+  const job = jobDraft ? { ...(server || {}), ...jobDraft } : server;
+  if(!jobDraft){
+    pendingJobStack = server ? [...server.stack] : [];
+    pendingJobCerts = server ? [...(server.certs || [])] : [];
+  }
+  jobDraft = null;
   return `${statusbar()}
   <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('${isEdit?'jobDetail':'jobs'}'${isEdit?`, ${state.param}`:''})">${I.back}</div><div class="page-title">${isEdit?'공고 수정':'새 공고 등록'}</div></div></div>
   <div class="content">
     <div class="form-field"><label class="form-label">공고 제목</label><input id="pj-title" class="form-input" placeholder="예: 클라우드 전환 인프라 아키텍트" value="${job?esc(job.title):''}"></div>
-    <div class="form-field"><label class="form-label">필요 기술스택 (콤마로 구분)</label><input id="pj-stack" class="form-input" placeholder="예: AWS, Kubernetes, VMware" value="${job?esc(job.stack.join(', ')):''}"></div>
+    <div class="form-field">
+      <label class="form-label">필요 기술스택</label>
+      <div class="tag-row" id="pj-stack-tags">${pendingJobStack.map((v,i)=>`<span class="tag on rm" onclick="removeJobStack(${i})">${esc(v)} ${I.x}</span>`).join('')}</div>
+      <button class="btn btn-outline" style="margin-top:8px; display:flex; align-items:center; justify-content:center; gap:7px;" onclick="openPicker('jobStack','jobPost'${isEdit?`, ${state.param}`:''})">${I.search}분류에서 찾아보기 · 직접 추가</button>
+    </div>
+    <div class="form-field">
+      <label class="form-label">요구 자격증 (선택)</label>
+      <div class="tag-row" id="pj-cert-tags">${pendingJobCerts.map((v,i)=>`<span class="tag on rm" onclick="removeJobCert(${i})">${esc(v)} ${I.x}</span>`).join('')}</div>
+      <button class="btn btn-outline" style="margin-top:8px; display:flex; align-items:center; justify-content:center; gap:7px;" onclick="openPicker('jobCerts','jobPost'${isEdit?`, ${state.param}`:''})">${I.search}분류에서 찾아보기 · 직접 추가</button>
+      <div class="page-sub" style="margin-top:5px;">자격증이 필요한 프로젝트라면 지정해주세요.</div>
+    </div>
     <div class="form-field"><label class="form-label">근무 기간</label><input id="pj-period" class="form-input" placeholder="예: 6개월" value="${job?esc(job.period):''}"></div>
     <div class="form-field"><label class="form-label">단가</label><input id="pj-rate" class="form-input" placeholder="예: 600만원/월" value="${job?esc(job.rate):''}"></div>
     <div class="form-field"><label class="form-label">근무 형태</label><input id="pj-type" class="form-input" placeholder="예: 상주 · 주5일" value="${job?esc(job.work_type):''}"></div>

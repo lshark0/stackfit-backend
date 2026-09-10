@@ -72,6 +72,7 @@ if (USE_POSTGRES) {
     await ensureColumnPg('jobs', 'deadline', 'TEXT');
     await ensureColumnPg('jobs', 'duty', 'TEXT');
     await ensureColumnPg('jobs', 'grade', 'TEXT');
+    await ensureColumnPg('jobs', 'certs_json', "TEXT NOT NULL DEFAULT '[]'");
     await ensureColumnPg('freelancer_profiles', 'grade', 'TEXT');
     await ensureColumnPg('freelancer_profiles', 'certs_json', "TEXT NOT NULL DEFAULT '[]'");
     await ensureColumnPg('users', 'oauth_provider', 'TEXT');
@@ -126,6 +127,7 @@ if (USE_POSTGRES) {
     try { db.exec('ALTER TABLE jobs ADD COLUMN deadline TEXT'); } catch (e) {}
     try { db.exec('ALTER TABLE jobs ADD COLUMN duty TEXT'); } catch (e) {}
     try { db.exec('ALTER TABLE jobs ADD COLUMN grade TEXT'); } catch (e) {}
+    try { db.exec("ALTER TABLE jobs ADD COLUMN certs_json TEXT NOT NULL DEFAULT '[]'"); } catch (e) {}
     try { db.exec('ALTER TABLE freelancer_profiles ADD COLUMN grade TEXT'); } catch (e) {}
     try { db.exec("ALTER TABLE freelancer_profiles ADD COLUMN certs_json TEXT NOT NULL DEFAULT '[]'"); } catch (e) {}
     try { db.exec('ALTER TABLE users ADD COLUMN oauth_provider TEXT'); } catch (e) {}
