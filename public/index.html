@@ -1175,9 +1175,43 @@ async function deleteJob(id){
     go('jobs');
   }catch(e){ toast(e.message); }
 }
+// 어떤 공고로 제안하는지 골라야, 프리랜서가 조건을 보고 판단할 수 있습니다.
 async function proposeTalent(userId){
-  try{ await apiFetch(`/talents/${userId}/propose`, {method:'POST', body:{}}); toast('제안을 보냈어요'); go('talentDetail', userId); }
-  catch(e){ toast(e.message); }
+  let jobs = [];
+  try{
+    const d = await apiFetch('/jobs');
+    jobs = (d.jobs || []).filter(j => j.d_day !== '마감');
+  }catch(e){ toast(e.message); return; }
+
+  if(!jobs.length){
+    showConfirm('먼저 공고를 등록해주세요.\n어떤 프로젝트인지 있어야 제안할 수 있어요.', () => go('jobPost'));
+    return;
+  }
+
+  const box = document.getElementById('confirmOverlay');
+  document.getElementById('confirmMsg').innerHTML =
+    `<div style="font-size:15px; font-weight:700; margin-bottom:4px;">어떤 공고로 제안할까요?</div>
+     <div class="page-sub" style="margin-bottom:12px;">선택한 공고 정보가 상대방에게 함께 전달돼요.</div>
+     <div style="display:flex; flex-direction:column; gap:7px; text-align:left; max-height:46vh; overflow-y:auto;">
+       ${jobs.map(j=>`
+         <button class="btn btn-outline" style="font-size:13px; padding:11px; text-align:left; line-height:1.5;"
+           onclick="sendProposal(${userId}, ${j.id})">
+           <div style="font-weight:700;">${esc(j.title)}</div>
+           <div style="font-size:11.5px; color:var(--slate); margin-top:3px;">
+             ${[j.duty, j.grade, j.rate, j.period].filter(Boolean).map(esc).join(' · ')}
+           </div>
+         </button>`).join('')}
+     </div>`;
+  document.getElementById('confirmOkBtn').style.display = 'none';
+  box.classList.add('open');
+}
+async function sendProposal(userId, jobId){
+  closeConfirm();
+  try{
+    await apiFetch(`/talents/${userId}/propose`, {method:'POST', body:{ jobId }});
+    toast('제안을 보냈어요');
+    go('talentDetail', userId);
+  }catch(e){ toast(e.message); }
 }
 async function cancelProposal(userId){
   showConfirm('보낸 제안을 취소할까요?', async () => {
@@ -1397,6 +1431,21 @@ function addProfileTag(){
   pendingStack.push(v); input.value=''; refreshTagsUI();
 }
 function removeProfileTag(i){ pendingStack.splice(i,1); refreshTagsUI(); }
+
+// 자격증도 기술스택과 같은 방식으로 태그처럼 추가·삭제합니다.
+let pendingCerts = [];
+function refreshCertsUI(){
+  const el = document.getElementById('pf-certs');
+  if(!el) return;
+  el.innerHTML = pendingCerts.map((c,i)=>`<span class="tag on rm" onclick="removeProfileCert(${i})">${esc(c)} ${I.x}</span>`).join('');
+}
+function addProfileCert(){
+  const input = document.getElementById('pf-newcert');
+  const v = input.value.trim();
+  if(!v) return;
+  pendingCerts.push(v); input.value=''; refreshCertsUI();
+}
+function removeProfileCert(i){ pendingCerts.splice(i,1); refreshCertsUI(); }
 async function saveProfile(){
   try{
     await apiFetch('/profile', {method:'PUT', body:{
@@ -1406,6 +1455,7 @@ async function saveProfile(){
       rate: document.getElementById('pf-rate').value.trim(),
       summary: document.getElementById('pf-summary').value.trim(),
       stack: pendingStack,
+      certs: pendingCerts,
     }});
     toast('프로필이 저장됐어요');
     // 지원하려다 프로필 때문에 막혔던 경우, 저장 후 그 공고로 돌아갑니다.
@@ -1776,6 +1826,9 @@ async function screenTalentDetail(){
     </div>
     <div class="section-label with-ic">${I.layers}기술스택</div>
     <div class="tag-row">${t.stack.map(s=>`<span class="tag on">${esc(s)}</span>`).join('')}</div>
+    ${(t.certs && t.certs.length) ? `
+      <div class="section-label with-ic">${I.badgeCheck}자격증</div>
+      <div class="tag-row">${t.certs.map(c=>`<span class="tag on">${esc(c)}</span>`).join('')}</div>` : ''}
     <div class="section-label with-ic">${I.user}자기 소개</div><div class="para">${esc(t.summary) || '자기 소개가 아직 등록되지 않았어요.'}</div>
     <div class="section-label with-ic">${I.checklist}포트폴리오 ${(t.portfolios||[]).length ? `(${t.portfolios.length}건)` : ''}</div>
     ${(t.portfolios||[]).length
@@ -2326,6 +2379,7 @@ async function screenProfileViews(){
 async function screenProfileEdit(){
   const p = await apiFetch('/profile');
   pendingStack = [...p.stack];
+  pendingCerts = [...(p.certs || [])];
   return `${statusbar()}
   <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('mypage')">${I.back}</div><div class="page-title">프로필 수정</div></div></div>
   <div class="content">
@@ -2346,6 +2400,12 @@ async function screenProfileEdit(){
       <label class="form-label">기술스택</label>
       <div class="tag-row" id="pf-tags">${pendingStack.map((s,i)=>`<span class="tag on rm" onclick="removeProfileTag(${i})">${esc(s)} ${I.x}</span>`).join('')}</div>
       <div class="add-tag-row"><input id="pf-newtag" class="form-input" placeholder="기술스택 추가 후 Enter" onkeydown="if(event.key==='Enter'){event.preventDefault();addProfileTag();}"><button class="btn btn-outline" style="width:auto; padding:12px 16px;" onclick="addProfileTag()">추가</button></div>
+    </div>
+    <div class="form-field">
+      <label class="form-label">자격증</label>
+      <div class="tag-row" id="pf-certs">${pendingCerts.map((c,i)=>`<span class="tag on rm" onclick="removeProfileCert(${i})">${esc(c)} ${I.x}</span>`).join('')}</div>
+      <div class="add-tag-row"><input id="pf-newcert" class="form-input" placeholder="예: 정보처리기사, AWS SAA" onkeydown="if(event.key==='Enter'){event.preventDefault();addProfileCert();}"><button class="btn btn-outline" style="width:auto; padding:12px 16px;" onclick="addProfileCert()">추가</button></div>
+      <div class="page-sub" style="margin-top:5px;">보유한 자격증을 입력하면 기업이 확인할 수 있어요.</div>
     </div>
     <div class="form-field">
       <label class="form-label">자기소개</label>

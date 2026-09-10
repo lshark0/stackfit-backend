@@ -83,6 +83,7 @@ router.get('/:userId', requireAuth, requireRole('company'), async (req, res) => 
   res.json({
     ...t,
     stack: JSON.parse(t.stack_json),
+    certs: JSON.parse(t.certs_json || '[]'),
     proposed,
     resume_url: signedFileUrl(t.resume_filename),
     portfolios: sortPortfoliosByPeriod(portfolioRows).map((p) => ({ ...p, stack: JSON.parse(p.stack_json) })),

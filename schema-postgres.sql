@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS freelancer_profiles (
   years       TEXT NOT NULL DEFAULT '',
   rate        TEXT NOT NULL DEFAULT '',
   stack_json  TEXT NOT NULL DEFAULT '[]',
+  certs_json  TEXT NOT NULL DEFAULT '[]',   -- 보유 자격증 목록
   summary     TEXT NOT NULL DEFAULT '',
   verified    INTEGER NOT NULL DEFAULT 0,
   completion  INTEGER NOT NULL DEFAULT 20,

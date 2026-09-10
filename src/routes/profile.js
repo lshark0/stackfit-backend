@@ -89,6 +89,7 @@ router.get('/', requireAuth, async (req, res) => {
     return res.json({
       ...p,
       stack: JSON.parse(p.stack_json),
+      certs: JSON.parse(p.certs_json || '[]'),
       resume_url: signedFileUrl(p.resume_filename),
     });
   }
@@ -98,7 +99,7 @@ router.get('/', requireAuth, async (req, res) => {
 
 router.put('/', requireAuth, async (req, res) => {
   if (req.user.role === 'freelancer') {
-    const { name, role_title, years, rate, stack, summary, grade } = req.body || {};
+    const { name, role_title, years, rate, stack, summary, grade, certs } = req.body || {};
     const current = await get('SELECT * FROM freelancer_profiles WHERE user_id = ?', [req.user.id]);
 
     let nextStack = Array.isArray(stack) ? stack : JSON.parse(current.stack_json);
@@ -106,6 +107,13 @@ router.put('/', requireAuth, async (req, res) => {
       .filter((s) => typeof s === 'string' && s.trim())
       .slice(0, 20)
       .map((s) => s.trim().slice(0, 40));
+
+    // 자격증도 기술스택처럼 배열로 받아 정리합니다.
+    let nextCerts = Array.isArray(certs) ? certs : JSON.parse(current.certs_json || '[]');
+    nextCerts = nextCerts
+      .filter((c) => typeof c === 'string' && c.trim())
+      .slice(0, 20)
+      .map((c) => c.trim().slice(0, 60));
 
     const GRADE_OPTIONS = ['초급', '중급', '고급', '특급'];
     const nextGrade = grade === undefined ? current.grade : (GRADE_OPTIONS.includes(grade) ? grade : null);
@@ -118,13 +126,14 @@ router.put('/', requireAuth, async (req, res) => {
       stackCount: nextStack.length, hasResume: !!current.resume_filename,
     });
     await run(
-      `UPDATE freelancer_profiles SET name=?, role_title=?, years=?, rate=?, stack_json=?, summary=?, grade=?, completion=? WHERE user_id=?`,
+      `UPDATE freelancer_profiles SET name=?, role_title=?, years=?, rate=?, stack_json=?, certs_json=?, summary=?, grade=?, completion=? WHERE user_id=?`,
       [
         name !== undefined ? clamp(name, 60, current.name) : current.name,
         nextRoleTitle,
         years !== undefined ? clamp(years, 20, current.years) : current.years,
         nextRate,
         JSON.stringify(nextStack),
+        JSON.stringify(nextCerts),
         nextSummary,
         nextGrade,
         completion,
@@ -132,7 +141,7 @@ router.put('/', requireAuth, async (req, res) => {
       ]
     );
     const updated = await get('SELECT * FROM freelancer_profiles WHERE user_id = ?', [req.user.id]);
-    return res.json({ ...updated, stack: JSON.parse(updated.stack_json) });
+    return res.json({ ...updated, stack: JSON.parse(updated.stack_json), certs: JSON.parse(updated.certs_json || '[]') });
   }
 
   const { name, contact_person, description } = req.body || {};
