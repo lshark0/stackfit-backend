@@ -6,6 +6,7 @@ const { wrapAllRoutes } = require('../middleware/asyncHandler');
 const { computeMatch } = require('../match');
 const { getRatingSummary, getRatingSummaries } = require('../ratings');
 const { sortPortfoliosByPeriod } = require('../periodSort');
+const { matchesCategory } = require('../stackCatalog');
 
 const router = express.Router();
 wrapAllRoutes(router);
@@ -24,7 +25,7 @@ router.get('/', requireAuth, requireRole('company'), async (req, res) => {
     );
   }
   if (category && category !== '전체') {
-    talents = talents.filter(t => t.stack.some(s => s.toLowerCase().includes(String(category).toLowerCase())));
+    talents = talents.filter(t => matchesCategory(t.stack, category));
   }
   if (grade && grade !== '전체') {
     talents = talents.filter(t => t.grade === grade);

@@ -1952,13 +1952,13 @@ async function screenJobs(){
   if(jobGrade && jobGrade!=='전체') qs.set('grade', jobGrade);
   if(jobDuty) qs.set('duty', jobDuty);
   const data = await apiFetch('/jobs?' + qs.toString());
-  const cats = ["전체","인프라","클라우드"];
+  const cats = ["전체", ...Object.keys(STACK_CATALOG)];
   const grades = ["전체","초급","중급","고급","특급"];
   const duties = ["","PM","PL","TA","SA","DBA","개발자","QA","보안","감리","기타"];
   return `${statusbar()}${header(isCompany?"등록한 공고":"공고 탐색", `${data.jobs.length}개의 공고`,{}, nc)}
   <div class="content">
     <div class="search-box">${I.search}<input value="${esc(jobQuery)}" placeholder="제목, 기업명, 기술스택 검색" oninput="onJobSearch(this.value)"></div>
-    <div class="chip-row" id="jobChips">${cats.map((c)=>`<div class="chip ${c===jobCat?'active':''}" onclick="setJobCat('${c}', this)">${c}</div>`).join('')}</div>
+    <div class="chip-row" id="jobChips">${cats.map((c)=>`<div class="chip ${c===jobCat?'active':''}" onclick="setJobCat('${jsAttrStr(c)}', this)">${c}</div>`).join('')}</div>
     <div style="display:flex; gap:8px; margin:10px 0;">
       <select id="jobGradeSel" class="form-input" style="flex:1; padding:9px 10px; font-size:12.5px;" onchange="jobGrade=this.value; refreshJobList();">
         ${grades.map(g=>`<option value="${g}" ${g===jobGrade?'selected':''}>${g==='전체'?'등급 전체':g}</option>`).join('')}
@@ -2036,13 +2036,13 @@ async function screenTalent(){
   if(talentGrade && talentGrade!=='전체') qs.set('grade', talentGrade);
   if(talentDuty) qs.set('duty', talentDuty);
   const data = await apiFetch('/talents?' + qs.toString());
-  const cats = ["전체","인프라","클라우드","DBA","보안"];
+  const cats = ["전체", ...Object.keys(STACK_CATALOG)];
   const grades = ["전체","초급","중급","고급","특급"];
   const duties = ["","PM","PL","TA","SA","DBA","개발자","QA","보안","감리","기타"];
   return `${statusbar()}${header("인재풀 검색","업무 · 등급 · 기술스택으로 필터링",{}, nc)}
   <div class="content">
     <div class="search-box">${I.search}<input value="${esc(talentQuery)}" placeholder="이름, 직무, 기술스택 검색" oninput="onTalentSearch(this.value)"></div>
-    <div class="chip-row" id="talentChips">${cats.map((c)=>`<div class="chip ${c===talentCat?'active':''}" onclick="setTalentCat('${c}', this)">${c}</div>`).join('')}</div>
+    <div class="chip-row" id="talentChips">${cats.map((c)=>`<div class="chip ${c===talentCat?'active':''}" onclick="setTalentCat('${jsAttrStr(c)}', this)">${c}</div>`).join('')}</div>
     <div style="display:flex; gap:8px; margin:10px 0;">
       <select id="talentGradeSel" class="form-input" style="flex:1; padding:9px 10px; font-size:12.5px;" onchange="talentGrade=this.value; refreshTalentList();">
         ${grades.map(g=>`<option value="${g}" ${g===talentGrade?'selected':''}>${g==='전체'?'등급 전체':g}</option>`).join('')}

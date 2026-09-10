@@ -4,6 +4,7 @@ const { requireAuth, requireRole } = require('../middleware/requireAuth');
 const { wrapAllRoutes } = require('../middleware/asyncHandler');
 const { verifyToken } = require('../auth');
 const { computeMatch } = require('../match');
+const { matchesCategory } = require('../stackCatalog');
 const { getRatingSummary, getRatingSummaries } = require('../ratings');
 
 // SI/공공 프로젝트에서 흔히 쓰는 업무 구분과 기술등급
@@ -75,7 +76,8 @@ router.get('/', optionalAuth, async (req, res) => {
     );
   }
   if (category && category !== '전체') {
-    jobs = jobs.filter(j => j.category === category);
+    // 공고에 저장된 분류값 또는 요구 기술이 해당 분야에 속하면 포함합니다.
+    jobs = jobs.filter(j => j.category === category || matchesCategory(j.stack, category));
   }
   if (duty && duty !== '전체') {
     jobs = jobs.filter(j => j.duty === duty);
