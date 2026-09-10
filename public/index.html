@@ -1242,10 +1242,6 @@ async function markAlertRead(id, tag){
   else if(tag==='메시지') go('chatList');
   else render();
 }
-async function startChatWithTalent(freelancerId){
-  try{ const conv = await apiFetch('/conversations', {method:'POST', body:{freelancerId}}); go('chatRoom', conv.id); }
-  catch(e){ toast(e.message); }
-}
 async function startChatWithCompany(companyId, jobId){
   try{ const conv = await apiFetch('/conversations', {method:'POST', body:{companyId, jobId: jobId||null}}); go('chatRoom', conv.id); }
   catch(e){ toast(e.message); }
@@ -1872,7 +1868,6 @@ async function screenTalentDetail(){
     <div style="height:90px;"></div>
   </div>
   <div style="position:absolute; left:0; right:0; bottom:0; padding:14px 20px 22px; background:var(--paper); border-top:1px solid var(--line); display:flex; gap:10px;">
-    <button class="btn btn-outline" onclick="startChatWithTalent(${t.user_id})">메시지 보내기</button>
     ${t.proposed
       ? `<button class="btn btn-outline" onclick="cancelProposal(${t.user_id})" style="display:flex; align-items:center; justify-content:center; gap:7px;">${I.xCircle}제안 취소</button>`
       : `<button class="btn btn-primary" onclick="proposeTalent(${t.user_id})" style="display:flex; align-items:center; justify-content:center; gap:7px;">${I.sent}제안 보내기</button>`}
