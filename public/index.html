@@ -1521,8 +1521,12 @@ function pickerItems(){
   } else {
     items = (cat[pickerCategory] || []).slice();
   }
-  // 이미 고른 항목 중 카탈로그에 없는 것(직접 추가한 것)도 보이도록 합쳐줍니다.
-  pickerSelected().forEach(v => { if(!items.includes(v)) items.push(v); });
+  // 직접 추가한 항목(어느 분류에도 없는 것)은 '전체'에서만 함께 보여줍니다.
+  // 분류를 골랐을 때는 그 분류의 항목만 나와야 하므로 끼워 넣지 않습니다.
+  if(pickerCategory === '전체'){
+    const inCatalog = new Set(Object.values(cat).flat());
+    pickerSelected().forEach(v => { if(!inCatalog.has(v)) items.push(v); });
+  }
 
   const q = pickerQuery.trim().toLowerCase();
   if(q) items = items.filter(v => v.toLowerCase().includes(q));
