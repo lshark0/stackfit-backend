@@ -1445,6 +1445,31 @@ let pendingStack = [];
 // 프로필 미완성으로 지원이 막혔을 때, 어떤 공고로 돌아갈지와 부족한 항목을 기억합니다.
 let pendingApplyJobId = null;
 let profileMissingFields = [];
+/* ---------------- 기술스택 · 자격증 카탈로그 ---------------- */
+// 직접 타이핑하지 않고 분류에서 고르거나 검색할 수 있도록 자주 쓰이는 항목을 모아둡니다.
+// 목록에 없는 항목은 직접 추가할 수 있습니다.
+const STACK_CATALOG = {
+  '언어': ['Java','Python','JavaScript','TypeScript','C','C++','C#','Go','Kotlin','Swift','PHP','Ruby','Scala','R','SQL','Shell'],
+  '백엔드': ['Spring','Spring Boot','Node.js','Express','NestJS','Django','Flask','FastAPI','.NET','Laravel','eGovFrame','MyBatis','JPA','Hibernate'],
+  '프론트엔드': ['React','Vue','Angular','Next.js','Nuxt','Svelte','jQuery','HTML/CSS','Tailwind','Redux','Flutter','React Native'],
+  '데이터베이스': ['Oracle','MySQL','MariaDB','PostgreSQL','MS-SQL','Tibero','MongoDB','Redis','Cassandra','Elasticsearch','Altibase','CUBRID'],
+  '클라우드': ['AWS','Azure','GCP','NCP(네이버클라우드)','NHN Cloud','KT Cloud','OpenStack','VMware'],
+  '인프라·운영': ['Linux','Unix','AIX','HP-UX','Windows Server','Docker','Kubernetes','Jenkins','GitLab CI','Ansible','Terraform','Nginx','Apache','WebLogic','JEUS','Tomcat','WebSphere'],
+  '데이터·AI': ['Hadoop','Spark','Kafka','Airflow','TensorFlow','PyTorch','Pandas','Tableau','Power BI','ETL'],
+  '보안': ['방화벽','IPS/IDS','WAF','DLP','SIEM','ISMS-P','모의해킹','취약점진단','접근제어'],
+  '기타': ['Git','SVN','Jira','Confluence','Figma','Redmine','Nexus','SonarQube'],
+};
+
+const CERT_CATALOG = {
+  '국가기술자격': ['정보처리기사','정보처리산업기사','정보처리기능사','정보보안기사','정보보안산업기사','전자계산기조직응용기사','빅데이터분석기사','컴퓨터시스템응용기술사','정보관리기술사','정보통신기사','네트워크관리사 2급'],
+  '국가공인': ['SQLD(SQL 개발자)','SQLP(SQL 전문가)','ADsP(데이터분석 준전문가)','ADP(데이터분석 전문가)','DAsP(데이터아키텍처 준전문가)','DAP(데이터아키텍처 전문가)','리눅스마스터 1급','리눅스마스터 2급','컴퓨터활용능력 1급'],
+  '클라우드': ['AWS SAA(솔루션스 아키텍트)','AWS SAP(프로페셔널)','AWS DVA(개발자)','AWS SysOps','Azure AZ-104','Azure AZ-305','GCP ACE','GCP PCA','NCP 자격증'],
+  '데이터베이스': ['OCP(오라클 공인 전문가)','OCA(오라클 공인 준전문가)','OCM(오라클 마스터)','MySQL DBA','MongoDB Associate'],
+  '인프라·네트워크': ['CCNA','CCNP','CCIE','RHCSA','RHCE','LPIC-1','LPIC-2','CKA(쿠버네티스 관리자)','CKAD','VCP(VMware)'],
+  '보안': ['CISSP','CISA','CISM','CEH(모의해킹)','ISMS-P 인증심사원','개인정보관리사(CPPG)','산업보안관리사'],
+  '관리·기타': ['PMP','정보시스템감리사','ITIL Foundation','SCRUM Master(CSM)','전자상거래관리사'],
+};
+
 function refreshTagsUI(){
   const el = document.getElementById('pf-tags');
   if(!el) return;
@@ -1460,6 +1485,124 @@ function removeProfileTag(i){ pendingStack.splice(i,1); refreshTagsUI(); }
 
 // 자격증도 기술스택과 같은 방식으로 태그처럼 추가·삭제합니다.
 let pendingCerts = [];
+/* ---- 기술스택 · 자격증 선택기 (검색 + 분류 + 직접 추가) ---- */
+// kind: 'stack' | 'cert'
+let pickerKind = 'stack';
+let pickerCategory = '전체';
+let pickerQuery = '';
+
+function pickerCatalog(){ return pickerKind === 'stack' ? STACK_CATALOG : CERT_CATALOG; }
+function pickerSelected(){ return pickerKind === 'stack' ? pendingStack : pendingCerts; }
+function pickerLabel(){ return pickerKind === 'stack' ? '기술스택' : '자격증'; }
+
+// 선택기로 이동하면 화면이 바뀌므로, 입력 중이던 다른 항목들을 임시로 보관해둡니다.
+let profileDraft = null;
+function captureProfileDraft(){
+  const val = (id) => { const el = document.getElementById(id); return el ? el.value : null; };
+  const d = {
+    name: val('pf-name'), role_title: val('pf-role'), grade: val('pf-grade'),
+    rate: val('pf-rate'), summary: val('pf-summary'),
+  };
+  if(Object.values(d).every(v => v === null)) return; // 폼이 없으면 저장하지 않음
+  profileDraft = d;
+}
+function openPicker(kind){
+  captureProfileDraft();
+  pickerKind = kind; pickerCategory = '전체'; pickerQuery = '';
+  go('pickerScreen');
+}
+
+// 현재 분류 · 검색어에 맞는 항목을 추립니다.
+function pickerItems(){
+  const cat = pickerCatalog();
+  let items = [];
+  if(pickerCategory === '전체'){
+    Object.values(cat).forEach(list => { items = items.concat(list); });
+  } else {
+    items = (cat[pickerCategory] || []).slice();
+  }
+  // 이미 고른 항목 중 카탈로그에 없는 것(직접 추가한 것)도 보이도록 합쳐줍니다.
+  pickerSelected().forEach(v => { if(!items.includes(v)) items.push(v); });
+
+  const q = pickerQuery.trim().toLowerCase();
+  if(q) items = items.filter(v => v.toLowerCase().includes(q));
+  return [...new Set(items)];
+}
+
+function screenPicker(){
+  const cats = ['전체', ...Object.keys(pickerCatalog())];
+  const items = pickerItems();
+  const selected = pickerSelected();
+  const q = pickerQuery.trim();
+  // 검색어가 카탈로그에 없으면 직접 추가할 수 있게 안내합니다.
+  const canAddCustom = q && !items.some(v => v.toLowerCase() === q.toLowerCase());
+
+  return `${statusbar()}
+  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('profileEdit')">${I.back}</div>
+    <div><div class="page-title">${pickerLabel()} 선택</div><div class="page-sub">${selected.length}개 선택됨</div></div>
+  </div></div>
+  <div class="content">
+    <div class="search-box">${I.search}<input id="picker-q" value="${esc(pickerQuery)}" placeholder="${pickerLabel()} 검색" oninput="onPickerSearch(this.value)"></div>
+
+    ${selected.length ? `
+      <div class="section-label with-ic">${I.checkCircle}선택한 ${pickerLabel()}</div>
+      <div class="tag-row">${selected.map((v,i)=>`<span class="tag on rm" onclick="pickerRemove(${i})">${esc(v)} ${I.x}</span>`).join('')}</div>` : ''}
+
+    ${canAddCustom ? `
+      <div class="reco-empty" style="text-align:left; margin-top:12px; border-color:var(--amber); background:#FDF6E9;">
+        <b style="color:var(--ink);">"${esc(q)}"이(가) 목록에 없나요?</b>
+        <div style="margin-top:5px;">직접 추가할 수 있어요.</div>
+        <button class="btn btn-primary" style="margin-top:10px;" onclick="pickerAddCustom()">"${esc(q)}" 추가하기</button>
+      </div>` : ''}
+
+    <div class="chip-row" style="margin-top:12px;">
+      ${cats.map(c=>`<div class="chip ${c===pickerCategory?'active':''}" onclick="setPickerCategory('${jsAttrStr(c)}')">${esc(c)}</div>`).join('')}
+    </div>
+
+    <div class="section-label with-ic">${I.layers}${pickerCategory === '전체' ? '전체 목록' : esc(pickerCategory)}</div>
+    <div class="tag-row" style="gap:7px;">
+      ${items.map(v=>{
+        const on = selected.includes(v);
+        return `<span class="tag ${on?'on':''}" style="cursor:pointer; padding:9px 13px;" onclick="pickerToggle('${jsAttrStr(v)}')">${on?'✓ ':''}${esc(v)}</span>`;
+      }).join('') || `<div class="page-sub">검색 결과가 없어요. 위에서 직접 추가해보세요.</div>`}
+    </div>
+
+    <button class="btn btn-primary" style="margin-top:18px;" onclick="go('profileEdit')">선택 완료 (${selected.length}개)</button>
+    <div style="height:20px;"></div>
+  </div>`;
+}
+
+const onPickerSearch = debounce(v => { pickerQuery = v; renderPickerBody(); }, 250);
+function setPickerCategory(c){ pickerCategory = c; renderPickerBody(); }
+function pickerToggle(v){
+  const arr = pickerSelected();
+  const i = arr.indexOf(v);
+  if(i >= 0) arr.splice(i,1); else arr.push(v);
+  renderPickerBody();
+}
+function pickerRemove(i){ pickerSelected().splice(i,1); renderPickerBody(); }
+function pickerAddCustom(){
+  const v = pickerQuery.trim();
+  if(!v) return;
+  const arr = pickerSelected();
+  if(!arr.includes(v)) arr.push(v);
+  pickerQuery = '';
+  renderPickerBody();
+  toast(`"${v}" 추가했어요`);
+}
+// 검색어 입력 포커스를 잃지 않도록 화면 전체가 아닌 내용만 다시 그립니다.
+function renderPickerBody(){
+  const el = document.getElementById('screen');
+  if(!el) return;
+  const focused = document.activeElement && document.activeElement.id === 'picker-q';
+  const pos = focused ? document.activeElement.selectionStart : null;
+  el.innerHTML = screenPicker();
+  if(focused){
+    const input = document.getElementById('picker-q');
+    if(input){ input.focus(); try{ input.setSelectionRange(pos, pos); }catch(e){} }
+  }
+}
+
 function refreshCertsUI(){
   const el = document.getElementById('pf-certs');
   if(!el) return;
@@ -2413,9 +2556,14 @@ async function screenProfileViews(){
 }
 
 async function screenProfileEdit(){
-  const p = await apiFetch('/profile');
-  pendingStack = [...p.stack];
-  pendingCerts = [...(p.certs || [])];
+  const server = await apiFetch('/profile');
+  // 선택기에 다녀온 경우에는 입력 중이던 값을 유지합니다.
+  const p = profileDraft ? { ...server, ...profileDraft } : server;
+  if(!profileDraft){
+    pendingStack = [...server.stack];
+    pendingCerts = [...(server.certs || [])];
+  }
+  profileDraft = null;
   return `${statusbar()}
   <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('mypage')">${I.back}</div><div class="page-title">프로필 수정</div></div></div>
   <div class="content">
@@ -2435,12 +2583,14 @@ async function screenProfileEdit(){
     <div class="form-field">
       <label class="form-label">기술스택</label>
       <div class="tag-row" id="pf-tags">${pendingStack.map((s,i)=>`<span class="tag on rm" onclick="removeProfileTag(${i})">${esc(s)} ${I.x}</span>`).join('')}</div>
-      <div class="add-tag-row"><input id="pf-newtag" class="form-input" placeholder="기술스택 추가 후 Enter" onkeydown="if(event.key==='Enter'){event.preventDefault();addProfileTag();}"><button class="btn btn-outline" style="width:auto; padding:12px 16px;" onclick="addProfileTag()">추가</button></div>
+      <button class="btn btn-outline" style="margin-top:8px; display:flex; align-items:center; justify-content:center; gap:7px;" onclick="openPicker('stack')">${I.search}분류에서 찾아보기 · 직접 추가</button>
+      <div class="add-tag-row" style="margin-top:8px;"><input id="pf-newtag" class="form-input" placeholder="직접 입력 후 Enter" onkeydown="if(event.key==='Enter'){event.preventDefault();addProfileTag();}"><button class="btn btn-outline" style="width:auto; padding:12px 16px;" onclick="addProfileTag()">추가</button></div>
     </div>
     <div class="form-field">
       <label class="form-label">자격증</label>
       <div class="tag-row" id="pf-certs">${pendingCerts.map((c,i)=>`<span class="tag on rm" onclick="removeProfileCert(${i})">${esc(c)} ${I.x}</span>`).join('')}</div>
-      <div class="add-tag-row"><input id="pf-newcert" class="form-input" placeholder="예: 정보처리기사, AWS SAA" onkeydown="if(event.key==='Enter'){event.preventDefault();addProfileCert();}"><button class="btn btn-outline" style="width:auto; padding:12px 16px;" onclick="addProfileCert()">추가</button></div>
+      <button class="btn btn-outline" style="margin-top:8px; display:flex; align-items:center; justify-content:center; gap:7px;" onclick="openPicker('cert')">${I.search}분류에서 찾아보기 · 직접 추가</button>
+      <div class="add-tag-row" style="margin-top:8px;"><input id="pf-newcert" class="form-input" placeholder="직접 입력 후 Enter (예: 정보처리기사)" onkeydown="if(event.key==='Enter'){event.preventDefault();addProfileCert();}"><button class="btn btn-outline" style="width:auto; padding:12px 16px;" onclick="addProfileCert()">추가</button></div>
       <div class="page-sub" style="margin-top:5px;">보유한 자격증을 입력하면 기업이 확인할 수 있어요.</div>
     </div>
     <div class="form-field">
@@ -2573,7 +2723,7 @@ async function render(){
       myApplications: screenMyApplications,
       portfolios: screenPortfolios, portfolioEdit: screenPortfolioEdit,
       savedJobs: screenSavedJobs, profileViews: screenProfileViews, receivedProposals: screenReceivedProposals,
-      proposeForm: screenProposeForm,
+      proposeForm: screenProposeForm, pickerScreen: screenPicker,
       reviewForm: screenReviewForm,
     };
     const fn = map[state.screen] || screenOnboarding;
