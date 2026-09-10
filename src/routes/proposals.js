@@ -10,7 +10,7 @@ wrapAllRoutes(router);
 router.post('/talents/:userId/propose', requireAuth, requireRole('company'), async (req, res) => {
   const freelancerId = Number(req.params.userId);
   if (!Number.isInteger(freelancerId)) return res.status(400).json({ error: '올바르지 않은 사용자 ID입니다.' });
-  const { jobId } = req.body || {};
+  const { jobId, message } = req.body || {};
 
   const talent = await get('SELECT * FROM freelancer_profiles WHERE user_id = ?', [freelancerId]);
   if (!talent) return res.status(404).json({ error: '프로필을 찾을 수 없습니다.' });
@@ -28,7 +28,10 @@ router.post('/talents/:userId/propose', requireAuth, requireRole('company'), asy
   const existing = await get('SELECT id FROM proposals WHERE company_id=? AND freelancer_id=?', [req.user.id, freelancerId]);
   if (existing) return res.status(409).json({ error: '이미 제안을 보냈습니다.' });
 
-  await run('INSERT INTO proposals (company_id, freelancer_id, job_id) VALUES (?,?,?)', [req.user.id, freelancerId, safeJobId]);
+  const safeMessage = typeof message === 'string' ? message.trim().slice(0, 1000) : '';
+  await run('INSERT INTO proposals (company_id, freelancer_id, job_id, message) VALUES (?,?,?,?)', [
+    req.user.id, freelancerId, safeJobId, safeMessage,
+  ]);
 
   const company = await get('SELECT name FROM companies WHERE user_id = ?', [req.user.id]);
   await run('INSERT INTO notifications (user_id, tag, title, body) VALUES (?,?,?,?)', [
@@ -71,7 +74,7 @@ router.delete('/talents/:userId/propose', requireAuth, requireRole('company'), a
 // 내가(프리랜서) 받은 제안 목록
 router.get('/proposals/received', requireAuth, requireRole('freelancer'), async (req, res) => {
   const rows = await all(
-    `SELECT p.id, p.created_at, p.job_id, p.company_id, p.status, p.decline_reason, p.responded_at,
+    `SELECT p.id, p.created_at, p.job_id, p.company_id, p.status, p.message, p.decline_reason, p.responded_at,
             c.name AS company_name, c.description AS company_description,
             j.title AS job_title, j.stack_json, j.rate, j.period, j.work_type, j.location,
             j.duty, j.grade, j.description AS job_description, j.deadline, j.status AS job_status
@@ -120,7 +123,8 @@ async function loadMyProposal(req, res) {
 
 const nowStr = () => new Date().toISOString().slice(0, 19).replace('T', ' ');
 
-// 제안 수락 — 연결된 공고가 있으면 프로젝트를 만들어 계약 단계로 넘어갑니다.
+// 제안 수락 — 바로 계약으로 넘어가지 않고, 먼저 채팅으로 세부 조건을 논의합니다.
+// (계약은 기업이 지원자 관리에서 수락하거나 별도 합의 후 진행)
 router.post('/proposals/:id/accept', requireAuth, requireRole('freelancer'), async (req, res) => {
   const proposal = await loadMyProposal(req, res);
   if (!proposal) return;
@@ -130,27 +134,19 @@ router.post('/proposals/:id/accept', requireAuth, requireRole('freelancer'), asy
   const profile = await get('SELECT name FROM freelancer_profiles WHERE user_id = ?', [req.user.id]);
   const who = profile ? profile.name : '프리랜서';
 
-  let projectCreated = false;
-  if (proposal.job_id) {
-    const job = await get('SELECT * FROM jobs WHERE id = ?', [proposal.job_id]);
-    if (job) {
-      const active = await get(
-        "SELECT id FROM projects WHERE job_id=? AND freelancer_id=? AND status != '완료'",
-        [job.id, req.user.id]
-      );
-      if (!active) {
-        await run(
-          'INSERT INTO projects (job_id, company_id, freelancer_id, title, rate, period, status, stage) VALUES (?,?,?,?,?,?,?,?)',
-          [job.id, proposal.company_id, req.user.id, job.title, job.rate, job.period, '진행중', 1]
-        );
-        projectCreated = true;
-      }
-    }
+  // 바로 대화를 이어갈 수 있도록 채팅방을 준비합니다 (이미 있으면 그대로 사용).
+  let conv = await get(
+    'SELECT * FROM conversations WHERE company_id=? AND freelancer_id=? AND job_id IS NOT DISTINCT FROM ?',
+    [proposal.company_id, req.user.id, proposal.job_id || null]
+  );
+  if (!conv) {
+    const r = await run('INSERT INTO conversations (company_id, freelancer_id, job_id) VALUES (?,?,?)', [
+      proposal.company_id, req.user.id, proposal.job_id || null,
+    ]);
+    conv = await get('SELECT * FROM conversations WHERE id = ?', [r.lastInsertRowid]);
   }
 
-  const body = projectCreated
-    ? `${who}님이 제안을 수락했어요. 프로젝트 관리에서 계약서를 첨부해주세요.`
-    : `${who}님이 제안을 수락했어요. 채팅으로 세부 조건을 논의해보세요.`;
+  const body = `${who}님이 제안을 수락했어요. 채팅으로 세부 조건을 논의해보세요.`;
   await run('INSERT INTO notifications (user_id, tag, title, body) VALUES (?,?,?,?)', [
     proposal.company_id, '제안', '제안이 수락됐어요', body,
   ]);
@@ -158,7 +154,7 @@ router.post('/proposals/:id/accept', requireAuth, requireRole('freelancer'), asy
     kind: 'result', title: '🎉 제안이 수락됐어요', body, url: '/', tag: `proposal-${proposal.id}`,
   }).catch(() => {});
 
-  res.json({ status: 'accepted', projectCreated });
+  res.json({ status: 'accepted', conversationId: conv.id });
 });
 
 // 제안 거절 — 사유를 함께 전달합니다.

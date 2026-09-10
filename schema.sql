@@ -78,6 +78,7 @@ CREATE TABLE IF NOT EXISTS proposals (
   freelancer_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   job_id        INTEGER REFERENCES jobs(id) ON DELETE SET NULL,
   status        TEXT NOT NULL DEFAULT 'sent' CHECK (status IN ('sent','accepted','declined')),
+  message        TEXT NOT NULL DEFAULT '',          -- 기업이 함께 보낸 제안 메시지
   decline_reason TEXT,                            -- 프리랜서가 거절한 사유
   responded_at   TEXT,                            -- 수락/거절한 시각
   created_at    TEXT NOT NULL DEFAULT (datetime('now'))

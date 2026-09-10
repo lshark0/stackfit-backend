@@ -63,6 +63,7 @@ if (USE_POSTGRES) {
     await ensureColumnPg('projects', 'contract_original_name', 'TEXT');
     await ensureColumnPg('projects', 'contract_data', 'BYTEA');
     await ensureColumnPg('proposals', 'status', "TEXT NOT NULL DEFAULT 'sent'");
+    await ensureColumnPg('proposals', 'message', "TEXT NOT NULL DEFAULT ''");
     await ensureColumnPg('proposals', 'decline_reason', 'TEXT');
     await ensureColumnPg('proposals', 'responded_at', 'TEXT');
     await migrateProjectStages();
@@ -114,6 +115,7 @@ if (USE_POSTGRES) {
     try { db.exec('ALTER TABLE projects ADD COLUMN contract_original_name TEXT'); } catch (e) {}
     try { db.exec('ALTER TABLE projects ADD COLUMN contract_data BLOB'); } catch (e) {}
     try { db.exec("ALTER TABLE proposals ADD COLUMN status TEXT NOT NULL DEFAULT 'sent'"); } catch (e) {}
+    try { db.exec("ALTER TABLE proposals ADD COLUMN message TEXT NOT NULL DEFAULT ''"); } catch (e) {}
     try { db.exec('ALTER TABLE proposals ADD COLUMN decline_reason TEXT'); } catch (e) {}
     try { db.exec('ALTER TABLE proposals ADD COLUMN responded_at TEXT'); } catch (e) {}
     await migrateProjectStages();
