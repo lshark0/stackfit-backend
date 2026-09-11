@@ -1415,9 +1415,13 @@ function chatKeydown(ev, convId){ if(ev.key==='Enter'){ ev.preventDefault(); sen
 async function decideApplicant(jobId, applicationId, status){
   try{
     await apiFetch(`/jobs/${jobId}/applicants/${applicationId}`, {method:'PATCH', body:{status}});
-    toast(status==='accepted' ? '수락했어요! 프로젝트 관리에서 진행 상황을 확인하세요'
-        : status==='submitted' ? '거절을 취소했어요. 다시 검토중 상태예요'
-        : '지원자를 거절했어요');
+    if(status==='accepted'){
+      // 수락하면 프로젝트가 바로 생성되므로, 프로젝트 관리 화면으로 이동해 계약을 이어서 진행할 수 있게 합니다.
+      toast('수락했어요! 프로젝트 관리로 이동할게요');
+      go('projects');
+      return;
+    }
+    toast(status==='submitted' ? '거절을 취소했어요. 다시 검토중 상태예요' : '지원자를 거절했어요');
     go('applicants', jobId);
   }catch(e){ toast(e.message); }
 }
