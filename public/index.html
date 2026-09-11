@@ -1953,7 +1953,11 @@ function screenLogin(){
   <div class="content">
     ${socialLoginButtons()}
     <div class="form-field" style="margin-top:6px;"><label class="form-label">이메일</label><input id="li-email" class="form-input" type="email" placeholder="you@example.com"></div>
-    <div class="form-field"><label class="form-label">비밀번호</label><input id="li-password" class="form-input" type="password" placeholder="비밀번호" onkeydown="if(event.key==='Enter'){event.preventDefault();doLogin();}"></div>
+    <div class="form-field"><label class="form-label">비밀번호</label>
+      <div style="position:relative;">
+        <input id="li-password" class="form-input" type="password" placeholder="비밀번호" autocomplete="current-password" style="padding-right:44px;" onkeydown="if(event.key==='Enter'){event.preventDefault();doLogin();}">
+        <div onclick="togglePasswordVisibility('li-password', this)" title="비밀번호 보기" role="button" aria-label="비밀번호 보기" style="position:absolute; right:12px; top:50%; transform:translateY(-50%); cursor:pointer; color:var(--slate-light);">${I.eye}</div>
+      </div></div>
     <button class="btn btn-primary" onclick="doLogin()">이메일로 로그인</button>
     <div class="server-line" style="margin-top:16px;">계정이 없으신가요? <b onclick="go('signup')">회원가입</b></div>
   </div>`;
@@ -2826,7 +2830,11 @@ async function screenDeleteAccount(){
       <div class="tt">정말 탈퇴하시겠어요?</div>
       <div class="ds">탈퇴하면 프로필, 공고, 채팅, 리뷰 등 모든 데이터가 즉시 삭제되고 복구할 수 없어요.</div>
     </div>
-    ${me.user.hasPassword ? `<div class="form-field"><label class="form-label">비밀번호 확인</label><input id="da-password" class="form-input" type="password" placeholder="본인 확인을 위해 입력해주세요"></div>` : ''}
+    ${me.user.hasPassword ? `<div class="form-field"><label class="form-label">비밀번호 확인</label>
+      <div style="position:relative;">
+        <input id="da-password" class="form-input" type="password" placeholder="본인 확인을 위해 입력해주세요" autocomplete="current-password" style="padding-right:44px;">
+        <div onclick="togglePasswordVisibility('da-password', this)" title="비밀번호 보기" role="button" aria-label="비밀번호 보기" style="position:absolute; right:12px; top:50%; transform:translateY(-50%); cursor:pointer; color:var(--slate-light);">${I.eye}</div>
+      </div></div>` : ''}
     <button class="btn btn-outline" style="border-color:var(--danger); color:var(--danger);" onclick="submitDeleteAccount(${me.user.hasPassword})">탈퇴하기</button>
   </div>`;
 }
