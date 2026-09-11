@@ -2311,6 +2311,7 @@ async function screenProjects(){
   const steps = ["계약 체결","프로젝트 진행","프로젝트 완료"];
   return `${statusbar()}${header("프로젝트 관리","계약 · 진행 현황",{}, nc)}
   <div class="content">
+    <div class="list-item" onclick="go('projectArchive')" style="margin-bottom:12px;"><div class="li-l"><div class="li-icon">${I.checklist}</div><div class="li-tt">완료 프로젝트 보관함</div></div>${I.back}</div>
     ${isCompany ? `<div class="reco-empty" style="text-align:left; margin-bottom:12px;">
       <b style="color:var(--ink);">프로젝트는 지원자를 수락하면 생성돼요</b>
       <div style="margin-top:5px; line-height:1.7;">공고를 올린 것만으로는 아직 계약 전 단계예요.<br>지원자를 <b>수락</b>하면 이곳에서 계약·진행 단계를 관리할 수 있어요.</div>
@@ -2332,6 +2333,7 @@ async function screenProjects(){
             <div style="color:var(--amber-deep); font-size:14px;">${'★'.repeat(p.receivedReview.rating)}${'☆'.repeat(5-p.receivedReview.rating)}</div>
             ${p.receivedReview.comment? `<div class="page-sub" style="margin-top:6px; line-height:1.6;">${esc(p.receivedReview.comment)}</div>` : ''}
           </div>` : (p.status==='완료'? `<div class="page-sub" style="margin-top:10px;">아직 상대방의 평가가 등록되지 않았어요.</div>` : '')}
+        ${p.status==='완료' ? projectArchiveButtons(p.id, false) : ''}
       </div>`).join('') || (isCompany
         ? `${emptyArt(ART.noProjects, '아직 계약된 프로젝트가 없어요', myJobs.jobs.length
             ? `등록한 공고 <b>${myJobs.jobs.length}건</b>에서 지원자를 수락하면<br>프로젝트가 자동으로 생성돼요.`
@@ -2339,6 +2341,66 @@ async function screenProjects(){
            <button class="btn btn-primary" onclick="jobQuery=''; jobCat='전체'; jobGrade='전체'; jobDuty=''; go('jobs')">${myJobs.jobs.length ? '공고 관리로 이동' : '공고 등록하러 가기'}</button>`
         : emptyArt(ART.noProjects, '진행 중인 프로젝트가 없어요', '지원이 수락되면 프로젝트가 자동으로 생성돼요.'))}
   </div>${tabbar('projects')}`;
+}
+
+// 완료된 프로젝트 카드 하단의 보관·삭제 버튼 (진행 목록/보관함 화면 공용).
+// inArchive가 true면 "보관함으로 이동" 대신 "진행 목록으로 복원"을 보여줍니다.
+function projectArchiveButtons(id, inArchive){
+  return `<div style="display:flex; gap:8px; margin-top:10px;">
+    ${inArchive
+      ? `<button class="btn btn-outline" style="width:auto; padding:9px 14px; font-size:12px;" onclick="unarchiveProject(${id})">진행 목록으로 복원</button>`
+      : `<button class="btn btn-outline" style="width:auto; padding:9px 14px; font-size:12px;" onclick="archiveProject(${id})">보관함으로 이동</button>`}
+    <button class="btn btn-outline" style="width:auto; padding:9px 14px; font-size:12px; border-color:var(--danger); color:var(--danger);" onclick="deleteProject(${id})">삭제</button>
+  </div>`;
+}
+async function archiveProject(id){
+  try{
+    await apiFetch(`/projects/${id}/archive`, {method:'POST'});
+    toast('완료 보관함으로 옮겼어요');
+    render();
+  }catch(e){ toast(e.message); }
+}
+async function unarchiveProject(id){
+  try{
+    await apiFetch(`/projects/${id}/unarchive`, {method:'POST'});
+    toast('진행 목록으로 복원했어요');
+    render();
+  }catch(e){ toast(e.message); }
+}
+async function deleteProject(id){
+  showConfirm('이 프로젝트를 삭제할까요?\n계약·진행 기록과 서로 남긴 리뷰·평점도 함께 사라지며 되돌릴 수 없어요.', async () => {
+    try{
+      await apiFetch(`/projects/${id}`, {method:'DELETE'});
+      toast('프로젝트가 삭제됐어요');
+      render();
+    }catch(e){ toast(e.message); }
+  });
+}
+
+async function screenProjectArchive(){
+  const nc = await unreadCount();
+  const data = await apiFetch('/projects/archived');
+  return `${statusbar()}${header("완료 프로젝트 보관함","진행 목록에서 뺀 완료 건",{back:'projects'}, nc)}
+  <div class="content">
+    <div class="page-sub" style="margin-bottom:12px;">완료된 프로젝트를 보관하면 진행 목록에서 빠지고, 필요할 때 여기서 다시 확인하거나 되돌릴 수 있어요.</div>
+    ${data.projects.map(p=>`
+      <div class="card">
+        <div class="card-top"><div><div class="card-title">${esc(p.title)}</div></div><span class="tag" style="border-radius:999px;">${esc(p.status)}</span></div>
+        <div class="meta-row"><span>${I.clock}${esc(p.period)}</span><span class="rate">${esc(p.rate)}</span></div>
+        ${p.completed_at ? `<div class="icon-meta" style="margin-top:8px;"><span class="im">${I.checkCircle}완료 <b>${fmtDate(p.completed_at)}</b></span></div>` : ''}
+        ${p.myReview
+          ? `<div class="page-sub" style="margin-top:10px;">내가 남긴 평점: ${'★'.repeat(p.myReview.rating)}${'☆'.repeat(5-p.myReview.rating)}</div>`
+          : `<button class="btn btn-primary" style="margin-top:10px;" onclick="go('reviewForm', ${p.id})">리뷰 남기기</button>`}
+        ${p.receivedReview? `
+          <div style="margin-top:10px; padding:12px; background:var(--card); border:1px solid var(--line); border-radius:12px;">
+            <div style="font-size:11.5px; font-weight:700; color:var(--slate); margin-bottom:4px;">상대방이 남긴 평가</div>
+            <div style="color:var(--amber-deep); font-size:14px;">${'★'.repeat(p.receivedReview.rating)}${'☆'.repeat(5-p.receivedReview.rating)}</div>
+            ${p.receivedReview.comment? `<div class="page-sub" style="margin-top:6px; line-height:1.6;">${esc(p.receivedReview.comment)}</div>` : ''}
+          </div>` : `<div class="page-sub" style="margin-top:10px;">아직 상대방의 평가가 등록되지 않았어요.</div>`}
+        ${projectArchiveButtons(p.id, true)}
+      </div>`).join('') || emptyArt(ART.noProjects, '보관된 완료 프로젝트가 없어요', '완료된 프로젝트의 "보관함으로 이동" 버튼을 누르면<br>여기로 옮겨져 진행 목록이 깔끔해져요.')}
+    <div style="height:20px;"></div>
+  </div>`;
 }
 
 let pendingRating = 0;
@@ -3114,7 +3176,7 @@ async function render(){
       onboarding: screenOnboarding, serverSetup: screenServerSetup,
       signup: screenSignup, login: screenLogin,
       home: screenHome, jobs: screenJobs, jobDetail: screenJobDetail,
-      talent: screenTalent, talentDetail: screenTalentDetail, projects: screenProjects, applicants: screenApplicants,
+      talent: screenTalent, talentDetail: screenTalentDetail, projects: screenProjects, projectArchive: screenProjectArchive, applicants: screenApplicants,
       chatList: screenChatList, chatRoom: screenChatRoom, mypage: screenMypage,
       profileEdit: screenProfileEdit, alerts: screenAlerts, jobPost: screenJobPost,
       companyProfileEdit: screenCompanyProfileEdit,

@@ -12,25 +12,18 @@ const upload = createDocUpload();
 const router = express.Router();
 wrapAllRoutes(router);
 
-router.get('/', requireAuth, async (req, res) => {
-  const col = req.user.role === 'freelancer' ? 'freelancer_id' : 'company_id';
-  // 진행 중인 프로젝트를 항상 위에 보여줍니다 (완료된 건에 새 계약이 묻히지 않도록).
-  const rows = await all(
-    `SELECT * FROM projects WHERE ${col} = ? ORDER BY (CASE WHEN status = '완료' THEN 1 ELSE 0 END), created_at DESC, id DESC`,
-    [req.user.id]
-  );
-
-  // 각 프로젝트에 내가 이미 리뷰를 남겼는지, 그리고 상대방이 나에게 남긴 평가도 함께 내려줍니다.
-  // 프로젝트 수만큼 쿼리를 반복하지 않도록, 관련된 리뷰를 한 번에 가져와 메모리에서 매칭합니다.
+// 각 프로젝트에 내가 이미 리뷰를 남겼는지, 그리고 상대방이 나에게 남긴 평가도 함께 내려줍니다.
+// 프로젝트 수만큼 쿼리를 반복하지 않도록, 관련된 리뷰를 한 번에 가져와 메모리에서 매칭합니다.
+async function attachReviews(rows, userId) {
   const projectIds = rows.map((p) => p.id);
   let allReviews = [];
   if (projectIds.length) {
     const placeholders = projectIds.map(() => '?').join(',');
     allReviews = await all(`SELECT * FROM reviews WHERE project_id IN (${placeholders})`, projectIds);
   }
-  const withReview = rows.map((p) => {
-    const mine = allReviews.find((r) => r.project_id === p.id && r.reviewer_id === req.user.id);
-    const received = allReviews.find((r) => r.project_id === p.id && r.reviewee_id === req.user.id);
+  return rows.map((p) => {
+    const mine = allReviews.find((r) => r.project_id === p.id && r.reviewer_id === userId);
+    const received = allReviews.find((r) => r.project_id === p.id && r.reviewee_id === userId);
     const { contract_data, ...rest } = p; // 파일 내용 자체는 목록에 담지 않습니다.
     return {
       ...rest,
@@ -39,7 +32,65 @@ router.get('/', requireAuth, async (req, res) => {
       receivedReview: received ? { rating: received.rating, comment: received.comment } : null,
     };
   });
-  res.json({ projects: withReview });
+}
+
+router.get('/', requireAuth, async (req, res) => {
+  const col = req.user.role === 'freelancer' ? 'freelancer_id' : 'company_id';
+  // 진행 중인 프로젝트를 항상 위에 보여줍니다 (완료된 건에 새 계약이 묻히지 않도록).
+  // 내가 보관함으로 옮긴 완료 프로젝트는 여기서 빠집니다 (아래 /archived 에서 조회).
+  const rows = await all(
+    `SELECT * FROM projects WHERE ${col} = ?
+       AND id NOT IN (SELECT project_id FROM archived_projects WHERE user_id = ?)
+     ORDER BY (CASE WHEN status = '완료' THEN 1 ELSE 0 END), created_at DESC, id DESC`,
+    [req.user.id, req.user.id]
+  );
+  res.json({ projects: await attachReviews(rows, req.user.id) });
+});
+
+// 내가 보관함으로 옮긴 완료 프로젝트 목록 (다른 사람의 목록·평점에는 영향 없음)
+router.get('/archived', requireAuth, async (req, res) => {
+  const col = req.user.role === 'freelancer' ? 'freelancer_id' : 'company_id';
+  const rows = await all(
+    `SELECT * FROM projects WHERE ${col} = ?
+       AND id IN (SELECT project_id FROM archived_projects WHERE user_id = ?)
+     ORDER BY completed_at DESC, id DESC`,
+    [req.user.id, req.user.id]
+  );
+  res.json({ projects: await attachReviews(rows, req.user.id) });
+});
+
+// 완료된 프로젝트를 보관함으로 이동 (나에게만 적용되며, 프로젝트 자체는 지워지지 않습니다)
+router.post('/:id/archive', requireAuth, async (req, res) => {
+  const project = await loadMyProject(req, res);
+  if (!project) return;
+  if (project.status !== '완료') {
+    return res.status(400).json({ error: '완료된 프로젝트만 보관할 수 있어요.' });
+  }
+  const existing = await get('SELECT id FROM archived_projects WHERE user_id=? AND project_id=?', [req.user.id, project.id]);
+  if (!existing) {
+    await run('INSERT INTO archived_projects (user_id, project_id) VALUES (?,?)', [req.user.id, project.id]);
+  }
+  res.json({ ok: true });
+});
+
+// 보관함에서 진행 목록으로 복원
+router.post('/:id/unarchive', requireAuth, async (req, res) => {
+  const project = await loadMyProject(req, res);
+  if (!project) return;
+  await run('DELETE FROM archived_projects WHERE user_id=? AND project_id=?', [req.user.id, project.id]);
+  res.json({ ok: true });
+});
+
+// 완료된 프로젝트를 완전히 삭제 (계약 당사자 양쪽 모두에게서 사라지며,
+// 연결된 리뷰·평점도 DB 외래키(CASCADE)로 함께 삭제됩니다. 되돌릴 수 없어요.)
+router.delete('/:id', requireAuth, async (req, res) => {
+  const project = await loadMyProject(req, res);
+  if (!project) return;
+  if (project.status !== '완료') {
+    return res.status(400).json({ error: '완료된 프로젝트만 삭제할 수 있어요.' });
+  }
+  await run('DELETE FROM projects WHERE id = ?', [project.id]);
+  res.json({ ok: true });
 });
 
 // 진행 단계는 3단계입니다: 1) 계약 체결  2) 프로젝트 진행  3) 프로젝트 완료

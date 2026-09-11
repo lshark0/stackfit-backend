@@ -213,3 +213,14 @@ CREATE TABLE IF NOT EXISTS saved_talents (
   UNIQUE(company_id, freelancer_id)
 );
 CREATE INDEX IF NOT EXISTS idx_saved_talents_company ON saved_talents(company_id);
+
+-- 완료된 프로젝트를 진행 목록에서 빼고 보관함으로 옮겨두는 기능(사용자별로 독립적).
+-- 프로젝트 자체는 지우지 않으므로 상대방의 목록과 평점 기록에는 영향이 없습니다.
+CREATE TABLE IF NOT EXISTS archived_projects (
+  id            SERIAL PRIMARY KEY,
+  user_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  project_id    INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(user_id, project_id)
+);
+CREATE INDEX IF NOT EXISTS idx_archived_projects_user ON archived_projects(user_id);
