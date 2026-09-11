@@ -134,12 +134,38 @@ router.patch('/jobs/:jobId/applicants/:applicationId', requireAuth, requireRole(
 
   const application = await get('SELECT * FROM applications WHERE id = ? AND job_id = ?', [req.params.applicationId, job.id]);
   if (!application) return res.status(404).json({ error: '지원 내역을 찾을 수 없습니다.' });
-  // 거절은 언제든 되돌릴 수 있지만, 수락은 이미 프로젝트가 만들어졌으므로 되돌릴 수 없습니다.
-  if (application.status === 'accepted') {
-    return res.status(400).json({ error: '이미 수락한 지원이에요. 진행 중인 프로젝트가 있어 되돌릴 수 없어요.' });
-  }
   if (application.status === status) {
     return res.status(400).json({ error: '이미 같은 상태예요.' });
+  }
+
+  // 수락 취소 — 계약이 아직 시작되지 않았을 때(계약서에 양측 모두 동의하기 전)만 되돌릴 수 있고,
+  // 되돌릴 때 만들어졌던 프로젝트도 함께 정리합니다. 이미 계약이 진행 중이면 프로젝트 관리에서 다뤄야 합니다.
+  if (application.status === 'accepted') {
+    if (status !== 'submitted') {
+      return res.status(400).json({ error: '수락을 취소한 뒤에 다시 시도해주세요.' });
+    }
+    const project = await get(
+      "SELECT * FROM projects WHERE job_id=? AND freelancer_id=? AND status != '완료' ORDER BY id DESC LIMIT 1",
+      [job.id, application.freelancer_id]
+    );
+    if (project && (project.stage !== 1 || project.company_agreed || project.freelancer_agreed)) {
+      return res.status(400).json({ error: '이미 계약이 진행되고 있어 수락을 취소할 수 없어요.' });
+    }
+    if (project) {
+      await run('DELETE FROM projects WHERE id = ?', [project.id]);
+    }
+    await run('UPDATE applications SET status = ? WHERE id = ?', [status, application.id]);
+    await addNotification(application.freelancer_id, {
+      tag: '지원결과', title: '합격이 취소됐어요',
+      body: `"${job.title}" 공고의 합격 결정이 취소돼 다시 검토 중이에요.`,
+      link: 'myApplications',
+    });
+    pushTo(application.freelancer_id, {
+      kind: 'result', title: '합격이 취소됐어요',
+      body: `"${job.title}" 공고의 합격 결정이 취소돼 다시 검토 중이에요.`,
+      tag: `result-${job.id}`, link: 'myApplications',
+    });
+    return res.json({ status });
   }
 
   await run('UPDATE applications SET status = ? WHERE id = ?', [status, application.id]);

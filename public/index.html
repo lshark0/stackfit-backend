@@ -1425,6 +1425,16 @@ async function decideApplicant(jobId, applicationId, status){
     go('applicants', jobId);
   }catch(e){ toast(e.message); }
 }
+// 수락 취소 — 계약이 아직 시작되지 않았을 때(계약서 동의 전)만 가능하며, 만들어졌던 프로젝트도 함께 정리됩니다.
+async function cancelAcceptance(jobId, applicationId){
+  showConfirm('수락을 취소할까요?\n계약이 아직 시작되지 않았을 때만 취소할 수 있고, 만들어졌던 프로젝트도 함께 정리돼요. 지원자에게도 알림이 가요.', async () => {
+    try{
+      await apiFetch(`/jobs/${jobId}/applicants/${applicationId}`, {method:'PATCH', body:{status:'submitted'}});
+      toast('수락을 취소했어요. 다시 검토중 상태예요');
+      go('applicants', jobId);
+    }catch(e){ toast(e.message); }
+  });
+}
 
 async function uploadResume(input){
   const file = input.files && input.files[0];
@@ -2771,6 +2781,11 @@ async function screenApplicants(){
             <button class="btn btn-primary" onclick="decideApplicant(${state.param}, ${a.application_id}, 'accepted')">수락으로 변경</button>
           </div>
           <div class="page-sub" style="margin-top:6px;">잘못 거절했다면 되돌릴 수 있어요.</div>` : ''}
+        ${a.status==='accepted'? `
+          <div style="display:flex; gap:8px; margin-top:12px;">
+            <button class="btn btn-outline" onclick="cancelAcceptance(${state.param}, ${a.application_id})">수락 취소</button>
+          </div>
+          <div class="page-sub" style="margin-top:6px;">계약서에 서로 동의하기 전까지는 수락을 취소할 수 있어요.</div>` : ''}
       </div>`).join('') || emptyArt(ART.noTalents, '아직 지원자가 없어요', '인재풀에서 직접 포지션을 제안해볼 수도 있어요.')}
   </div>`;
 }
