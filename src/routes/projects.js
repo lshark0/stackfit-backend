@@ -37,6 +37,8 @@ async function attachReviews(rows, userId) {
 // 합격 처리는 됐는데(지원 상태 accepted) 어떤 이유로든 프로젝트가 만들어지지 않았거나
 // 사라진 경우를 이 화면에서도 복구합니다 (지원자 관리·내 지원 현황과 동일한 안전장치).
 // 정상 흐름에서는 수락 시점에 항상 함께 생성되므로 평소엔 아무 일도 하지 않습니다.
+// 완료된 프로젝트가 이미 있어도 '있으면 그만'으로 판단합니다 — 완료 여부로 걸러내면
+// 완료된 건마다 이 화면을 열 때마다 중복 생성됩니다.
 async function repairMissingAcceptedProjects(userId, role) {
   const col = role === 'freelancer' ? 'a.freelancer_id' : 'j.company_id';
   const rows = await all(
@@ -46,11 +48,11 @@ async function repairMissingAcceptedProjects(userId, role) {
     [userId]
   );
   for (const r of rows) {
-    const activeProject = await get(
-      "SELECT id FROM projects WHERE job_id=? AND freelancer_id=? AND status != '완료'",
+    const existingProject = await get(
+      'SELECT id FROM projects WHERE job_id=? AND freelancer_id=?',
       [r.job_id, r.freelancer_id]
     );
-    if (!activeProject) {
+    if (!existingProject) {
       await run(
         'INSERT INTO projects (job_id, company_id, freelancer_id, title, rate, period, status, stage) VALUES (?,?,?,?,?,?,?,?)',
         [r.job_id, r.company_id, r.freelancer_id, r.title, r.rate, r.period, '진행중', 1]

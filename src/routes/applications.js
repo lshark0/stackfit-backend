@@ -83,10 +83,12 @@ router.delete('/jobs/:id/apply', requireAuth, requireRole('freelancer'), async (
 // 합격 처리는 됐는데(지원 상태 accepted) 어떤 이유로든 프로젝트가 만들어지지 않았거나
 // 사라진 경우를 그 자리에서 복구합니다. 정상 흐름에서는 수락 시점에 항상 함께 생성되므로
 // 평소엔 아무 일도 하지 않는, 데이터 정합성을 지키기 위한 보험 성격의 점검입니다.
+// 완료된 프로젝트가 이미 있어도(재계약 전까지는) 새로 만들지 않도록, '있으면 그만'으로
+// 판단합니다 — 완료 여부로 걸러내면 완료된 건마다 화면을 열 때마다 중복 생성됩니다.
 // 복구했거나 이미 있던 프로젝트를 반환해, 호출한 쪽에서 현재 계약 진행 단계를 함께 알 수 있게 합니다.
 async function ensureAcceptedProject(job, freelancerId) {
   let project = await get(
-    "SELECT * FROM projects WHERE job_id=? AND freelancer_id=? AND status != '완료' ORDER BY id DESC LIMIT 1",
+    'SELECT * FROM projects WHERE job_id=? AND freelancer_id=? ORDER BY id DESC LIMIT 1',
     [job.id, freelancerId]
   );
   if (!project) {
@@ -94,7 +96,7 @@ async function ensureAcceptedProject(job, freelancerId) {
       'INSERT INTO projects (job_id, company_id, freelancer_id, title, rate, period, status, stage) VALUES (?,?,?,?,?,?,?,?)',
       [job.id, job.company_id, freelancerId, job.title, job.rate, job.period, '진행중', 1]
     );
-    project = { stage: 1, company_agreed: 0, freelancer_agreed: 0 };
+    project = { status: '진행중', stage: 1, company_agreed: 0, freelancer_agreed: 0 };
   }
   return project;
 }
@@ -108,11 +110,22 @@ router.get('/me/applications', requireAuth, requireRole('freelancer'), async (re
      WHERE a.freelancer_id = ? ORDER BY a.created_at DESC, a.id DESC`,
     [req.user.id]
   );
+  // 합격한 지원 건은 연결된 프로젝트가 지금 어느 단계인지 함께 내려줘서,
+  // "내 지원 현황"에서도 실제 진행 상황에 맞는 안내를 보여줄 수 있게 합니다.
+  const projectStateById = {};
   for (const r of rows) {
-    if (r.application_status === 'accepted') await ensureAcceptedProject(r, req.user.id);
+    if (r.application_status === 'accepted') {
+      const project = await ensureAcceptedProject(r, req.user.id);
+      projectStateById[r.application_id] = { status: project.status, stage: project.stage };
+    }
   }
   res.json({
-    applications: rows.map(r => ({ ...r, status: r.application_status, stack: JSON.parse(r.stack_json) })),
+    applications: rows.map(r => ({
+      ...r,
+      status: r.application_status,
+      stack: JSON.parse(r.stack_json),
+      projectState: projectStateById[r.application_id] || null,
+    })),
   });
 });
 

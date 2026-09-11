@@ -2711,6 +2711,14 @@ async function deletePortfolio(id){
   });
 }
 
+// 합격한 지원 건의 실제 계약 진행 단계에 맞는 안내 문구를 만듭니다.
+function acceptedProjectHint(projectState){
+  if(!projectState) return '👉 눌러서 프로젝트 관리로 이동하세요.';
+  if(projectState.status === '완료') return '👉 프로젝트가 완료됐어요. 눌러서 프로젝트 관리에서 리뷰를 남겨보세요.';
+  if(projectState.stage === 2) return '👉 프로젝트가 진행 중이에요. 눌러서 프로젝트 관리에서 확인하세요.';
+  if(projectState.stage === 3) return '👉 완료 확인을 기다리고 있어요. 눌러서 프로젝트 관리에서 확인하세요.';
+  return '👉 눌러서 프로젝트 관리로 이동해 계약을 진행하세요.';
+}
 async function screenMyApplications(){
   const nc = await unreadCount();
   const data = await apiFetch('/me/applications');
@@ -2733,7 +2741,7 @@ async function screenMyApplications(){
           <span class="im">${I.wallet}<b>${esc(a.rate)}</b></span>
           <span class="im">${I.calendar}${(parseServerTime(a.created_at)||new Date()).toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric'})} 지원</span>
         </div>
-        ${a.status==='accepted' ? `<div class="page-sub" style="margin-top:8px;">👉 눌러서 프로젝트 관리로 이동해 계약을 진행하세요.</div>` : ''}
+        ${a.status==='accepted' ? `<div class="page-sub" style="margin-top:8px;">${acceptedProjectHint(a.projectState)}</div>` : ''}
       </div>`).join('') || emptyArt(ART.noJobs, '아직 지원한 공고가 없어요', '마음에 드는 공고에 지원해보세요.')}
   </div>${tabbar('home')}`;
 }
