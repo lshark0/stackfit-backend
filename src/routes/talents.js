@@ -53,7 +53,7 @@ router.get('/', requireAuth, requireRole('company'), async (req, res) => {
   const ratingById = await getRatingSummaries(talents.map((t) => t.user_id));
   const result = talents.map((t) => ({
     ...publicTalent(t),
-    match: jobStack.length ? computeMatch(jobStack, t.stack) : Math.round(55 + t.stack.length * 6),
+    match: jobStack.length ? computeMatch(jobStack, t.stack) : Math.min(99, Math.round(55 + t.stack.length * 6)),
     proposed: proposedIds.has(t.user_id),
     saved: savedIds.has(t.user_id),
     ...(ratingById[t.user_id] || { rating_avg: null, rating_count: 0 }),
@@ -80,7 +80,7 @@ router.get('/saved', requireAuth, requireRole('company'), async (req, res) => {
       return {
         ...publicTalent(t),
         stack,
-        match: Math.round(55 + stack.length * 6),
+        match: Math.min(99, Math.round(55 + stack.length * 6)),
         proposed: proposedIds.has(t.user_id),
         saved: true,
         ...(ratingById[t.user_id] || { rating_avg: null, rating_count: 0 }),
