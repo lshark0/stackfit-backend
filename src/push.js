@@ -47,7 +47,10 @@ async function sendPushToUser(userId, payload) {
   } catch (e) {
     return;
   }
-  if (!subs.length) return;
+  if (!subs.length) {
+    console.log(`[김프리] 푸시 생략: 사용자 ${userId}에게 등록된 기기가 없음 (${payload && payload.kind})`);
+    return;
+  }
 
   const body = JSON.stringify(payload);
   await Promise.all(
@@ -60,6 +63,7 @@ async function sendPushToUser(userId, payload) {
         await webpush.sendNotification(subscription, body);
       } catch (err) {
         const code = err && err.statusCode;
+        console.warn(`[김프리] 푸시 전송 실패: 사용자 ${userId}, 구독 ${s.id}, 상태 ${code || '-'} ${err && err.body ? String(err.body).slice(0, 120) : (err && err.message) || ''}`);
         if (code === 404 || code === 410) {
           // 사용자가 앱을 지웠거나 알림을 껐을 때 — 더 이상 쓸 수 없는 구독이라 삭제
           await run('DELETE FROM push_subscriptions WHERE id = ?', [s.id]).catch(() => {});
