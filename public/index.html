@@ -2751,8 +2751,6 @@ async function screenMypage(){
     <div class="section-label with-ic">${I.user}계정</div>
     <div class="list-item" onclick="go('${isCompany?'companyProfileEdit':'profileEdit'}')"><div class="li-l"><div class="li-icon">${I.user}</div><div class="li-tt">프로필 ${isCompany?'/ 회사 정보':'수정'}</div></div>${I.back}</div>
     ${!isCompany?`
-    <div class="list-item" onclick="go('myApplications')"><div class="li-l"><div class="li-icon">${I.checklist}</div><div class="li-tt">내 지원 현황</div></div>${I.back}</div>
-    <div class="list-item" onclick="go('receivedProposals')"><div class="li-l"><div class="li-icon">${I.bell}</div><div class="li-tt">받은 제안</div></div>${I.back}</div>
     <div class="list-item" onclick="go('proposalSettings')"><div class="li-l"><div class="li-icon">${I.gear}</div>
       <div><div class="li-tt">제안 설정</div><div class="page-sub" style="margin-top:2px;">${Number(profile.accept_proposals ?? 1)===1 ? '제안 받는 중' : '제안 받지 않음'}</div></div></div>${I.back}</div>` : ''}
     ${me.user.hasPassword ? `<div class="list-item" onclick="go('changePassword')"><div class="li-l"><div class="li-icon">${I.gear}</div><div class="li-tt">비밀번호 변경</div></div>${I.back}</div>` : ''}
