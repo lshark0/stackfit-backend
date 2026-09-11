@@ -2782,13 +2782,24 @@ async function screenMypage(){
   </div>${tabbar('mypage')}`;
 }
 
+// 눈 아이콘을 누르면 입력한 비밀번호를 보거나 다시 가릴 수 있는 입력칸
+function passwordField(id, label, placeholder, autocomplete){
+  return `<div class="form-field">
+    <label class="form-label">${label}</label>
+    <div style="position:relative;">
+      <input id="${id}" class="form-input" type="password" placeholder="${placeholder||''}" autocomplete="${autocomplete||'off'}" style="padding-right:44px;">
+      <div onclick="togglePasswordVisibility('${id}', this)" title="비밀번호 보기" role="button" aria-label="비밀번호 보기"
+        style="position:absolute; right:12px; top:50%; transform:translateY(-50%); cursor:pointer; color:var(--slate-light);">${I.eye}</div>
+    </div>
+  </div>`;
+}
 async function screenChangePassword(){
   return `${statusbar()}
   <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('mypage')">${I.back}</div><div class="page-title">비밀번호 변경</div></div></div>
   <div class="content">
-    <div class="form-field"><label class="form-label">현재 비밀번호</label><input id="cp-current" class="form-input" type="password"></div>
-    <div class="form-field"><label class="form-label">새 비밀번호</label><input id="cp-new" class="form-input" type="password" placeholder="영문+숫자 포함 8자 이상"></div>
-    <div class="form-field"><label class="form-label">새 비밀번호 확인</label><input id="cp-new-confirm" class="form-input" type="password"></div>
+    ${passwordField('cp-current', '현재 비밀번호', '현재 비밀번호', 'current-password')}
+    ${passwordField('cp-new', '새 비밀번호', '영문+숫자 포함 8자 이상', 'new-password')}
+    ${passwordField('cp-new-confirm', '새 비밀번호 확인', '새 비밀번호를 다시 입력해주세요', 'new-password')}
     <button class="btn btn-primary" onclick="submitChangePassword()">변경하기</button>
   </div>`;
 }
