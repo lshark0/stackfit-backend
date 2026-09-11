@@ -83,17 +83,20 @@ router.delete('/jobs/:id/apply', requireAuth, requireRole('freelancer'), async (
 // 합격 처리는 됐는데(지원 상태 accepted) 어떤 이유로든 프로젝트가 만들어지지 않았거나
 // 사라진 경우를 그 자리에서 복구합니다. 정상 흐름에서는 수락 시점에 항상 함께 생성되므로
 // 평소엔 아무 일도 하지 않는, 데이터 정합성을 지키기 위한 보험 성격의 점검입니다.
+// 복구했거나 이미 있던 프로젝트를 반환해, 호출한 쪽에서 현재 계약 진행 단계를 함께 알 수 있게 합니다.
 async function ensureAcceptedProject(job, freelancerId) {
-  const activeProject = await get(
-    "SELECT id FROM projects WHERE job_id=? AND freelancer_id=? AND status != '완료'",
+  let project = await get(
+    "SELECT * FROM projects WHERE job_id=? AND freelancer_id=? AND status != '완료' ORDER BY id DESC LIMIT 1",
     [job.id, freelancerId]
   );
-  if (!activeProject) {
+  if (!project) {
     await run(
       'INSERT INTO projects (job_id, company_id, freelancer_id, title, rate, period, status, stage) VALUES (?,?,?,?,?,?,?,?)',
       [job.id, job.company_id, freelancerId, job.title, job.rate, job.period, '진행중', 1]
     );
+    project = { stage: 1, company_agreed: 0, freelancer_agreed: 0 };
   }
+  return project;
 }
 
 router.get('/me/applications', requireAuth, requireRole('freelancer'), async (req, res) => {
@@ -123,8 +126,13 @@ router.get('/jobs/:id/applicants', requireAuth, requireRole('company'), async (r
      WHERE a.job_id = ? ORDER BY a.created_at DESC`,
     [req.params.id]
   );
+  // 수락 취소는 계약서에 양측 모두 동의하기 전(stage 1, 미동의)까지만 가능합니다.
+  // 이미 계약이 진행된 뒤에는 취소 버튼을 보여줘도 눌러보면 실패하므로, 여기서 미리 판단해 내려줍니다.
+  const canCancelById = {};
   for (const r of rows) {
-    if (r.status === 'accepted') await ensureAcceptedProject(job, r.freelancer_id);
+    if (r.status !== 'accepted') continue;
+    const project = await ensureAcceptedProject(job, r.freelancer_id);
+    canCancelById[r.freelancer_id] = project.stage === 1 && !project.company_agreed && !project.freelancer_agreed;
   }
   res.json({
     job: { id: job.id, title: job.title },
@@ -139,6 +147,7 @@ router.get('/jobs/:id/applicants', requireAuth, requireRole('company'), async (r
         stack,
         match: computeMatch(jobStack, stack),
         resume_url: signedFileUrl(r.resume_filename),
+        canCancelAcceptance: r.status === 'accepted' ? !!canCancelById[r.freelancer_id] : false,
       };
     }),
   });

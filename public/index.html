@@ -2782,11 +2782,13 @@ async function screenApplicants(){
             <button class="btn btn-primary" onclick="decideApplicant(${state.param}, ${a.application_id}, 'accepted')">수락으로 변경</button>
           </div>
           <div class="page-sub" style="margin-top:6px;">잘못 거절했다면 되돌릴 수 있어요.</div>` : ''}
-        ${a.status==='accepted'? `
+        ${a.status==='accepted' ? (a.canCancelAcceptance ? `
           <div style="display:flex; gap:8px; margin-top:12px;">
             <button class="btn btn-outline" onclick="cancelAcceptance(${state.param}, ${a.application_id})">수락 취소</button>
           </div>
-          <div class="page-sub" style="margin-top:6px;">계약서에 서로 동의하기 전까지는 수락을 취소할 수 있어요.</div>` : ''}
+          <div class="page-sub" style="margin-top:6px;">계약서에 서로 동의하기 전까지는 수락을 취소할 수 있어요.</div>` : `
+          <button class="btn btn-primary" style="margin-top:12px;" onclick="go('projects')">프로젝트 관리에서 계약 진행하기</button>
+          <div class="page-sub" style="margin-top:6px;">이미 계약이 진행 중이라 수락을 취소할 수 없어요.</div>`) : ''}
       </div>`).join('') || emptyArt(ART.noTalents, '아직 지원자가 없어요', '인재풀에서 직접 포지션을 제안해볼 수도 있어요.')}
   </div>`;
 }
