@@ -3,7 +3,7 @@ const { run, get, all } = require('../db');
 const { signedFileUrl } = require('../fileAccess');
 const { requireAuth, requireRole } = require('../middleware/requireAuth');
 const { wrapAllRoutes } = require('../middleware/asyncHandler');
-const { computeMatch } = require('../match');
+const { computeMatch, breadthMatch } = require('../match');
 const { getRatingSummary, getRatingSummaries } = require('../ratings');
 const { sortPortfoliosByPeriod } = require('../periodSort');
 const { matchesCategory } = require('../stackCatalog');
@@ -53,7 +53,7 @@ router.get('/', requireAuth, requireRole('company'), async (req, res) => {
   const ratingById = await getRatingSummaries(talents.map((t) => t.user_id));
   const result = talents.map((t) => ({
     ...publicTalent(t),
-    match: jobStack.length ? computeMatch(jobStack, t.stack) : Math.min(99, Math.round(55 + t.stack.length * 6)),
+    match: jobStack.length ? computeMatch(jobStack, t.stack) : breadthMatch(t.stack.length),
     proposed: proposedIds.has(t.user_id),
     saved: savedIds.has(t.user_id),
     ...(ratingById[t.user_id] || { rating_avg: null, rating_count: 0 }),
@@ -80,7 +80,7 @@ router.get('/saved', requireAuth, requireRole('company'), async (req, res) => {
       return {
         ...publicTalent(t),
         stack,
-        match: Math.min(99, Math.round(55 + stack.length * 6)),
+        match: breadthMatch(stack.length),
         proposed: proposedIds.has(t.user_id),
         saved: true,
         ...(ratingById[t.user_id] || { rating_avg: null, rating_count: 0 }),
