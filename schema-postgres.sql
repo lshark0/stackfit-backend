@@ -224,3 +224,15 @@ CREATE TABLE IF NOT EXISTS archived_projects (
   UNIQUE(user_id, project_id)
 );
 CREATE INDEX IF NOT EXISTS idx_archived_projects_user ON archived_projects(user_id);
+
+-- 완료된 프로젝트를 "삭제"하는 기능도 사용자별로 독립적입니다.
+-- 실제 프로젝트 레코드는 지우지 않아 상대방의 목록·리뷰·평점에는 영향이 없고,
+-- 삭제한 사람의 화면(진행 목록·보관함 모두)에서만 더 이상 보이지 않습니다.
+CREATE TABLE IF NOT EXISTS deleted_projects (
+  id            SERIAL PRIMARY KEY,
+  user_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  project_id    INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(user_id, project_id)
+);
+CREATE INDEX IF NOT EXISTS idx_deleted_projects_user ON deleted_projects(user_id);

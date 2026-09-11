@@ -37,12 +37,13 @@ async function attachReviews(rows, userId) {
 router.get('/', requireAuth, async (req, res) => {
   const col = req.user.role === 'freelancer' ? 'freelancer_id' : 'company_id';
   // 진행 중인 프로젝트를 항상 위에 보여줍니다 (완료된 건에 새 계약이 묻히지 않도록).
-  // 내가 보관함으로 옮긴 완료 프로젝트는 여기서 빠집니다 (아래 /archived 에서 조회).
+  // 내가 보관함으로 옮겼거나 삭제한 완료 프로젝트는 여기서 빠집니다.
   const rows = await all(
     `SELECT * FROM projects WHERE ${col} = ?
        AND id NOT IN (SELECT project_id FROM archived_projects WHERE user_id = ?)
+       AND id NOT IN (SELECT project_id FROM deleted_projects WHERE user_id = ?)
      ORDER BY (CASE WHEN status = '완료' THEN 1 ELSE 0 END), created_at DESC, id DESC`,
-    [req.user.id, req.user.id]
+    [req.user.id, req.user.id, req.user.id]
   );
   res.json({ projects: await attachReviews(rows, req.user.id) });
 });
@@ -53,8 +54,9 @@ router.get('/archived', requireAuth, async (req, res) => {
   const rows = await all(
     `SELECT * FROM projects WHERE ${col} = ?
        AND id IN (SELECT project_id FROM archived_projects WHERE user_id = ?)
+       AND id NOT IN (SELECT project_id FROM deleted_projects WHERE user_id = ?)
      ORDER BY completed_at DESC, id DESC`,
-    [req.user.id, req.user.id]
+    [req.user.id, req.user.id, req.user.id]
   );
   res.json({ projects: await attachReviews(rows, req.user.id) });
 });
@@ -81,15 +83,19 @@ router.post('/:id/unarchive', requireAuth, async (req, res) => {
   res.json({ ok: true });
 });
 
-// 완료된 프로젝트를 완전히 삭제 (계약 당사자 양쪽 모두에게서 사라지며,
-// 연결된 리뷰·평점도 DB 외래키(CASCADE)로 함께 삭제됩니다. 되돌릴 수 없어요.)
+// 완료된 프로젝트를 삭제 — 직접 삭제한 사람의 화면(진행 목록·보관함)에서만 사라집니다.
+// 프로젝트 레코드 자체는 지우지 않으므로 계약 상대방의 목록과 서로 남긴 리뷰·평점에는 영향이 없어요.
 router.delete('/:id', requireAuth, async (req, res) => {
   const project = await loadMyProject(req, res);
   if (!project) return;
   if (project.status !== '완료') {
     return res.status(400).json({ error: '완료된 프로젝트만 삭제할 수 있어요.' });
   }
-  await run('DELETE FROM projects WHERE id = ?', [project.id]);
+  await run('DELETE FROM archived_projects WHERE user_id=? AND project_id=?', [req.user.id, project.id]);
+  const existing = await get('SELECT id FROM deleted_projects WHERE user_id=? AND project_id=?', [req.user.id, project.id]);
+  if (!existing) {
+    await run('INSERT INTO deleted_projects (user_id, project_id) VALUES (?,?)', [req.user.id, project.id]);
+  }
   res.json({ ok: true });
 });
 

@@ -2368,7 +2368,7 @@ async function unarchiveProject(id){
   }catch(e){ toast(e.message); }
 }
 async function deleteProject(id){
-  showConfirm('이 프로젝트를 삭제할까요?\n계약·진행 기록과 서로 남긴 리뷰·평점도 함께 사라지며 되돌릴 수 없어요.', async () => {
+  showConfirm('이 프로젝트를 삭제할까요?\n내 목록에서만 사라지며, 상대방의 목록과 서로 남긴 리뷰·평점에는 영향이 없어요. 되돌릴 수 없어요.', async () => {
     try{
       await apiFetch(`/projects/${id}`, {method:'DELETE'});
       toast('프로젝트가 삭제됐어요');
