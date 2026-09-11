@@ -34,8 +34,34 @@ async function attachReviews(rows, userId) {
   });
 }
 
+// 합격 처리는 됐는데(지원 상태 accepted) 어떤 이유로든 프로젝트가 만들어지지 않았거나
+// 사라진 경우를 이 화면에서도 복구합니다 (지원자 관리·내 지원 현황과 동일한 안전장치).
+// 정상 흐름에서는 수락 시점에 항상 함께 생성되므로 평소엔 아무 일도 하지 않습니다.
+async function repairMissingAcceptedProjects(userId, role) {
+  const col = role === 'freelancer' ? 'a.freelancer_id' : 'j.company_id';
+  const rows = await all(
+    `SELECT a.freelancer_id, j.id AS job_id, j.company_id, j.title, j.rate, j.period
+     FROM applications a JOIN jobs j ON j.id = a.job_id
+     WHERE a.status = 'accepted' AND ${col} = ?`,
+    [userId]
+  );
+  for (const r of rows) {
+    const activeProject = await get(
+      "SELECT id FROM projects WHERE job_id=? AND freelancer_id=? AND status != '완료'",
+      [r.job_id, r.freelancer_id]
+    );
+    if (!activeProject) {
+      await run(
+        'INSERT INTO projects (job_id, company_id, freelancer_id, title, rate, period, status, stage) VALUES (?,?,?,?,?,?,?,?)',
+        [r.job_id, r.company_id, r.freelancer_id, r.title, r.rate, r.period, '진행중', 1]
+      );
+    }
+  }
+}
+
 router.get('/', requireAuth, async (req, res) => {
   const col = req.user.role === 'freelancer' ? 'freelancer_id' : 'company_id';
+  await repairMissingAcceptedProjects(req.user.id, req.user.role);
   // 진행 중인 프로젝트를 항상 위에 보여줍니다 (완료된 건에 새 계약이 묻히지 않도록).
   // 내가 보관함으로 옮겼거나 삭제한 완료 프로젝트는 여기서 빠집니다.
   const rows = await all(

@@ -80,6 +80,22 @@ router.delete('/jobs/:id/apply', requireAuth, requireRole('freelancer'), async (
   res.json({ applied: false });
 });
 
+// 합격 처리는 됐는데(지원 상태 accepted) 어떤 이유로든 프로젝트가 만들어지지 않았거나
+// 사라진 경우를 그 자리에서 복구합니다. 정상 흐름에서는 수락 시점에 항상 함께 생성되므로
+// 평소엔 아무 일도 하지 않는, 데이터 정합성을 지키기 위한 보험 성격의 점검입니다.
+async function ensureAcceptedProject(job, freelancerId) {
+  const activeProject = await get(
+    "SELECT id FROM projects WHERE job_id=? AND freelancer_id=? AND status != '완료'",
+    [job.id, freelancerId]
+  );
+  if (!activeProject) {
+    await run(
+      'INSERT INTO projects (job_id, company_id, freelancer_id, title, rate, period, status, stage) VALUES (?,?,?,?,?,?,?,?)',
+      [job.id, job.company_id, freelancerId, job.title, job.rate, job.period, '진행중', 1]
+    );
+  }
+}
+
 router.get('/me/applications', requireAuth, requireRole('freelancer'), async (req, res) => {
   const rows = await all(
     `SELECT a.id AS application_id, a.status AS application_status, a.created_at, j.*, c.name AS org
@@ -89,6 +105,9 @@ router.get('/me/applications', requireAuth, requireRole('freelancer'), async (re
      WHERE a.freelancer_id = ? ORDER BY a.created_at DESC, a.id DESC`,
     [req.user.id]
   );
+  for (const r of rows) {
+    if (r.application_status === 'accepted') await ensureAcceptedProject(r, req.user.id);
+  }
   res.json({
     applications: rows.map(r => ({ ...r, status: r.application_status, stack: JSON.parse(r.stack_json) })),
   });
@@ -104,6 +123,9 @@ router.get('/jobs/:id/applicants', requireAuth, requireRole('company'), async (r
      WHERE a.job_id = ? ORDER BY a.created_at DESC`,
     [req.params.id]
   );
+  for (const r of rows) {
+    if (r.status === 'accepted') await ensureAcceptedProject(job, r.freelancer_id);
+  }
   res.json({
     job: { id: job.id, title: job.title },
     applicants: rows.map(r => {
