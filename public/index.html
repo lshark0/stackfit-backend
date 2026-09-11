@@ -996,8 +996,8 @@ function talentCard(t){
           <div style="margin-top:5px; display:flex; flex-wrap:wrap; gap:5px; align-items:center;">
             ${dutyBadge(t.role_title)}
             ${t.verified?`<span class="sbadge verified">${I.verified}인증됨</span>`:''}
-            ${t.proposed?`<span class="sbadge proposed">${I.sent}제안완료</span>`:''}
-            ${t.accept_proposals===0?`<span class="sbadge fail">제안 받지 않음</span>`:''}
+            ${t.proposed?`<span class="sbadge proposed">${I.sent}제안완료</span>`
+              : t.accept_proposals===0?`<span class="sbadge fail">제안 받지 않음</span>`:''}
           </div>
         </div>
       </div>
@@ -2200,8 +2200,8 @@ async function screenTalentDetail(){
         <div style="margin-top:7px; display:flex; flex-wrap:wrap; gap:5px; align-items:center;">
           ${gradeBadge(t.grade)}
           ${t.verified?`<span class="sbadge verified">${I.verified}인증됨</span>`:''}
-          ${t.proposed?`<span class="sbadge proposed">${I.sent}제안완료</span>`:''}
-          ${!t.accept_proposals?`<span class="sbadge fail">제안 받지 않음</span>`:''}
+          ${t.proposed?`<span class="sbadge proposed">${I.sent}제안완료</span>`
+            : !t.accept_proposals?`<span class="sbadge fail">제안 받지 않음</span>`:''}
         </div>
         <div style="margin-top:6px;">${ratingBadge(t.rating_avg, t.rating_count)}</div>
       </div>
