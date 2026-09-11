@@ -3021,6 +3021,8 @@ async function screenProfileEdit(){
           ${(pf.client||pf.role_title) ? `<div class="card-org">${esc(pf.client||'')}${pf.client&&pf.role_title?' · ':''}${esc(pf.role_title||'')}</div>` : ''}
           ${pf.period?`<div class="meta-row" style="margin-top:6px;"><span>${I.clock}${esc(pf.period)}</span></div>`:''}
           ${pf.stack.length?`<div class="tag-row">${pf.stack.map(x=>`<span class="tag">${esc(x)}</span>`).join('')}</div>`:''}
+          ${pf.description?`<div class="para" style="margin-top:8px;">${esc(pf.description)}</div>`:''}
+          ${pf.link_url?`<a href="${esc(pf.link_url)}" target="_blank" rel="noopener noreferrer" class="page-sub" style="display:inline-block; margin-top:8px; color:var(--ink); text-decoration:underline;">🔗 관련 링크 열기</a>`:''}
           <div style="display:flex; gap:6px; margin-top:10px;">
             <button class="btn btn-outline" style="width:auto; padding:8px 13px; font-size:12px;" onclick="openPortfolioEdit(${pf.id})">수정</button>
             <button class="btn btn-outline" style="width:auto; padding:8px 13px; font-size:12px; border-color:var(--danger); color:var(--danger);" onclick="deletePortfolio(${pf.id})">삭제</button>
