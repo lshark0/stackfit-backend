@@ -5,6 +5,7 @@ const { run, get, all } = require('../db');
 const { signedFileUrl } = require('../fileAccess');
 const { requireAuth, requireRole } = require('../middleware/requireAuth');
 const { wrapAllRoutes } = require('../middleware/asyncHandler');
+const { normalizeMobile, normalizePhone, normalizeEmail } = require('../contact');
 
 const router = express.Router();
 wrapAllRoutes(router);
@@ -84,23 +85,70 @@ router.get('/views', requireAuth, requireRole('freelancer'), async (req, res) =>
 });
 
 router.get('/', requireAuth, async (req, res) => {
+  // 가입 이메일은 연락용 이메일을 아직 입력하지 않았을 때 기본값으로 채워주기 위해 함께 내려줍니다.
+  const account = await get('SELECT email FROM users WHERE id = ?', [req.user.id]);
+  // (이메일을 제공하지 않는 소셜 계정의 임시 주소는 실제 연락처가 아니므로 제외)
+  const accountEmail = account && !String(account.email).endsWith('@stackfit.local') ? account.email : '';
   if (req.user.role === 'freelancer') {
     const p = await get('SELECT * FROM freelancer_profiles WHERE user_id = ?', [req.user.id]);
+    // eslint-disable-next-line no-unused-vars
+    const { resume_data, ...rest } = p; // 파일 원본은 화면에 필요 없으므로 응답에서 제외
     return res.json({
-      ...p,
+      ...rest,
+      account_email: accountEmail,
       stack: JSON.parse(p.stack_json),
       certs: JSON.parse(p.certs_json || '[]'),
       resume_url: signedFileUrl(p.resume_filename),
     });
   }
   const c = await get('SELECT * FROM companies WHERE user_id = ?', [req.user.id]);
-  res.json(c);
+  res.json({ ...c, account_email: accountEmail });
+});
+
+// [프리랜서] 제안 받기 설정 — 제안 수신 여부와, 기업에게 공개할 연락 수단(휴대폰/이메일)
+router.put('/proposal-settings', requireAuth, requireRole('freelancer'), async (req, res) => {
+  const current = await get(
+    'SELECT phone, email, accept_proposals, share_phone, share_email FROM freelancer_profiles WHERE user_id = ?',
+    [req.user.id]
+  );
+  const { accept_proposals, share_phone, share_email } = req.body || {};
+  const flag = (v, fallback) => (v === undefined ? Number(fallback) : (v ? 1 : 0));
+  const next = {
+    accept_proposals: flag(accept_proposals, current.accept_proposals ?? 1),
+    share_phone: flag(share_phone, current.share_phone ?? 0),
+    share_email: flag(share_email, current.share_email ?? 0),
+  };
+  // 등록하지 않은 연락처는 공개할 수 없습니다.
+  if (next.share_phone && !current.phone) {
+    return res.status(400).json({ error: '프로필 수정에서 휴대폰 번호를 먼저 등록해주세요.', code: 'NO_PHONE' });
+  }
+  if (next.share_email && !current.email) {
+    return res.status(400).json({ error: '프로필 수정에서 이메일을 먼저 등록해주세요.', code: 'NO_EMAIL' });
+  }
+  await run(
+    'UPDATE freelancer_profiles SET accept_proposals=?, share_phone=?, share_email=? WHERE user_id=?',
+    [next.accept_proposals, next.share_phone, next.share_email, req.user.id]
+  );
+  res.json(next);
 });
 
 router.put('/', requireAuth, async (req, res) => {
   if (req.user.role === 'freelancer') {
-    const { name, role_title, years, rate, stack, summary, grade, certs } = req.body || {};
+    const { name, role_title, years, rate, stack, summary, grade, certs, phone, email } = req.body || {};
     const current = await get('SELECT * FROM freelancer_profiles WHERE user_id = ?', [req.user.id]);
+
+    // 휴대폰은 필수, 이메일은 선택입니다.
+    let nextPhone = current.phone || '';
+    if (phone !== undefined) {
+      nextPhone = normalizeMobile(phone);
+      if (!nextPhone) return res.status(400).json({ error: '휴대폰 번호를 정확히 입력해주세요. (예: 010-1234-5678)' });
+    }
+    if (!nextPhone) return res.status(400).json({ error: '휴대폰 번호는 필수 항목이에요.' });
+    let nextEmail = current.email || '';
+    if (email !== undefined) {
+      nextEmail = normalizeEmail(email);
+      if (nextEmail === null) return res.status(400).json({ error: '이메일 형식이 올바르지 않아요.' });
+    }
 
     let nextStack = Array.isArray(stack) ? stack : JSON.parse(current.stack_json);
     nextStack = nextStack
@@ -126,7 +174,7 @@ router.put('/', requireAuth, async (req, res) => {
       stackCount: nextStack.length, hasResume: !!current.resume_filename,
     });
     await run(
-      `UPDATE freelancer_profiles SET name=?, role_title=?, years=?, rate=?, stack_json=?, certs_json=?, summary=?, grade=?, completion=? WHERE user_id=?`,
+      `UPDATE freelancer_profiles SET name=?, role_title=?, years=?, rate=?, stack_json=?, certs_json=?, summary=?, grade=?, completion=?, phone=?, email=? WHERE user_id=?`,
       [
         name !== undefined ? clamp(name, 60, current.name) : current.name,
         nextRoleTitle,
@@ -137,21 +185,57 @@ router.put('/', requireAuth, async (req, res) => {
         nextSummary,
         nextGrade,
         completion,
+        nextPhone,
+        nextEmail,
         req.user.id,
       ]
     );
+    // 연락처를 지웠다면 공개 설정도 함께 꺼서, 빈 연락처가 공개로 남지 않게 합니다.
+    if (!nextEmail) await run('UPDATE freelancer_profiles SET share_email=0 WHERE user_id=?', [req.user.id]);
     const updated = await get('SELECT * FROM freelancer_profiles WHERE user_id = ?', [req.user.id]);
-    return res.json({ ...updated, stack: JSON.parse(updated.stack_json), certs: JSON.parse(updated.certs_json || '[]') });
+    // eslint-disable-next-line no-unused-vars
+    const { resume_data, ...rest } = updated;
+    return res.json({ ...rest, stack: JSON.parse(updated.stack_json), certs: JSON.parse(updated.certs_json || '[]') });
   }
 
-  const { name, contact_person, description } = req.body || {};
+  const { name, contact_person, description, position, company_phone, phone, email, address } = req.body || {};
   const current = await get('SELECT * FROM companies WHERE user_id = ?', [req.user.id]);
-  await run('UPDATE companies SET name=?, contact_person=?, description=? WHERE user_id=?', [
-    name !== undefined ? clamp(name, 60, current.name) : current.name,
-    contact_person !== undefined ? clamp(contact_person, 60, current.contact_person) : current.contact_person,
-    description !== undefined ? clamp(description, 500, current.description) : current.description,
-    req.user.id,
-  ]);
+
+  // 담당자 휴대폰은 필수, 회사전화·이메일·주소는 선택입니다.
+  let nextPhone = current.phone || '';
+  if (phone !== undefined) {
+    nextPhone = normalizeMobile(phone);
+    if (!nextPhone) return res.status(400).json({ error: '휴대폰 번호를 정확히 입력해주세요. (예: 010-1234-5678)' });
+  }
+  if (!nextPhone) return res.status(400).json({ error: '담당자 휴대폰 번호는 필수 항목이에요.' });
+  let nextCompanyPhone = current.company_phone || '';
+  if (company_phone !== undefined) {
+    if (String(company_phone).trim() === '') nextCompanyPhone = '';
+    else {
+      nextCompanyPhone = normalizePhone(company_phone);
+      if (!nextCompanyPhone) return res.status(400).json({ error: '회사 전화번호를 정확히 입력해주세요. (예: 02-1234-5678)' });
+    }
+  }
+  let nextEmail = current.email || '';
+  if (email !== undefined) {
+    nextEmail = normalizeEmail(email);
+    if (nextEmail === null) return res.status(400).json({ error: '이메일 형식이 올바르지 않아요.' });
+  }
+
+  await run(
+    'UPDATE companies SET name=?, contact_person=?, description=?, contact_position=?, company_phone=?, phone=?, email=?, address=? WHERE user_id=?',
+    [
+      name !== undefined ? clamp(name, 60, current.name) : current.name,
+      contact_person !== undefined ? clamp(contact_person, 60, current.contact_person) : current.contact_person,
+      description !== undefined ? clamp(description, 500, current.description) : current.description,
+      position !== undefined ? clamp(String(position).trim(), 40, current.contact_position || '') : (current.contact_position || ''),
+      nextCompanyPhone,
+      nextPhone,
+      nextEmail,
+      address !== undefined ? clamp(String(address).trim(), 200, current.address || '') : (current.address || ''),
+      req.user.id,
+    ]
+  );
   res.json(await get('SELECT * FROM companies WHERE user_id = ?', [req.user.id]));
 });
 

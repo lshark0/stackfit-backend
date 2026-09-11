@@ -77,6 +77,20 @@ if (USE_POSTGRES) {
     await ensureColumnPg('freelancer_profiles', 'certs_json', "TEXT NOT NULL DEFAULT '[]'");
     await ensureColumnPg('users', 'oauth_provider', 'TEXT');
     await ensureColumnPg('users', 'oauth_id', 'TEXT');
+    // 알림을 누르면 이동할 화면 링크
+    await ensureColumnPg('notifications', 'link', 'TEXT');
+    // 프리랜서 연락처 + 제안 받기 설정
+    await ensureColumnPg('freelancer_profiles', 'phone', "TEXT NOT NULL DEFAULT ''");
+    await ensureColumnPg('freelancer_profiles', 'email', "TEXT NOT NULL DEFAULT ''");
+    await ensureColumnPg('freelancer_profiles', 'accept_proposals', 'INTEGER NOT NULL DEFAULT 1');
+    await ensureColumnPg('freelancer_profiles', 'share_phone', 'INTEGER NOT NULL DEFAULT 0');
+    await ensureColumnPg('freelancer_profiles', 'share_email', 'INTEGER NOT NULL DEFAULT 0');
+    // 기업 담당자/회사 연락처
+    await ensureColumnPg('companies', 'contact_position', "TEXT NOT NULL DEFAULT ''");
+    await ensureColumnPg('companies', 'company_phone', "TEXT NOT NULL DEFAULT ''");
+    await ensureColumnPg('companies', 'phone', "TEXT NOT NULL DEFAULT ''");
+    await ensureColumnPg('companies', 'email', "TEXT NOT NULL DEFAULT ''");
+    await ensureColumnPg('companies', 'address', "TEXT NOT NULL DEFAULT ''");
     await pool.query(
       'CREATE UNIQUE INDEX IF NOT EXISTS idx_users_oauth ON users(oauth_provider, oauth_id) WHERE oauth_provider IS NOT NULL'
     );
@@ -132,6 +146,18 @@ if (USE_POSTGRES) {
     try { db.exec("ALTER TABLE freelancer_profiles ADD COLUMN certs_json TEXT NOT NULL DEFAULT '[]'"); } catch (e) {}
     try { db.exec('ALTER TABLE users ADD COLUMN oauth_provider TEXT'); } catch (e) {}
     try { db.exec('ALTER TABLE users ADD COLUMN oauth_id TEXT'); } catch (e) {}
+    const addCol = (table, col, ddl) => { try { db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${ddl}`); } catch (e) {} };
+    addCol('notifications', 'link', 'TEXT');
+    addCol('freelancer_profiles', 'phone', "TEXT NOT NULL DEFAULT ''");
+    addCol('freelancer_profiles', 'email', "TEXT NOT NULL DEFAULT ''");
+    addCol('freelancer_profiles', 'accept_proposals', 'INTEGER NOT NULL DEFAULT 1');
+    addCol('freelancer_profiles', 'share_phone', 'INTEGER NOT NULL DEFAULT 0');
+    addCol('freelancer_profiles', 'share_email', 'INTEGER NOT NULL DEFAULT 0');
+    addCol('companies', 'contact_position', "TEXT NOT NULL DEFAULT ''");
+    addCol('companies', 'company_phone', "TEXT NOT NULL DEFAULT ''");
+    addCol('companies', 'phone', "TEXT NOT NULL DEFAULT ''");
+    addCol('companies', 'email', "TEXT NOT NULL DEFAULT ''");
+    addCol('companies', 'address', "TEXT NOT NULL DEFAULT ''");
     try {
       db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_oauth ON users(oauth_provider, oauth_id) WHERE oauth_provider IS NOT NULL');
     } catch (e) {}

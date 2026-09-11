@@ -1,4 +1,4 @@
-const CACHE_NAME = 'kimfree-shell-v8';
+const CACHE_NAME = 'kimfree-shell-v9';
 // manifest.json은 캐시하지 않습니다. 낡은 앱 이름/아이콘 정보가 남아
 // 브라우저가 예전 앱으로 잘못 인식하는 것을 막기 위함입니다.
 const SHELL_FILES = ['/icons/icon-192.png', '/icons/icon-512.png'];
@@ -102,22 +102,29 @@ self.addEventListener('push', (event) => {
     renotify: true,
     requireInteraction: false,
     vibrate: [120, 60, 120],
-    data: { url: data.url || '/' },
+    // 알림을 눌렀을 때 이동할 화면 (예: 'chatRoom:12')
+    data: { url: data.url || '/', link: data.link || null },
   };
   event.waitUntil(self.registration.showNotification(heading, options));
 });
 
-// 알림을 탭하면 이미 열려있는 앱 창으로 이동하고, 없으면 새로 엽니다.
+// 알림을 탭하면 관련 화면으로 바로 이동합니다.
+// - 앱이 이미 열려 있으면: 그 창을 앞으로 가져온 뒤 해당 화면으로 이동하라고 알려줍니다.
+// - 앱이 닫혀 있으면: 이동할 화면 정보가 담긴 주소(/?go=화면&p=번호)로 새로 엽니다.
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const targetUrl = (event.notification.data && event.notification.data.url) || '/';
+  const data = event.notification.data || {};
+  const targetUrl = data.url || '/';
+  const link = data.link || null;
 
-  event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      for (const client of clientList) {
-        if ('focus' in client) return client.focus();
-      }
-      if (self.clients.openWindow) return self.clients.openWindow(targetUrl);
-    })
-  );
+  event.waitUntil((async () => {
+    const clientList = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    const client = clientList.find((c) => 'focus' in c);
+    if (client) {
+      try { await client.focus(); } catch (e) {}
+      if (link) client.postMessage({ type: 'OPEN_LINK', link });
+      return;
+    }
+    if (self.clients.openWindow) await self.clients.openWindow(targetUrl);
+  })());
 });

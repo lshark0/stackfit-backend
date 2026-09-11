@@ -3,7 +3,7 @@ const { run, get, all } = require('../db');
 const { requireAuth } = require('../middleware/requireAuth');
 const { wrapAllRoutes } = require('../middleware/asyncHandler');
 const crypto = require('crypto');
-const { sendPushToUser } = require('../push');
+const { addNotification, pushTo } = require('../notify');
 const { signedFileUrl } = require('../fileAccess');
 const { EXT_LABEL, extOf, createDocUpload, isValidDocument, fixFilenameEncoding } = require('../docUpload');
 
@@ -56,9 +56,10 @@ async function loadMyProject(req, res) {
 
 const nowStr = () => new Date().toISOString().slice(0, 19).replace('T', ' ');
 
+// 프로젝트 관련 알림은 누르면 '프로젝트 관리' 화면으로 이동합니다.
 async function notify(userId, tag, title, body) {
-  await run('INSERT INTO notifications (user_id, tag, title, body) VALUES (?,?,?,?)', [userId, tag, title, body]).catch(() => {});
-  sendPushToUser(userId, { kind: 'result', title, body, url: '/', tag: 'project' }).catch(() => {});
+  await addNotification(userId, { tag, title, body, link: 'projects' });
+  pushTo(userId, { kind: 'result', title, body, tag: 'project', link: 'projects' });
 }
 
 // [1단계] 계약 조건에 동의 — 기업과 프리랜서가 각자 눌러야 하며, 둘 다 동의해야 다음 단계로 넘어갑니다.
@@ -196,9 +197,11 @@ router.post('/:id/review', requireAuth, async (req, res) => {
     'INSERT INTO reviews (project_id, reviewer_id, reviewee_id, rating, comment) VALUES (?,?,?,?,?)',
     [project.id, req.user.id, revieweeId, r, safeComment]
   );
-  await run('INSERT INTO notifications (user_id, tag, title, body) VALUES (?,?,?,?)', [
-    revieweeId, '리뷰', '새 리뷰가 도착했어요', `"${project.title}" 프로젝트에 대한 리뷰(★${r})가 등록됐습니다.`,
-  ]);
+  await addNotification(revieweeId, {
+    tag: '리뷰', title: '새 리뷰가 도착했어요',
+    body: `"${project.title}" 프로젝트에 대한 리뷰(★${r})가 등록됐습니다.`,
+    link: 'projects',
+  });
 
   res.status(201).json({ ok: true });
 });

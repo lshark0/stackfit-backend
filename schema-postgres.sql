@@ -203,3 +203,13 @@ CREATE TABLE IF NOT EXISTS app_settings (
 );
 
 CREATE INDEX IF NOT EXISTS idx_push_user ON push_subscriptions(user_id);
+
+-- 기업이 관심 있는 인재를 즐겨찾기 (관심 인재)
+CREATE TABLE IF NOT EXISTS saved_talents (
+  id            SERIAL PRIMARY KEY,
+  company_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  freelancer_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(company_id, freelancer_id)
+);
+CREATE INDEX IF NOT EXISTS idx_saved_talents_company ON saved_talents(company_id);

@@ -108,6 +108,12 @@ router.get('/', optionalAuth, async (req, res) => {
     applied: appliedJobIds.has(j.id),
     saved: savedJobIds.has(j.id),
   }));
+  // 프리랜서에게는 매칭률이 높은 공고부터 보여줍니다.
+  // 매칭률이 같으면 기존 순서(최신 등록순)를 유지하고, 마감된 공고는 뒤로 보냅니다.
+  if (req.user && req.user.role === 'freelancer') {
+    const closed = (j) => (j.d_day === '마감' ? 1 : 0);
+    result.sort((a, b) => closed(a) - closed(b) || b.match - a.match);
+  }
 
   const finalResult = req.query.saved === 'true' ? result.filter(j => j.saved) : result;
   res.json({ jobs: finalResult });

@@ -4,7 +4,8 @@ const { signedFileUrl } = require('../fileAccess');
 const { computeMatch } = require('../match');
 const { requireAuth, requireRole } = require('../middleware/requireAuth');
 const { wrapAllRoutes } = require('../middleware/asyncHandler');
-const { sendPushToUser } = require('../push');
+const { addNotification, pushTo } = require('../notify');
+const { publicTalent } = require('../contact');
 
 const router = express.Router();
 wrapAllRoutes(router);
@@ -34,6 +35,7 @@ router.post('/jobs/:id/apply', requireAuth, requireRole('freelancer'), async (re
   if (!myProfile || JSON.parse(myProfile.stack_json || '[]').length === 0) missing.push('기술스택');
   if (!myProfile || !String(myProfile.summary || '').trim()) missing.push('자기 소개');
   if (!myProfile || !myProfile.resume_filename) missing.push('경력기술서');
+  if (!myProfile || !String(myProfile.phone || '').trim()) missing.push('휴대폰');
   if (missing.length) {
     return res.status(400).json({
       error: `지원하려면 프로필을 먼저 완성해주세요. (${missing.join(', ')})`,
@@ -45,19 +47,23 @@ router.post('/jobs/:id/apply', requireAuth, requireRole('freelancer'), async (re
   await run('INSERT INTO applications (job_id, freelancer_id) VALUES (?,?)', [jobId, req.user.id]);
 
   const profile = await get('SELECT name FROM freelancer_profiles WHERE user_id = ?', [req.user.id]);
-  await run('INSERT INTO notifications (user_id, tag, title, body) VALUES (?,?,?,?)', [
-    job.company_id, '지원', '새 지원자가 있어요', `${profile.name}님이 "${job.title}" 공고에 지원했습니다.`,
-  ]);
-  sendPushToUser(job.company_id, {
+  await addNotification(job.company_id, {
+    tag: '지원', title: '새 지원자가 있어요',
+    body: `${profile.name}님이 "${job.title}" 공고에 지원했습니다.`,
+    link: `applicants:${job.id}`,
+  });
+  pushTo(job.company_id, {
     kind: 'applicant',
     title: '🙋 새 지원자 도착',
     body: `${profile.name}님이 "${job.title}" 공고에 지원했어요.`,
-    url: '/',
     tag: `applicant-${job.id}`,
-  }).catch(() => {});
-  await run('INSERT INTO notifications (user_id, tag, title, body) VALUES (?,?,?,?)', [
-    req.user.id, '지원', '지원이 접수되었어요', `"${job.title}" 공고에 지원이 완료됐습니다.`,
-  ]);
+    link: `applicants:${job.id}`,
+  });
+  await addNotification(req.user.id, {
+    tag: '지원', title: '지원이 접수되었어요',
+    body: `"${job.title}" 공고에 지원이 완료됐습니다.`,
+    link: 'myApplications',
+  });
 
   res.status(201).json({ applied: true });
 });
@@ -103,7 +109,7 @@ router.get('/jobs/:id/applicants', requireAuth, requireRole('company'), async (r
     applicants: rows.map(r => {
       const stack = r.stack_json ? JSON.parse(r.stack_json) : [];
       return {
-        ...r,
+        ...publicTalent(r),
         user_id: r.user_id ?? r.freelancer_id,
         name: r.name || '(탈퇴한 회원)',
         role_title: r.role_title || '',
@@ -147,19 +153,20 @@ router.patch('/jobs/:jobId/applicants/:applicationId', requireAuth, requireRole(
   const resultBody = status === 'accepted'
     ? `"${job.title}" 공고에 합격하셨습니다. 프로젝트가 생성됐어요.`
     : `"${job.title}" 공고에는 아쉽게도 채용이 어려워요.`;
-  await run('INSERT INTO notifications (user_id, tag, title, body) VALUES (?,?,?,?)', [
-    application.freelancer_id,
-    status === 'accepted' ? '합격' : '지원결과',
-    resultTitle,
-    resultBody,
-  ]);
-  sendPushToUser(application.freelancer_id, {
+  const resultLink = status === 'accepted' ? 'projects' : 'myApplications';
+  await addNotification(application.freelancer_id, {
+    tag: status === 'accepted' ? '합격' : '지원결과',
+    title: resultTitle,
+    body: resultBody,
+    link: resultLink,
+  });
+  pushTo(application.freelancer_id, {
     kind: 'result',
     title: status === 'accepted' ? '🎉 지원이 수락됐어요' : '📢 지원 결과 도착',
     body: resultBody,
-    url: '/',
     tag: `result-${job.id}`,
-  }).catch(() => {});
+    link: resultLink,
+  });
 
   if (status === 'accepted') {
     // 같은 공고·같은 사람이라도 이전 계약이 이미 '완료'됐다면 재계약이므로 새 프로젝트를 만듭니다.

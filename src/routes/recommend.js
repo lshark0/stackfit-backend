@@ -4,6 +4,7 @@ const { requireAuth, requireRole } = require('../middleware/requireAuth');
 const { wrapAllRoutes } = require('../middleware/asyncHandler');
 const { signedFileUrl } = require('../fileAccess');
 const { recommendTalentsForJob, recommendJobsForProfile } = require('../recommend');
+const { publicTalent } = require('../contact');
 
 const router = express.Router();
 wrapAllRoutes(router);
@@ -40,7 +41,7 @@ router.get('/talents', requireAuth, requireRole('company'), async (req, res) => 
   const talents = await recommendTalentsForJob(target, 5);
   res.json({
     job: { id: job.id, title: job.title },
-    talents: talents.map((t) => ({ ...t, resume_url: signedFileUrl(t.resume_filename) })),
+    talents: talents.map((t) => ({ ...publicTalent(t), resume_url: signedFileUrl(t.resume_filename) })),
   });
 });
 

@@ -2,7 +2,8 @@ const express = require('express');
 const { run, get, all } = require('../db');
 const { requireAuth, requireRole } = require('../middleware/requireAuth');
 const { wrapAllRoutes } = require('../middleware/asyncHandler');
-const { sendPushToUser } = require('../push');
+const { addNotification, pushTo } = require('../notify');
+const { publicTalent } = require('../contact');
 
 const router = express.Router();
 wrapAllRoutes(router);
@@ -14,6 +15,10 @@ router.post('/talents/:userId/propose', requireAuth, requireRole('company'), asy
 
   const talent = await get('SELECT * FROM freelancer_profiles WHERE user_id = ?', [freelancerId]);
   if (!talent) return res.status(404).json({ error: '프로필을 찾을 수 없습니다.' });
+  // 프리랜서가 '제안 받지 않기'로 설정해두었다면 제안을 보낼 수 없습니다.
+  if (Number(talent.accept_proposals ?? 1) !== 1) {
+    return res.status(403).json({ error: '이 인재는 현재 제안을 받지 않고 있어요.', code: 'NOT_ACCEPTING' });
+  }
 
   // 공고를 지정한 경우, 본인 기업의 실제 공고가 맞는지 확인합니다.
   let safeJobId = null;
@@ -34,17 +39,19 @@ router.post('/talents/:userId/propose', requireAuth, requireRole('company'), asy
   ]);
 
   const company = await get('SELECT name FROM companies WHERE user_id = ?', [req.user.id]);
-  await run('INSERT INTO notifications (user_id, tag, title, body) VALUES (?,?,?,?)', [
-    freelancerId, '제안', '새로운 제안이 도착했어요', `${company ? company.name : '한 기업'}에서 포지션을 제안했습니다.`,
-  ]);
+  await addNotification(freelancerId, {
+    tag: '제안', title: '새로운 제안이 도착했어요',
+    body: `${company ? company.name : '한 기업'}에서 포지션을 제안했습니다.`,
+    link: 'receivedProposals',
+  });
 
-  sendPushToUser(freelancerId, {
+  pushTo(freelancerId, {
     kind: 'proposal',
     title: '📨 새 포지션 제안',
     body: `${company ? company.name : '한 기업'}에서 포지션을 제안했어요. 앱에서 확인해보세요.`,
-    url: '/',
     tag: 'proposal',
-  }).catch(() => {});
+    link: 'receivedProposals',
+  });
 
   res.status(201).json({ proposed: true });
 });
@@ -69,6 +76,51 @@ router.delete('/talents/:userId/propose', requireAuth, requireRole('company'), a
   );
 
   res.json({ proposed: false });
+});
+
+// 내가(기업) 보낸 제안 목록 — 응답 상태와, 수락된 건은 바로 대화할 수 있도록 채팅방 정보를 함께 내려줍니다.
+router.get('/proposals/sent', requireAuth, requireRole('company'), async (req, res) => {
+  const rows = await all(
+    `SELECT p.id, p.created_at, p.job_id, p.freelancer_id, p.status, p.message, p.decline_reason, p.responded_at,
+            j.title AS job_title
+     FROM proposals p
+     LEFT JOIN jobs j ON j.id = p.job_id
+     WHERE p.company_id = ?
+     ORDER BY (CASE WHEN p.status = 'accepted' THEN 0 WHEN p.status = 'sent' THEN 1 ELSE 2 END),
+              p.created_at DESC, p.id DESC`,
+    [req.user.id]
+  );
+  if (!rows.length) return res.json({ proposals: [] });
+
+  // N+1 방지: 프리랜서 프로필과 대화방을 한 번에 모아 메모리에서 조합합니다.
+  const fIds = [...new Set(rows.map((r) => r.freelancer_id))];
+  const ph = fIds.map(() => '?').join(',');
+  const profiles = await all(`SELECT * FROM freelancer_profiles WHERE user_id IN (${ph})`, fIds);
+  const profileById = Object.fromEntries(profiles.map((f) => [f.user_id, publicTalent(f)]));
+  const convs = await all(
+    `SELECT id, freelancer_id, job_id FROM conversations WHERE company_id = ? AND freelancer_id IN (${ph})`,
+    [req.user.id, ...fIds]
+  );
+
+  res.json({
+    proposals: rows.map((r) => {
+      const f = profileById[r.freelancer_id] || null;
+      // 제안한 공고의 대화방을 우선 찾고, 없으면 같은 사람과의 다른 대화방이라도 연결합니다.
+      const conv = convs.find((c) => c.freelancer_id === r.freelancer_id && (c.job_id || null) === (r.job_id || null))
+        || convs.find((c) => c.freelancer_id === r.freelancer_id);
+      return {
+        ...r,
+        freelancer_name: f ? f.name : '(탈퇴한 회원)',
+        role_title: f ? f.role_title : '',
+        grade: f ? f.grade : null,
+        stack: f ? JSON.parse(f.stack_json || '[]') : [],
+        // 수락한 경우에만 프리랜서가 공개로 설정한 연락처를 보여줍니다.
+        contact_phone: r.status === 'accepted' && f ? f.contact_phone : null,
+        contact_email: r.status === 'accepted' && f ? f.contact_email : null,
+        conversation_id: r.status === 'accepted' && conv ? conv.id : null,
+      };
+    }),
+  });
 });
 
 // 내가(프리랜서) 받은 제안 목록
@@ -146,13 +198,19 @@ router.post('/proposals/:id/accept', requireAuth, requireRole('freelancer'), asy
     conv = await get('SELECT * FROM conversations WHERE id = ?', [r.lastInsertRowid]);
   }
 
+  // 기업이 채팅 탭에서 바로 알아볼 수 있도록, 수락 사실을 대화방의 첫 메시지로 남깁니다.
+  const job = proposal.job_id ? await get('SELECT title FROM jobs WHERE id = ?', [proposal.job_id]) : null;
+  const opening = job
+    ? `📌 제안을 수락했어요.\n"${job.title}" 포지션의 세부 조건을 이야기 나눠요.`
+    : '📌 제안을 수락했어요.\n세부 조건을 이야기 나눠요.';
+  await run('INSERT INTO messages (conversation_id, sender_id, body) VALUES (?,?,?)', [conv.id, req.user.id, opening]);
+
   const body = `${who}님이 제안을 수락했어요. 채팅으로 세부 조건을 논의해보세요.`;
-  await run('INSERT INTO notifications (user_id, tag, title, body) VALUES (?,?,?,?)', [
-    proposal.company_id, '제안', '제안이 수락됐어요', body,
-  ]);
-  sendPushToUser(proposal.company_id, {
-    kind: 'result', title: '🎉 제안이 수락됐어요', body, url: '/', tag: `proposal-${proposal.id}`,
-  }).catch(() => {});
+  const link = `chatRoom:${conv.id}`;
+  await addNotification(proposal.company_id, { tag: '제안', title: '제안이 수락됐어요', body, link });
+  pushTo(proposal.company_id, {
+    kind: 'result', title: '🎉 제안이 수락됐어요', body, tag: `proposal-${proposal.id}`, link,
+  });
 
   res.json({ status: 'accepted', conversationId: conv.id });
 });
@@ -172,12 +230,10 @@ router.post('/proposals/:id/decline', requireAuth, requireRole('freelancer'), as
   const profile = await get('SELECT name FROM freelancer_profiles WHERE user_id = ?', [req.user.id]);
   const who = profile ? profile.name : '프리랜서';
   const body = `${who}님이 제안을 거절했어요. (사유: ${reason})`;
-  await run('INSERT INTO notifications (user_id, tag, title, body) VALUES (?,?,?,?)', [
-    proposal.company_id, '제안', '제안이 거절됐어요', body,
-  ]);
-  sendPushToUser(proposal.company_id, {
-    kind: 'result', title: '제안 결과가 도착했어요', body, url: '/', tag: `proposal-${proposal.id}`,
-  }).catch(() => {});
+  await addNotification(proposal.company_id, { tag: '제안', title: '제안이 거절됐어요', body, link: 'sentProposals' });
+  pushTo(proposal.company_id, {
+    kind: 'result', title: '제안 결과가 도착했어요', body, tag: `proposal-${proposal.id}`, link: 'sentProposals',
+  });
 
   res.json({ status: 'declined', reason });
 });

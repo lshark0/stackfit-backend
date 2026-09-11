@@ -2,7 +2,7 @@ const express = require('express');
 const { run, get, all } = require('../db');
 const { requireAuth } = require('../middleware/requireAuth');
 const { wrapAllRoutes } = require('../middleware/asyncHandler');
-const { sendPushToUser } = require('../push');
+const { pushTo } = require('../notify');
 
 const router = express.Router();
 wrapAllRoutes(router);
@@ -154,20 +154,20 @@ router.post('/:id/messages', requireAuth, async (req, res) => {
       body.trim().slice(0, 40), new Date().toISOString().slice(0, 19).replace('T', ' '), existing.id,
     ]);
   } else {
-    await run('INSERT INTO notifications (user_id, tag, title, body) VALUES (?,?,?,?)', [
-      counterpartId, '메시지', `${senderName}님의 새 메시지`, body.trim().slice(0, 40),
+    await run('INSERT INTO notifications (user_id, tag, title, body, link) VALUES (?,?,?,?,?)', [
+      counterpartId, '메시지', `${senderName}님의 새 메시지`, body.trim().slice(0, 40), `chatRoom:${conv.id}`,
     ]);
   }
 
   // 앱을 보고 있지 않아도 알 수 있도록 휴대폰 알림(푸시)을 보냅니다.
   // 실패해도 메시지 전송 자체는 성공 처리합니다.
-  sendPushToUser(counterpartId, {
+  pushTo(counterpartId, {
     kind: 'chat',
     title: `💬 ${senderName}님의 메시지`,
     body: body.trim().slice(0, 100),
-    url: '/',
     tag: `chat-${conv.id}`,
-  }).catch(() => {});
+    link: `chatRoom:${conv.id}`,
+  });
 
   const msgs = await all('SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at ASC, id ASC', [conv.id]);
   res.status(201).json({ messages: msgs });
