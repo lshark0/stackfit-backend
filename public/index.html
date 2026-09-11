@@ -2722,7 +2722,7 @@ async function screenMyApplications(){
   return `${statusbar()}${header("내 지원 현황", `${data.applications.length}건 지원`, {back:'home'}, nc)}
   <div class="content">
     ${data.applications.map(a=>`
-      <div class="card clickable" onclick="go('jobDetail', ${a.id})">
+      <div class="card clickable" onclick="${a.status==='accepted' ? `go('projects')` : `go('jobDetail', ${a.id})`}">
         <div class="card-top">
           <div style="min-width:0;"><div class="card-title">${esc(a.title)}</div><div class="card-org">${esc(a.org||'')}</div></div>
           ${badge[a.status] || `<span class="sbadge fail">${esc(a.status)}</span>`}
@@ -2733,6 +2733,7 @@ async function screenMyApplications(){
           <span class="im">${I.wallet}<b>${esc(a.rate)}</b></span>
           <span class="im">${I.calendar}${(parseServerTime(a.created_at)||new Date()).toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric'})} 지원</span>
         </div>
+        ${a.status==='accepted' ? `<div class="page-sub" style="margin-top:8px;">👉 눌러서 프로젝트 관리로 이동해 계약을 진행하세요.</div>` : ''}
       </div>`).join('') || emptyArt(ART.noJobs, '아직 지원한 공고가 없어요', '마음에 드는 공고에 지원해보세요.')}
   </div>${tabbar('home')}`;
 }
