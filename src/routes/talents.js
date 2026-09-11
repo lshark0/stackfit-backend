@@ -59,6 +59,7 @@ router.get('/', requireAuth, requireRole('company'), async (req, res) => {
     ...(ratingById[t.user_id] || { rating_avg: null, rating_count: 0 }),
   }));
 
+  result.sort((a, b) => b.match - a.match);
   res.json({ talents: result });
 });
 
