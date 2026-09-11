@@ -1291,32 +1291,27 @@ async function screenProposeForm(){
       </div>
     </div>
 
-    ${jobs.length ? `
-      <div class="form-field">
-        <label class="form-label">어떤 공고로 제안하시나요?</label>
-        <select id="pp-job" class="form-input">
-          ${jobs.map(j=>`<option value="${j.id}">${esc(j.title)}${[j.duty, j.grade, j.rate].filter(Boolean).length ? ' · ' + [j.duty, j.grade, j.rate].filter(Boolean).map(esc).join(' · ') : ''}</option>`).join('')}
-        </select>
-        <div class="page-sub" style="margin-top:5px;">선택한 공고의 조건이 상대방에게 함께 전달돼요.</div>
-      </div>
-      <div class="form-field">
-        <label class="form-label">전하실 말씀</label>
-        <textarea id="pp-message" class="form-input" style="min-height:120px;" placeholder="예: 이번 클라우드 전환 프로젝트에 TA로 참여해주실 수 있을까요? 보유하신 AWS 경험이 저희 요구사항과 잘 맞아 연락드립니다."></textarea>
-        <div class="page-sub" style="margin-top:5px;">왜 이분께 제안하는지 적어주면 수락 확률이 높아져요. (선택)</div>
-      </div>
-      <button class="btn btn-primary" style="display:flex; align-items:center; justify-content:center; gap:7px;" onclick="sendProposal(${userId})">${I.sent}제안 보내기</button>
-    ` : `
-      <div class="reco-empty" style="text-align:left; margin-top:12px;">
-        <b style="color:var(--ink);">먼저 공고를 등록해주세요</b>
-        <div style="margin-top:6px;">어떤 프로젝트인지 있어야 제안할 수 있어요.</div>
-        <button class="btn btn-primary" style="margin-top:10px;" onclick="go('jobPost')">공고 등록하러 가기</button>
-      </div>`}
+    <div class="form-field">
+      <label class="form-label">어떤 공고로 제안하시나요?</label>
+      <select id="pp-job" class="form-input">
+        <option value="">공고 없이 제안하기</option>
+        ${jobs.map(j=>`<option value="${j.id}">${esc(j.title)}${[j.duty, j.grade, j.rate].filter(Boolean).length ? ' · ' + [j.duty, j.grade, j.rate].filter(Boolean).map(esc).join(' · ') : ''}</option>`).join('')}
+      </select>
+      <div class="page-sub" style="margin-top:5px;">${jobs.length ? '선택한 공고의 조건이 상대방에게 함께 전달돼요. 특정 공고 없이 제안할 수도 있어요.' : '등록한 공고가 없어도 제안할 수 있어요.'}</div>
+    </div>
+    <div class="form-field">
+      <label class="form-label">전하실 말씀</label>
+      <textarea id="pp-message" class="form-input" style="min-height:120px;" placeholder="예: 이번 클라우드 전환 프로젝트에 TA로 참여해주실 수 있을까요? 보유하신 AWS 경험이 저희 요구사항과 잘 맞아 연락드립니다."></textarea>
+      <div class="page-sub" style="margin-top:5px;">왜 이분께 제안하는지 적어주면 수락 확률이 높아져요. (선택)</div>
+    </div>
+    <button class="btn btn-primary" style="display:flex; align-items:center; justify-content:center; gap:7px;" onclick="sendProposal(${userId})">${I.sent}제안 보내기</button>
     <div style="height:20px;"></div>
   </div>`;
 }
 
 async function sendProposal(userId){
-  const jobId = Number(document.getElementById('pp-job').value);
+  const jobSel = document.getElementById('pp-job').value;
+  const jobId = jobSel ? Number(jobSel) : null;
   const message = document.getElementById('pp-message').value.trim();
   try{
     await apiFetch(`/talents/${userId}/propose`, {method:'POST', body:{ jobId, message }});
