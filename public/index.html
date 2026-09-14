@@ -2872,7 +2872,6 @@ async function screenMypage(){
       </div>
       <label class="switch"><input type="checkbox" ${pushOn?'checked':''} onchange="togglePush(this)"><span class="slider"></span></label>
     </div>
-    ${pushOn ? `<div class="list-item" onclick="testPush()"><div class="li-l"><div class="li-icon">${I.checkCircle}</div><div class="li-tt">알림 테스트 보내기</div></div>${I.back}</div>` : ''}
     ${pushBroken ? `<div class="list-item" onclick="repairPush()"><div class="li-l"><div class="li-icon">${I.gear}</div><div><div class="li-tt">알림이 안 오면 여기를 눌러주세요</div><div class="page-sub" style="margin-top:2px;">알림 기능을 처음부터 다시 설치해요</div></div></div>${I.back}</div>` : ''}
     ${!pushOn && Notification.permission === 'denied' ? `<div class="reco-empty" style="margin-top:8px; text-align:left;">알림이 <b>차단</b>되어 있어요.<br>브라우저 주소창 왼쪽 자물쇠 → 알림 → 허용으로 바꿔주세요.</div>` : ''}` :
     `<div class="reco-empty" style="margin-top:8px; text-align:left;">이 브라우저에서는 푸시 알림을 쓸 수 없어요.<br><b>아이폰</b>은 Safari에서 공유 → "홈 화면에 추가"로 앱을 설치한 뒤 열면 사용할 수 있어요.</div>`}
@@ -3334,12 +3333,6 @@ async function togglePush(el){
   const ok = on ? await enablePush() : await disablePush();
   if(!ok) el.checked = !on; // 실패하면 스위치를 원래대로 되돌립니다
 }
-async function testPush(){
-  try{
-    await apiFetch('/push/test', {method:'POST'});
-    toast('테스트 알림을 보냈어요. 잠시 후 알림창을 확인해주세요.');
-  }catch(e){ toast(e.message); }
-}
 // 낡은 서비스워커가 남아 알림이 안 오는 경우를 위한 복구 기능.
 // 기존 등록을 모두 지우고 최신 버전으로 다시 설치한 뒤 알림을 재등록합니다.
 async function repairPush(){
@@ -3366,7 +3359,7 @@ async function repairPush(){
       const reg = await navigator.serviceWorker.register('/service-worker.js', { updateViaCache: 'none' });
       await navigator.serviceWorker.ready;
       await enablePush();
-      toast('다시 설치했어요. 알림 테스트를 눌러보세요.');
+      toast('알림 기능을 다시 설치했어요.');
       render();
     }catch(e){ toast('복구 실패: ' + e.message); }
   });

@@ -87,7 +87,6 @@ self.addEventListener('push', (event) => {
     proposal: '📨 포지션 제안',
     applicant: '🙋 새 지원자',
     result: '📢 지원 결과',
-    test: '🔔 알림 테스트',
   };
   const kind = data.kind || 'chat';
   const heading = data.title || kindLabel[kind] || '김프리';
