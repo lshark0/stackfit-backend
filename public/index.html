@@ -2829,9 +2829,17 @@ async function screenMypage(){
   const [profile, me] = await Promise.all([apiFetch('/profile'), apiFetch('/auth/me')]);
   // 이 기기에서 알림이 켜져 있는지 확인 (브라우저 권한 + 실제 구독 여부 둘 다 확인)
   const canPush = pushSupported();
-  const pushOn = canPush && Notification.permission === 'granted' && !!(await getPushSubscription());
+  let pushOn = canPush && Notification.permission === 'granted' && !!(await getPushSubscription());
   // 알림이 켜진 기기라면, 서버에도 '지금 로그인한 계정'의 기기로 등록돼 있도록 맞춰둡니다.
   if(pushOn) syncPushSubscription();
+  // 예전에 알림을 켠 적 있는데 지금은 구독이 사라진 경우(오래된 서비스워커 등)를 실제 문제로 보고,
+  // 먼저 조용히 재등록을 시도합니다. 그걸로 고쳐지면 아무것도 보여주지 않고, 안 되면 그때만
+  // "복구" 버튼을 보여줍니다 — 평소엔 이 메뉴 자체가 안 보입니다.
+  let pushBroken = false;
+  if(canPush && Notification.permission === 'granted' && !pushOn && everPushEnabled()){
+    const fixed = await enablePush({silent:true}).catch(()=>false);
+    if(fixed) pushOn = true; else pushBroken = true;
+  }
   return `${statusbar()}${header("마이페이지","",{bell:false})}
   <div class="content">
     <div class="mypage-head">
@@ -2865,7 +2873,7 @@ async function screenMypage(){
       <label class="switch"><input type="checkbox" ${pushOn?'checked':''} onchange="togglePush(this)"><span class="slider"></span></label>
     </div>
     ${pushOn ? `<div class="list-item" onclick="testPush()"><div class="li-l"><div class="li-icon">${I.checkCircle}</div><div class="li-tt">알림 테스트 보내기</div></div>${I.back}</div>` : ''}
-    ${canPush ? `<div class="list-item" onclick="repairPush()"><div class="li-l"><div class="li-icon">${I.gear}</div><div><div class="li-tt">알림이 안 오면 여기를 눌러주세요</div><div class="page-sub" style="margin-top:2px;">알림 기능을 처음부터 다시 설치해요</div></div></div>${I.back}</div>` : ''}
+    ${pushBroken ? `<div class="list-item" onclick="repairPush()"><div class="li-l"><div class="li-icon">${I.gear}</div><div><div class="li-tt">알림이 안 오면 여기를 눌러주세요</div><div class="page-sub" style="margin-top:2px;">알림 기능을 처음부터 다시 설치해요</div></div></div>${I.back}</div>` : ''}
     ${!pushOn && Notification.permission === 'denied' ? `<div class="reco-empty" style="margin-top:8px; text-align:left;">알림이 <b>차단</b>되어 있어요.<br>브라우저 주소창 왼쪽 자물쇠 → 알림 → 허용으로 바꿔주세요.</div>` : ''}` :
     `<div class="reco-empty" style="margin-top:8px; text-align:left;">이 브라우저에서는 푸시 알림을 쓸 수 없어요.<br><b>아이폰</b>은 Safari에서 공유 → "홈 화면에 추가"로 앱을 설치한 뒤 열면 사용할 수 있어요.</div>`}
     <div class="list-item" onclick="logout()"><div class="li-l"><div class="li-icon">${I.logout}</div><div class="li-tt">로그아웃</div></div></div>
@@ -3275,15 +3283,20 @@ async function getPushSubscription(){
     return await reg.pushManager.getSubscription();
   }catch(e){ return null; }
 }
-async function enablePush(){
+// 알림을 한 번이라도 성공적으로 켠 적 있는 기기인지 기억해둡니다.
+// (예전에 켰었는데 지금은 구독이 사라졌다 = 실제 문제, 처음부터 꺼져있었다 = 정상)
+function markPushEverEnabled(){ try{ localStorage.setItem('stackfit_push_ever_enabled', '1'); }catch(e){} }
+function everPushEnabled(){ try{ return localStorage.getItem('stackfit_push_ever_enabled') === '1'; }catch(e){ return false; } }
+async function enablePush(opts){
+  const silent = !!(opts && opts.silent);
   if(!pushSupported()){
-    toast('이 브라우저에서는 알림을 지원하지 않아요');
+    if(!silent) toast('이 브라우저에서는 알림을 지원하지 않아요');
     return false;
   }
   try{
     const permission = await Notification.requestPermission();
     if(permission !== 'granted'){
-      toast('알림이 차단되어 있어요. 브라우저 설정에서 허용해주세요.');
+      if(!silent) toast('알림이 차단되어 있어요. 브라우저 설정에서 허용해주세요.');
       return false;
     }
     const { publicKey } = await apiFetch('/push/public-key');
@@ -3297,10 +3310,11 @@ async function enablePush(){
     }
     const json = sub.toJSON();
     await apiFetch('/push/subscribe', {method:'POST', body:{ endpoint: json.endpoint, keys: json.keys }});
-    toast('알림이 켜졌어요');
+    markPushEverEnabled();
+    if(!silent) toast('알림이 켜졌어요');
     return true;
   }catch(e){
-    toast('알림 설정에 실패했어요: ' + e.message);
+    if(!silent) toast('알림 설정에 실패했어요: ' + e.message);
     return false;
   }
 }
