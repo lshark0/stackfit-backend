@@ -109,13 +109,16 @@ router.get('/', optionalAuth, async (req, res) => {
     saved: savedJobIds.has(j.id),
   }));
   // 프리랜서에게는 매칭률이 높은 공고부터 보여줍니다.
-  // 매칭률이 같을 때만 마감된 공고를 뒤로 보냅니다.
   if (req.user && req.user.role === 'freelancer') {
-    const closed = (j) => (j.d_day === '마감' ? 1 : 0);
-    result.sort((a, b) => b.match - a.match || closed(a) - closed(b));
+    result.sort((a, b) => b.match - a.match);
   }
 
-  const finalResult = req.query.saved === 'true' ? result.filter(j => j.saved) : result;
+  let finalResult = req.query.saved === 'true' ? result.filter(j => j.saved) : result;
+  // 공고 탐색(매칭률 순) 목록에서는 마감된 공고를 제외합니다.
+  // 단, 저장한 공고 목록에서는 계속 볼 수 있도록 둡니다.
+  if (req.user && req.user.role === 'freelancer' && req.query.saved !== 'true') {
+    finalResult = finalResult.filter(j => j.d_day !== '마감');
+  }
   res.json({ jobs: finalResult });
 });
 
