@@ -4,6 +4,7 @@ const { requireAuth } = require('../middleware/requireAuth');
 const { requireAdmin } = require('../middleware/requireAdmin');
 const { wrapAllRoutes } = require('../middleware/asyncHandler');
 const { addNotification, pushTo } = require('../notify');
+const { signedFileUrl } = require('../fileAccess');
 
 const router = express.Router();
 wrapAllRoutes(router);
@@ -15,7 +16,8 @@ const todayStr = () => new Date().toISOString().slice(0, 10);
 // 여기서는 신고된 공고 목록을 처리대기가 먼저 오도록 정렬해 보여줍니다.
 router.get('/job-reports', requireAuth, requireAdmin, async (req, res) => {
   const rows = await all(
-    `SELECT r.id, r.reason, r.status, r.created_at, r.resolved_at, r.admin_note,
+    `SELECT r.id, r.reason, r.content, r.reply_email, r.status, r.created_at, r.resolved_at, r.admin_note,
+       r.attachment_filename, r.attachment_original_name,
        j.id AS job_id, j.title AS job_title, j.status AS job_status,
        c.name AS company_name, c.user_id AS company_id,
        f.name AS reporter_name, r.freelancer_id AS reporter_id
@@ -25,7 +27,9 @@ router.get('/job-reports', requireAuth, requireAdmin, async (req, res) => {
      LEFT JOIN freelancer_profiles f ON f.user_id = r.freelancer_id
      ORDER BY (r.status = 'pending') DESC, r.created_at DESC, r.id DESC`
   );
-  res.json({ reports: rows });
+  res.json({
+    reports: rows.map((r) => ({ ...r, attachment_url: signedFileUrl(r.attachment_filename) })),
+  });
 });
 
 // 신고 처리: 반려(dismiss) / 공고 마감(close_job) / 공고 삭제(delete_job) 중 하나를 선택합니다.

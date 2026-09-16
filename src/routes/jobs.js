@@ -1,4 +1,6 @@
 const express = require('express');
+const crypto = require('crypto');
+const multer = require('multer');
 const { run, get, all } = require('../db');
 const { requireAuth, requireRole } = require('../middleware/requireAuth');
 const { wrapAllRoutes } = require('../middleware/asyncHandler');
@@ -6,6 +8,25 @@ const { verifyToken } = require('../auth');
 const { computeMatch } = require('../match');
 const { matchesCategory } = require('../stackCatalog');
 const { getRatingSummary, getRatingSummaries } = require('../ratings');
+const { signedFileUrl } = require('../fileAccess');
+const { normalizeEmail } = require('../contact');
+
+// 잡코리아 문의·신고 양식과 동일한 첨부 가능 파일 종류(용량 10MB)
+const REPORT_ATTACH_EXT = ['.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.hwp', '.jpg', '.jpeg', '.gif', '.png', '.pdf', '.zip'];
+const reportUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const ext = ('.' + (file.originalname.split('.').pop() || '')).toLowerCase();
+    if (!REPORT_ATTACH_EXT.includes(ext)) {
+      return cb(new Error('MS Office, 한글(HWP), jpg, gif, png, pdf, zip 파일만 첨부할 수 있어요.'));
+    }
+    cb(null, true);
+  },
+});
+function fixFilenameEncoding(name) {
+  try { return Buffer.from(name, 'latin1').toString('utf8'); } catch (e) { return name; }
+}
 
 // SI/공공 프로젝트에서 흔히 쓰는 업무 구분과 기술등급
 const DUTY_OPTIONS = ['PM', 'PL', 'TA', 'SA', 'DBA', '개발자', 'QA', '보안', '감리', '기타'];
@@ -167,6 +188,28 @@ router.get('/recent-views', requireAuth, requireRole('freelancer'), async (req, 
     jobs.push({ ...full, match: computeMatch(full.stack, profileStack) });
   }
   res.json({ jobs });
+});
+
+// 잡코리아 스타일: 내가 접수한 문의·신고 내역
+// /:id 라우트보다 먼저 등록해야 'my-reports'가 :id로 잡히지 않습니다.
+router.get('/my-reports', requireAuth, requireRole('freelancer'), async (req, res) => {
+  const rows = await all(
+    `SELECT r.id, r.reason, r.content, r.reply_email, r.status, r.created_at, r.resolved_at, r.admin_note,
+       r.attachment_filename, r.attachment_original_name,
+       j.id AS job_id, j.title AS job_title, c.name AS company_name
+     FROM job_reports r
+     JOIN jobs j ON j.id = r.job_id
+     LEFT JOIN companies c ON c.user_id = j.company_id
+     WHERE r.freelancer_id = ?
+     ORDER BY r.created_at DESC, r.id DESC`,
+    [req.user.id]
+  );
+  res.json({
+    reports: rows.map((r) => ({
+      ...r,
+      attachment_url: signedFileUrl(r.attachment_filename),
+    })),
+  });
 });
 
 // 잡코리아 스타일: 같은 분야·비슷한 기술스택의 다른 열려있는 공고를 추천합니다.
@@ -351,22 +394,46 @@ router.post('/:id/save', requireAuth, requireRole('freelancer'), async (req, res
 });
 
 // 잡코리아 스타일: 의심스럽거나 부적절한 공고 신고 (프리랜서 전용, 공고당 1회)
-router.post('/:id/report', requireAuth, requireRole('freelancer'), async (req, res) => {
-  const jobId = Number(req.params.id);
-  if (!Number.isInteger(jobId)) return res.status(400).json({ error: '올바르지 않은 공고 ID입니다.' });
+// 잡코리아 "문의·신고" 양식과 동일하게: 문의종류(reason) / 내용(content) /
+// 파일첨부(attachment, 선택) / 답변받을 이메일(email)을 받습니다.
+const REPORT_REASONS = ['불법/허위 채용정보', '과장/오류', '연락처 도용/사칭', '중복 등록', '차별적인 내용 포함', '기타'];
+router.post('/:id/report', requireAuth, requireRole('freelancer'), (req, res) => {
+  reportUpload.single('attachment')(req, res, async (err) => {
+    if (err) return res.status(400).json({ error: err.message || '업로드에 실패했어요.' });
 
-  const job = await get('SELECT id FROM jobs WHERE id = ?', [jobId]);
-  if (!job) return res.status(404).json({ error: '공고를 찾을 수 없습니다.' });
+    const jobId = Number(req.params.id);
+    if (!Number.isInteger(jobId)) return res.status(400).json({ error: '올바르지 않은 공고 ID입니다.' });
 
-  const { reason } = req.body || {};
-  const safeReason = typeof reason === 'string' ? reason.trim().slice(0, 500) : '';
-  if (!safeReason) return res.status(400).json({ error: '신고 사유를 선택해주세요.' });
+    const job = await get('SELECT id FROM jobs WHERE id = ?', [jobId]);
+    if (!job) return res.status(404).json({ error: '공고를 찾을 수 없습니다.' });
 
-  const existing = await get('SELECT id FROM job_reports WHERE freelancer_id=? AND job_id=?', [req.user.id, jobId]);
-  if (existing) return res.status(409).json({ error: '이미 신고한 공고예요.' });
+    const { reason, content, email } = req.body || {};
+    if (!REPORT_REASONS.includes(reason)) {
+      return res.status(400).json({ error: '문의종류를 선택해주세요.' });
+    }
+    const safeContent = typeof content === 'string' ? content.trim().slice(0, 2000) : '';
+    if (!safeContent) return res.status(400).json({ error: '내용을 입력해주세요.' });
+    const safeEmail = normalizeEmail(email);
+    if (!safeEmail) return res.status(400).json({ error: '답변받을 이메일을 정확히 입력해주세요.' });
 
-  await run('INSERT INTO job_reports (freelancer_id, job_id, reason) VALUES (?,?,?)', [req.user.id, jobId, safeReason]);
-  res.status(201).json({ reported: true });
+    const existing = await get('SELECT id FROM job_reports WHERE freelancer_id=? AND job_id=?', [req.user.id, jobId]);
+    if (existing) return res.status(409).json({ error: '이미 신고한 공고예요. 신고 내역에서 확인할 수 있어요.' });
+
+    let attachmentFilename = null, attachmentOriginalName = null, attachmentData = null;
+    if (req.file) {
+      const ext = ('.' + (req.file.originalname.split('.').pop() || '')).toLowerCase();
+      attachmentFilename = `${crypto.randomBytes(12).toString('hex')}${ext}`;
+      attachmentOriginalName = fixFilenameEncoding(req.file.originalname).slice(0, 200);
+      attachmentData = req.file.buffer;
+    }
+
+    await run(
+      `INSERT INTO job_reports (freelancer_id, job_id, reason, content, reply_email, attachment_filename, attachment_original_name, attachment_data)
+       VALUES (?,?,?,?,?,?,?,?)`,
+      [req.user.id, jobId, reason, safeContent, safeEmail, attachmentFilename, attachmentOriginalName, attachmentData]
+    );
+    res.status(201).json({ reported: true });
+  });
 });
 
 // 공고 삭제 (기업 전용, 본인이 등록한 공고만)

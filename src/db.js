@@ -101,6 +101,12 @@ if (USE_POSTGRES) {
     await ensureColumnPg('job_reports', 'status', "TEXT NOT NULL DEFAULT 'pending'");
     await ensureColumnPg('job_reports', 'resolved_at', 'TEXT');
     await ensureColumnPg('job_reports', 'admin_note', 'TEXT');
+    // 잡코리아 스타일 문의·신고 양식: 상세 내용, 답변받을 이메일, 첨부파일
+    await ensureColumnPg('job_reports', 'content', "TEXT NOT NULL DEFAULT ''");
+    await ensureColumnPg('job_reports', 'reply_email', "TEXT NOT NULL DEFAULT ''");
+    await ensureColumnPg('job_reports', 'attachment_filename', 'TEXT');
+    await ensureColumnPg('job_reports', 'attachment_original_name', 'TEXT');
+    await ensureColumnPg('job_reports', 'attachment_data', 'BYTEA');
     await pool.query(
       'CREATE UNIQUE INDEX IF NOT EXISTS idx_users_oauth ON users(oauth_provider, oauth_id) WHERE oauth_provider IS NOT NULL'
     );
@@ -178,6 +184,12 @@ if (USE_POSTGRES) {
     addCol('job_reports', 'status', "TEXT NOT NULL DEFAULT 'pending'");
     addCol('job_reports', 'resolved_at', 'TEXT');
     addCol('job_reports', 'admin_note', 'TEXT');
+    // 잡코리아 스타일 문의·신고 양식: 상세 내용, 답변받을 이메일, 첨부파일
+    addCol('job_reports', 'content', "TEXT NOT NULL DEFAULT ''");
+    addCol('job_reports', 'reply_email', "TEXT NOT NULL DEFAULT ''");
+    addCol('job_reports', 'attachment_filename', 'TEXT');
+    addCol('job_reports', 'attachment_original_name', 'TEXT');
+    addCol('job_reports', 'attachment_data', 'BLOB');
     try {
       db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_oauth ON users(oauth_provider, oauth_id) WHERE oauth_provider IS NOT NULL');
     } catch (e) {}

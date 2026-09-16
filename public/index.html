@@ -563,7 +563,7 @@ const I = {
 // 상세 화면에서 파생되는 화면(지원자 관리, 공고 수정, 제안 작성 등)을 오갈 때는 기억을 유지합니다.
 let jobDetailReturn = null;     // {screen, param}
 let talentDetailReturn = null;  // {screen, param}
-const JOB_DETAIL_CHILDREN = ['jobDetail','applicants','jobPost','pickerScreen','profileEdit','portfolioEdit'];
+const JOB_DETAIL_CHILDREN = ['jobDetail','applicants','jobPost','pickerScreen','profileEdit','portfolioEdit','reportJob'];
 const TALENT_DETAIL_CHILDREN = ['talentDetail','proposeForm'];
 
 function go(screen, param){
@@ -591,7 +591,7 @@ function jobDetailBack(){ goBackFrom(jobDetailReturn, 'jobs'); }
 function talentDetailBack(){ goBackFrom(talentDetailReturn, 'talent'); }
 
 // 회원 유형별로만 열 수 있는 화면. 다른 유형의 화면이 열리려 하면(뒤로가기 기록, 예전 알림 등) 홈으로 보냅니다.
-const FREELANCER_ONLY = ['receivedProposals','myApplications','portfolios','portfolioEdit','savedJobs','followedCompanies','profileViews','profileEdit','proposalSettings'];
+const FREELANCER_ONLY = ['receivedProposals','myApplications','portfolios','portfolioEdit','savedJobs','followedCompanies','profileViews','profileEdit','proposalSettings','reportJob'];
 const COMPANY_ONLY = ['talent','talentDetail','applicants','jobPost','companyProfileEdit','proposeForm','sentProposals','savedTalents'];
 function screenAllowed(screen){
   if(state.role==='company' && FREELANCER_ONLY.includes(screen)) return false;
@@ -2362,7 +2362,7 @@ async function screenJobDetail(){
     ${(!isCompany && j.similarJobs && j.similarJobs.length) ? `
     <div class="section-label">비슷한 공고</div>
     <div class="hrow">${j.similarJobs.map(miniJobCard).join('')}</div>` : ''}
-    ${!isCompany?`<div style="text-align:center; margin-top:22px;"><span onclick="openReportJob(${j.id})" style="font-size:11.5px; color:var(--slate-light); text-decoration:underline; cursor:pointer;">${I.flag}이 공고 신고하기</span></div>`:''}
+    ${!isCompany?`<div style="text-align:right; margin-top:18px;"><span onclick="go('reportJob', ${j.id})" style="font-size:11.5px; color:var(--slate-light); cursor:pointer;">불법/허위/과장/오류 신고 ›</span></div>`:''}
     <div style="height:90px;"></div>
   </div>
   <div style="position:absolute; left:0; right:0; bottom:0; padding:14px 20px 22px; background:var(--paper); border-top:1px solid var(--line); display:flex; gap:10px;">
@@ -2770,24 +2770,97 @@ async function declineProposal(reason){
   }catch(e){ toast(e.message); }
 }
 
-// 잡코리아 스타일: 의심스럽거나 부적절한 공고를 신고합니다.
-const JOB_REPORT_REASONS = ['허위·과장된 채용 정보', '연락처 도용/사칭', '중복 등록', '차별적인 내용 포함', '기타'];
-function openReportJob(jobId){
-  const box = document.getElementById('confirmOverlay');
-  document.getElementById('confirmMsg').innerHTML =
-    `<div style="font-size:15px; font-weight:700; margin-bottom:12px;">신고 사유를 선택해주세요</div>
-     <div style="display:flex; flex-direction:column; gap:7px; text-align:left;">
-       ${JOB_REPORT_REASONS.map(r=>`<button class="btn btn-outline" style="font-size:13px; padding:11px;" onclick="reportJob(${jobId}, '${jsAttrStr(r)}')">${esc(r)}</button>`).join('')}
-     </div>`;
-  document.getElementById('confirmOkBtn').style.display = 'none';
-  box.classList.add('open');
+// 잡코리아 "문의·신고" 양식 스타일: 공고 신고하기
+const REPORT_REASONS = ['불법/허위 채용정보', '과장/오류', '연락처 도용/사칭', '중복 등록', '차별적인 내용 포함', '기타'];
+let reportJobTab = 'form';
+let reportAttachmentFile = null;
+function setReportJobTab(tab, jobId){ reportJobTab = tab; render(); }
+function onReportFileChange(input){
+  reportAttachmentFile = input.files && input.files[0] ? input.files[0] : null;
+  const label = document.getElementById('rp-filename');
+  if(label) label.textContent = reportAttachmentFile ? reportAttachmentFile.name : '파일을 추가하세요';
 }
-async function reportJob(jobId, reason){
-  closeConfirm();
-  document.getElementById('confirmOkBtn').style.display = '';
+async function screenReportJob(){
+  const jobId = Number(state.param);
+  const [job, reportsData, profile] = await Promise.all([
+    apiFetch('/jobs/' + jobId).catch(()=>null),
+    apiFetch('/jobs/my-reports').then(r=>r.reports).catch(()=>[]),
+    apiFetch('/profile').catch(()=>null),
+  ]);
+  const existing = reportsData.find(r => r.job_id === jobId);
+  const defaultEmail = (profile && (profile.email || profile.account_email)) || '';
+  const statusBadge = {
+    pending: `<span class="sbadge pending">${I.clockSm}처리대기</span>`,
+    dismissed: `<span class="sbadge fail">반려됨</span>`,
+    resolved: `<span class="sbadge pass">${I.checkCircle}처리완료</span>`,
+  };
+  return `${statusbar()}
+  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('jobDetail', ${jobId})">${I.back}</div><div class="page-title" style="font-size:18px;">문의·신고</div></div></div>
+  <div class="content">
+    <div class="tab-switch" id="reportTabs">
+      <div class="tab ${reportJobTab==='form'?'active':''}" onclick="setReportJobTab('form')">문의·신고</div>
+      <div class="tab ${reportJobTab==='history'?'active':''}" onclick="setReportJobTab('history')">문의·신고 내역</div>
+    </div>
+    ${reportJobTab==='form' ? `
+      ${job ? `<div class="page-sub" style="margin:2px 0 12px;">신고 대상: <b style="color:var(--ink);">${esc(job.title)}</b></div>` : ''}
+      ${existing ? `<div class="reco-empty">이미 이 공고를 신고했어요.<br>"문의·신고 내역" 탭에서 처리 상태를 확인할 수 있어요.</div>` : `
+      <div class="form-field"><label class="form-label">문의종류 <span style="color:var(--danger); font-size:11px;">(필수)</span></label>
+        <select id="rp-reason" class="form-input">
+          <option value="">선택</option>
+          ${REPORT_REASONS.map(r=>`<option value="${esc(r)}">${esc(r)}</option>`).join('')}
+        </select></div>
+      <div class="form-field"><label class="form-label">내용 <span style="color:var(--danger); font-size:11px;">(필수)</span></label>
+        <textarea id="rp-content" class="form-input" style="min-height:160px;" placeholder="신고 내용을 자세히 적어주세요"></textarea></div>
+      <div class="form-field"><label class="form-label">파일첨부</label>
+        <label class="btn btn-outline" style="cursor:pointer; justify-content:flex-start; gap:8px;">${I.plus}<span id="rp-filename">파일을 추가하세요</span>
+          <input type="file" accept=".doc,.docx,.xls,.xlsx,.ppt,.pptx,.hwp,.jpg,.jpeg,.gif,.png,.pdf,.zip" style="display:none;" onchange="onReportFileChange(this)"></label>
+        <div class="page-sub" style="margin-top:5px;">10MB 이내의 MS Office 파일, hwp, jpg, gif, png, pdf, zip 가능</div></div>
+      <div class="form-field"><label class="form-label">답변받을 이메일 <span style="color:var(--danger); font-size:11px;">(필수)</span></label>
+        <input id="rp-email" class="form-input" type="email" value="${esc(defaultEmail)}" placeholder="you@example.com"></div>
+      <div style="display:flex; gap:10px; margin-top:16px;">
+        <button class="btn btn-outline" onclick="go('jobDetail', ${jobId})">취소</button>
+        <button class="btn btn-primary" onclick="submitJobReport(${jobId})">선택</button>
+      </div>`}
+    ` : `
+      ${reportsData.length ? reportsData.map(r=>`
+        <div class="card">
+          <div class="card-top">
+            <div style="min-width:0;"><div class="card-title">${esc(r.job_title)}</div><div class="card-org">${esc(r.company_name||'알 수 없음')}</div></div>
+            ${statusBadge[r.status]||''}
+          </div>
+          <div class="page-sub" style="margin-top:6px;">문의종류: <b style="color:var(--ink);">${esc(r.reason)}</b></div>
+          <div class="para" style="margin-top:6px;">${esc(r.content)}</div>
+          ${r.attachment_url ? `<a href="${viewerUrl(r.attachment_url)}" target="_blank" style="display:inline-block; margin-top:6px; font-size:12px; color:var(--ink); font-weight:600;">📎 ${esc(r.attachment_original_name||'첨부파일')}</a>` : ''}
+          <div class="page-sub" style="margin-top:6px;">${(parseServerTime(r.created_at)||new Date()).toLocaleString('ko-KR')}</div>
+          ${r.admin_note ? `<div class="page-sub" style="margin-top:4px;">답변: ${esc(r.admin_note)}</div>` : ''}
+        </div>`).join('') : emptyArt(ART.noJobs, '접수한 문의·신고가 없어요', '')}
+    `}
+  </div>`;
+}
+async function submitJobReport(jobId){
+  const reason = document.getElementById('rp-reason').value;
+  const content = document.getElementById('rp-content').value.trim();
+  const email = document.getElementById('rp-email').value.trim();
+  if(!reason){ toast('문의종류를 선택해주세요'); return; }
+  if(!content){ toast('내용을 입력해주세요'); return; }
+  if(!email){ toast('답변받을 이메일을 입력해주세요'); return; }
   try{
-    await apiFetch(`/jobs/${jobId}/report`, {method:'POST', body:{reason}});
+    const fd = new FormData();
+    fd.append('reason', reason);
+    fd.append('content', content);
+    fd.append('email', email);
+    if(reportAttachmentFile) fd.append('attachment', reportAttachmentFile);
+    const res = await fetch(API_BASE + '/jobs/' + jobId + '/report', {
+      method: 'POST',
+      headers: state.token ? {Authorization:'Bearer '+state.token} : {},
+      body: fd,
+    });
+    const data = await res.json().catch(()=>({}));
+    if(!res.ok) throw new Error(data.error || '접수에 실패했어요');
     toast('신고가 접수됐어요. 검토 후 조치할게요');
+    reportAttachmentFile = null;
+    reportJobTab = 'history';
+    go('reportJob', jobId);
   }catch(e){ toast(e.message); }
 }
 
@@ -3284,9 +3357,11 @@ async function screenAdminReports(){
           </div>
           ${statusBadge[r.status] || ''}
         </div>
-        <div class="page-sub" style="margin-top:8px;">신고자: ${esc(r.reporter_name||'(탈퇴한 회원)')}</div>
-        <div class="page-sub" style="margin-top:3px;">사유: <b style="color:var(--ink);">${esc(r.reason)}</b></div>
-        <div class="page-sub" style="margin-top:3px;">${(parseServerTime(r.created_at)||new Date()).toLocaleString('ko-KR')}${r.job_status==='closed' ? ' · 현재 공고 상태: 마감됨' : ''}</div>
+        <div class="page-sub" style="margin-top:8px;">신고자: ${esc(r.reporter_name||'(탈퇴한 회원)')} · 답변받을 이메일: ${esc(r.reply_email||'-')}</div>
+        <div class="page-sub" style="margin-top:3px;">문의종류: <b style="color:var(--ink);">${esc(r.reason)}</b></div>
+        <div class="para" style="margin-top:6px; font-size:12.5px;">${esc(r.content||'')}</div>
+        ${r.attachment_url ? `<a href="${viewerUrl(r.attachment_url)}" target="_blank" style="display:inline-block; margin-top:6px; font-size:12px; color:var(--ink); font-weight:600;">📎 ${esc(r.attachment_original_name||'첨부파일')}</a>` : ''}
+        <div class="page-sub" style="margin-top:6px;">${(parseServerTime(r.created_at)||new Date()).toLocaleString('ko-KR')}${r.job_status==='closed' ? ' · 현재 공고 상태: 마감됨' : ''}</div>
         ${r.admin_note ? `<div class="page-sub" style="margin-top:3px;">처리 메모: ${esc(r.admin_note)}</div>` : ''}
         <button class="btn btn-outline" style="margin-top:10px; font-size:12px;" onclick="go('jobDetail', ${r.job_id})">공고 상세 보기</button>
         ${(() => {
@@ -3577,7 +3652,7 @@ async function render(){
       savedJobs: screenSavedJobs, followedCompanies: screenFollowedCompanies, profileViews: screenProfileViews, receivedProposals: screenReceivedProposals,
       proposeForm: screenProposeForm, pickerScreen: screenPicker,
       reviewForm: screenReviewForm,
-      adminReports: screenAdminReports,
+      adminReports: screenAdminReports, reportJob: screenReportJob,
     };
     const fn = map[state.screen] || screenOnboarding;
     const html = await fn();

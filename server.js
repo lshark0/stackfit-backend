@@ -87,7 +87,14 @@ const MIME_BY_EXT = {
   '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   '.ppt': 'application/vnd.ms-powerpoint',
   '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  '.xls': 'application/vnd.ms-excel',
+  '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   '.hwp': 'application/x-hwp',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.png': 'image/png',
+  '.zip': 'application/zip',
 };
 app.get('/uploads/:filename', async (req, res) => {
   const { filename } = req.params;
@@ -111,7 +118,15 @@ app.get('/uploads/:filename', async (req, res) => {
       'SELECT contract_data FROM projects WHERE contract_filename = ?',
       [safeName]
     );
-    if (contractRow && contractRow.contract_data) data = contractRow.contract_data;
+    if (contractRow && contractRow.contract_data) {
+      data = contractRow.contract_data;
+    } else {
+      const reportRow = await get(
+        'SELECT attachment_data FROM job_reports WHERE attachment_filename = ?',
+        [safeName]
+      );
+      if (reportRow && reportRow.attachment_data) data = reportRow.attachment_data;
+    }
   }
   if (!data) {
     return res.status(404).json({ error: '파일을 찾을 수 없습니다.' });
