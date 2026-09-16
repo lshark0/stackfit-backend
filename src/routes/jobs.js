@@ -162,6 +162,8 @@ router.get('/recent-views', requireAuth, requireRole('freelancer'), async (req, 
   const jobs = [];
   for (const row of rows) {
     const full = await withCompanyAndStack(row);
+    // 마감된 공고는 최근 본 목록에서 더 이상 노출하지 않습니다(다른 공고 목록과 동일한 기준).
+    if (full.status !== 'open' || full.d_day === '마감') continue;
     jobs.push({ ...full, match: computeMatch(full.stack, profileStack) });
   }
   res.json({ jobs });

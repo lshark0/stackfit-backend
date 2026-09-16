@@ -15,6 +15,9 @@ router.post('/jobs/:id/apply', requireAuth, requireRole('freelancer'), async (re
   const job = await get('SELECT * FROM jobs WHERE id = ?', [jobId]);
   if (!job) return res.status(404).json({ error: '공고를 찾을 수 없습니다.' });
 
+  if (job.status !== 'open') {
+    return res.status(400).json({ error: '마감된 공고에는 지원할 수 없어요.' });
+  }
   if (job.deadline) {
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const deadlineDate = new Date(job.deadline + 'T00:00:00');

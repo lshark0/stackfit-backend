@@ -2327,6 +2327,7 @@ async function screenJobDetail(){
       <h2>${esc(j.title)}</h2>
       <div style="margin-top:8px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
         ${j.applied?`<span class="sbadge applied">${I.checkCircle}지원완료</span>`:''}
+        ${!isCompany && (j.status!=='open' || j.d_day==='마감')?`<span class="sbadge fail">${I.xCircle}마감된 공고</span>`:''}
         ${ratingBadge(j.rating_avg, j.rating_count)}
       </div>
     </div>
@@ -2366,9 +2367,17 @@ async function screenJobDetail(){
   </div>
   <div style="position:absolute; left:0; right:0; bottom:0; padding:14px 20px 22px; background:var(--paper); border-top:1px solid var(--line); display:flex; gap:10px;">
     ${isCompany? `<div class="star-btn" style="width:52px;height:52px;border-radius:12px; color:var(--danger); border-color:#F3D6D2;" onclick="deleteJob(${j.id})">${I.trash}</div><div class="star-btn" style="width:52px;height:52px;border-radius:12px;" title="공고 복사" onclick="duplicateJob(${j.id})">${I.copy}</div><button class="btn btn-outline" onclick="go('jobPost', ${j.id})">수정</button><button class="btn btn-primary" onclick="go('applicants', ${j.id})">지원자 ${j.applicantCount||0}명</button>`
-    : `<div class="star-btn ${j.saved?'filled':''}" style="width:52px;height:52px;border-radius:12px;" onclick="toggleSaveJob(${j.id}, event)">${I.star}</div>
+    : (() => {
+        const isClosed = j.status !== 'open' || j.d_day === '마감';
+        const applyBtn = j.applied
+          ? `<button class="btn btn-outline" onclick="cancelApplication(${j.id})">지원 취소</button>`
+          : (isClosed
+              ? `<button class="btn btn-outline" disabled style="opacity:.5; cursor:not-allowed;">마감된 공고예요</button>`
+              : `<button class="btn btn-primary" onclick="applyToJob(${j.id})">지원하기</button>`);
+        return `<div class="star-btn ${j.saved?'filled':''}" style="width:52px;height:52px;border-radius:12px;" onclick="toggleSaveJob(${j.id}, event)">${I.star}</div>
        <button class="btn btn-outline" style="flex:0 0 auto; width:auto; padding:13px 16px;" onclick="startChatWithCompany(${j.company_id}, ${j.id})">채팅</button>
-       <button class="btn ${j.applied?'btn-outline':'btn-primary'}" onclick="${j.applied?`cancelApplication(${j.id})`:`applyToJob(${j.id})`}">${j.applied?'지원 취소':'지원하기'}</button>`}
+       ${applyBtn}`;
+      })()}
   </div>`;
 }
 
