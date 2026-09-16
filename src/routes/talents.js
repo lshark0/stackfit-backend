@@ -63,6 +63,41 @@ router.get('/', requireAuth, requireRole('company'), async (req, res) => {
   res.json({ talents: result });
 });
 
+// 잡코리아 스타일: 기업이 최근 조회한 인재 목록 ("최근 본 인재")
+// '/:userId'보다 먼저 등록해야 'recent-views'가 :userId로 잡히지 않습니다.
+router.get('/recent-views', requireAuth, requireRole('company'), async (req, res) => {
+  const rows = await all(
+    `SELECT f.* FROM freelancer_profiles f
+     JOIN (
+       SELECT freelancer_id, MAX(created_at) AS viewed_at
+       FROM profile_views
+       WHERE company_id = ?
+       GROUP BY freelancer_id
+     ) v ON v.freelancer_id = f.user_id
+     ORDER BY v.viewed_at DESC
+     LIMIT 10`,
+    [req.user.id]
+  );
+  const proposalRows = await all('SELECT freelancer_id FROM proposals WHERE company_id = ?', [req.user.id]);
+  const proposedIds = new Set(proposalRows.map(p => p.freelancer_id));
+  const savedRows = await all('SELECT freelancer_id FROM saved_talents WHERE company_id = ?', [req.user.id]);
+  const savedIds = new Set(savedRows.map(s => s.freelancer_id));
+  const ratingById = await getRatingSummaries(rows.map((t) => t.user_id));
+  res.json({
+    talents: rows.map((t) => {
+      const stack = JSON.parse(t.stack_json);
+      return {
+        ...publicTalent(t),
+        stack,
+        match: breadthMatch(stack.length),
+        proposed: proposedIds.has(t.user_id),
+        saved: savedIds.has(t.user_id),
+        ...(ratingById[t.user_id] || { rating_avg: null, rating_count: 0 }),
+      };
+    }),
+  });
+});
+
 // [기업] 관심 인재 목록
 router.get('/saved', requireAuth, requireRole('company'), async (req, res) => {
   const rows = await all(

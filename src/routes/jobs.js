@@ -109,12 +109,20 @@ router.get('/', optionalAuth, async (req, res) => {
     : [];
   const applicantCountByJobId = Object.fromEntries(applicantCountRows.map((r) => [r.job_id, Number(r.c)]));
 
+  // 잡코리아 스타일: 기업에게는 등록한 공고의 조회수(공고 성과)도 보여줍니다.
+  let viewCountByJobId = {};
+  if (req.user && req.user.role === 'company' && jobIds.length) {
+    const viewCountRows = await all(`SELECT job_id, COUNT(*) AS c FROM job_views WHERE job_id IN (${jobIds.map(() => '?').join(',')}) GROUP BY job_id`, jobIds);
+    viewCountByJobId = Object.fromEntries(viewCountRows.map((r) => [r.job_id, Number(r.c)]));
+  }
+
   const result = jobs.map(j => ({
     ...j,
     match: computeMatch(j.stack, profileStack),
     applied: appliedJobIds.has(j.id),
     saved: savedJobIds.has(j.id),
     applicantCount: applicantCountByJobId[j.id] || 0,
+    viewCount: viewCountByJobId[j.id] || 0,
   }));
   // 프리랜서에게는 매칭률이 높은 공고부터 보여줍니다.
   if (req.user && req.user.role === 'freelancer') {
@@ -285,6 +293,38 @@ router.put('/:id', requireAuth, requireRole('company'), async (req, res) => {
   );
   const updated = await get('SELECT * FROM jobs WHERE id = ?', [jobId]);
   res.json(await withCompanyAndStack(updated));
+});
+
+// 잡코리아 스타일: 공고 복사(재등록) — 기존 공고 내용을 그대로 복사한 새 공고를 만듭니다.
+// 마감일 등을 수정할 수 있도록, 프론트에서 바로 공고 수정 화면으로 이동시킵니다.
+router.post('/:id/duplicate', requireAuth, requireRole('company'), async (req, res) => {
+  const jobId = Number(req.params.id);
+  if (!Number.isInteger(jobId)) return res.status(400).json({ error: '올바르지 않은 공고 ID입니다.' });
+
+  const job = await get('SELECT * FROM jobs WHERE id = ? AND company_id = ?', [jobId, req.user.id]);
+  if (!job) return res.status(404).json({ error: '공고를 찾을 수 없거나 복사 권한이 없어요.' });
+
+  const r = await run(
+    `INSERT INTO jobs (company_id, title, stack_json, certs_json, period, rate, work_type, location, category, description, deadline, duty, grade)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    [
+      req.user.id,
+      `${job.title} (복사본)`.slice(0, 120),
+      job.stack_json,
+      job.certs_json,
+      job.period,
+      job.rate,
+      job.work_type,
+      job.location,
+      job.category,
+      job.description,
+      job.deadline,
+      job.duty,
+      job.grade,
+    ]
+  );
+  const created = await get('SELECT * FROM jobs WHERE id = ?', [r.lastInsertRowid]);
+  res.status(201).json(await withCompanyAndStack(created));
 });
 
 // 공고 저장(즐겨찾기) 토글

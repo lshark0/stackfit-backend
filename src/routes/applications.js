@@ -166,6 +166,75 @@ router.get('/jobs/:id/applicants', requireAuth, requireRole('company'), async (r
   });
 });
 
+// 지원 수락/거절 확정 처리(검토중 → 합격/불합격) 공통 로직.
+// 단일 처리(PATCH)와 일괄 처리(bulk) 라우트가 함께 사용합니다.
+async function applyDecision(job, application, status) {
+  await run('UPDATE applications SET status = ? WHERE id = ?', [status, application.id]);
+
+  // 거절을 취소해 '검토중'으로 되돌린 경우에는 지원자에게 결과 알림을 보내지 않습니다.
+  if (status === 'submitted') return;
+
+  const resultTitle = status === 'accepted' ? '지원이 수락됐어요!' : '지원 결과가 도착했어요';
+  const resultBody = status === 'accepted'
+    ? `"${job.title}" 공고에 합격하셨습니다. 프로젝트가 생성됐어요.`
+    : `"${job.title}" 공고에는 아쉽게도 채용이 어려워요.`;
+  const resultLink = status === 'accepted' ? 'projects' : 'myApplications';
+  await addNotification(application.freelancer_id, {
+    tag: status === 'accepted' ? '합격' : '지원결과',
+    title: resultTitle,
+    body: resultBody,
+    link: resultLink,
+  });
+  pushTo(application.freelancer_id, {
+    kind: 'result',
+    title: status === 'accepted' ? '🎉 지원이 수락됐어요' : '📢 지원 결과 도착',
+    body: resultBody,
+    tag: `result-${job.id}`,
+    link: resultLink,
+  });
+
+  if (status === 'accepted') {
+    // 같은 공고·같은 사람이라도 이전 계약이 이미 '완료'됐다면 재계약이므로 새 프로젝트를 만듭니다.
+    // (진행 중인 프로젝트가 있을 때만 중복 생성을 막습니다.)
+    const activeProject = await get(
+      "SELECT id FROM projects WHERE job_id=? AND freelancer_id=? AND status != '완료'",
+      [job.id, application.freelancer_id]
+    );
+    if (!activeProject) {
+      await run(
+        'INSERT INTO projects (job_id, company_id, freelancer_id, title, rate, period, status, stage) VALUES (?,?,?,?,?,?,?,?)',
+        [job.id, job.company_id, application.freelancer_id, job.title, job.rate, job.period, '진행중', 1]
+      );
+    }
+  }
+}
+
+// 잡코리아 스타일: 지원자 일괄 처리 — 검토중인 여러 명을 한 번에 합격/불합격 처리합니다.
+// 이미 합격/불합격/취소 등으로 처리된 건은 건너뛰고(스킵 사유를 함께 반환), 검토중인 건만 반영합니다.
+// '/:applicationId' 라우트보다 먼저 등록해야 'bulk'가 :applicationId로 잡히지 않습니다.
+router.patch('/jobs/:jobId/applicants/bulk', requireAuth, requireRole('company'), async (req, res) => {
+  const { applicationIds, status } = req.body || {};
+  if (!['accepted', 'rejected'].includes(status)) {
+    return res.status(400).json({ error: "status는 'accepted' 또는 'rejected'여야 합니다." });
+  }
+  if (!Array.isArray(applicationIds) || !applicationIds.length) {
+    return res.status(400).json({ error: '처리할 지원자를 선택해주세요.' });
+  }
+  const job = await get('SELECT * FROM jobs WHERE id = ? AND company_id = ?', [req.params.jobId, req.user.id]);
+  if (!job) return res.status(404).json({ error: '공고를 찾을 수 없습니다.' });
+
+  let updated = 0;
+  const skipped = [];
+  for (const id of applicationIds) {
+    const application = await get('SELECT * FROM applications WHERE id = ? AND job_id = ?', [id, job.id]);
+    if (!application) { skipped.push({ id, reason: '지원 내역을 찾을 수 없음' }); continue; }
+    if (application.status !== 'submitted') { skipped.push({ id, reason: '이미 처리됨' }); continue; }
+    await applyDecision(job, application, status);
+    updated++;
+  }
+  res.json({ status, updated, skipped });
+});
+
 // 지원 수락/거절 (기업 전용, 본인 공고에 한함). 수락 시 프로젝트를 자동 생성합니다.
 router.patch('/jobs/:jobId/applicants/:applicationId', requireAuth, requireRole('company'), async (req, res) => {
   const { status } = req.body || {};
@@ -212,47 +281,7 @@ router.patch('/jobs/:jobId/applicants/:applicationId', requireAuth, requireRole(
     return res.json({ status });
   }
 
-  await run('UPDATE applications SET status = ? WHERE id = ?', [status, application.id]);
-
-  // 거절을 취소해 '검토중'으로 되돌린 경우에는 지원자에게 결과 알림을 보내지 않습니다.
-  if (status === 'submitted') {
-    return res.json({ status });
-  }
-
-  const resultTitle = status === 'accepted' ? '지원이 수락됐어요!' : '지원 결과가 도착했어요';
-  const resultBody = status === 'accepted'
-    ? `"${job.title}" 공고에 합격하셨습니다. 프로젝트가 생성됐어요.`
-    : `"${job.title}" 공고에는 아쉽게도 채용이 어려워요.`;
-  const resultLink = status === 'accepted' ? 'projects' : 'myApplications';
-  await addNotification(application.freelancer_id, {
-    tag: status === 'accepted' ? '합격' : '지원결과',
-    title: resultTitle,
-    body: resultBody,
-    link: resultLink,
-  });
-  pushTo(application.freelancer_id, {
-    kind: 'result',
-    title: status === 'accepted' ? '🎉 지원이 수락됐어요' : '📢 지원 결과 도착',
-    body: resultBody,
-    tag: `result-${job.id}`,
-    link: resultLink,
-  });
-
-  if (status === 'accepted') {
-    // 같은 공고·같은 사람이라도 이전 계약이 이미 '완료'됐다면 재계약이므로 새 프로젝트를 만듭니다.
-    // (진행 중인 프로젝트가 있을 때만 중복 생성을 막습니다.)
-    const activeProject = await get(
-      "SELECT id FROM projects WHERE job_id=? AND freelancer_id=? AND status != '완료'",
-      [job.id, application.freelancer_id]
-    );
-    if (!activeProject) {
-      await run(
-        'INSERT INTO projects (job_id, company_id, freelancer_id, title, rate, period, status, stage) VALUES (?,?,?,?,?,?,?,?)',
-        [job.id, req.user.id, application.freelancer_id, job.title, job.rate, job.period, '진행중', 1]
-      );
-    }
-  }
-
+  await applyDecision(job, application, status);
   res.json({ status });
 });
 

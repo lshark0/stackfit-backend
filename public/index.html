@@ -535,6 +535,8 @@ const I = {
   pin:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 21s-6.5-5.6-6.5-11A6.5 6.5 0 0 1 18.5 10c0 5.4-6.5 11-6.5 11Z"/><circle cx="12" cy="10" r="2"/></svg>`,
   clock:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><path d="M12 8V12L15 14"/></svg>`,
   usersSm:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="9" cy="8.5" r="3"/><path d="M3.5 18c.6-3 2.7-4.7 5.5-4.7s4.9 1.7 5.5 4.7"/><circle cx="17" cy="8.2" r="2.2"/><path d="M15.5 13.5c1.8.3 3.2 1.7 3.6 4"/></svg>`,
+  copy:`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  eyeSm:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="2.8"/></svg>`,
   logout:`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M13 4H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h6"/><path d="M17 16l4-4-4-4"/><path d="M21 12H9"/></svg>`,
   x:`<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 5L19 19M5 19L19 5" stroke-linecap="round"/></svg>`,
   gear:`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M12 3v2.2M12 18.8V21M4.9 4.9l1.5 1.5M17.6 17.6l1.5 1.5M3 12h2.2M18.8 12H21M4.9 19.1l1.5-1.5M17.6 6.4l1.5-1.5"/></svg>`,
@@ -980,6 +982,7 @@ function jobCard(j){
       <span class="im">${I.wallet}<b>${esc(j.rate)}</b></span>
       <span class="im">${I.clockSm}${esc(j.period)}</span>
       ${state.role==='freelancer' ? applicantBadge(j.applicantCount) : ''}
+      ${state.role==='company' ? `<span class="im">${I.eyeSm}<b>${j.viewCount||0}</b>회 조회</span><span class="im">${I.usersSm}<b>${j.applicantCount||0}</b>명 지원</span>` : ''}
     </div>
     <div class="meta-row" style="margin-top:6px;">${ddayBadge(j.d_day)}${ratingBadge(j.rating_avg, j.rating_count)}</div>
     ${state.role==='freelancer' ? gauge(j.match) : ''}
@@ -991,6 +994,14 @@ function miniJobCard(j){
     <div class="mc-title">${esc(j.title)}</div>
     <div class="mc-org">${esc(j.org)}</div>
     <div class="mc-meta">${ddayBadge(j.d_day)}${state.role==='freelancer' ? gaugeSm(j.match) : ''}</div>
+  </div>`;
+}
+// 잡코리아 스타일: 최근 본 인재 가로 스크롤용 축약 카드
+function miniTalentCard(t){
+  return `<div class="mini-card" onclick="go('talentDetail', ${t.user_id})">
+    <div class="mc-title">${esc(t.name)}</div>
+    <div class="mc-org">${esc(t.role_title || '')}</div>
+    <div class="mc-meta">${gradeBadge(t.grade)}</div>
   </div>`;
 }
 function recoJobCard(j){
@@ -1303,6 +1314,14 @@ async function deleteJob(id){
     }catch(e){ toast(e.message); }
   });
 }
+// 잡코리아 스타일: 공고 복사(재등록) — 복사한 새 공고의 수정 화면으로 바로 이동합니다.
+async function duplicateJob(id){
+  try{
+    const created = await apiFetch(`/jobs/${id}/duplicate`, {method:'POST'});
+    toast('공고를 복사했어요. 내용을 확인하고 등록해주세요');
+    go('jobPost', created.id);
+  }catch(e){ toast(e.message); }
+}
 // 제안은 '어떤 공고인지'와 '무슨 말을 전할지'를 함께 담아야 하므로 별도 화면에서 작성합니다.
 function proposeTalent(userId){ go('proposeForm', userId); }
 
@@ -1463,6 +1482,27 @@ async function cancelAcceptance(jobId, applicationId){
       go('applicants', jobId);
     }catch(e){ toast(e.message); }
   });
+}
+
+// 잡코리아 스타일: 지원자 일괄 처리 — 검토중인 지원자를 여러 명 선택해 한 번에 합격/불합격 처리합니다.
+let selectedApplicantIds = new Set();
+function toggleApplicantSelect(id, checked){
+  if(checked) selectedApplicantIds.add(id); else selectedApplicantIds.delete(id);
+  const bar = document.getElementById('bulkActionBar');
+  if(bar) bar.hidden = selectedApplicantIds.size === 0;
+  const countEl = document.getElementById('bulkCount');
+  if(countEl) countEl.textContent = selectedApplicantIds.size + '명 선택됨';
+}
+async function bulkDecideApplicants(status){
+  const ids = [...selectedApplicantIds];
+  if(!ids.length) return;
+  const jobId = state.param;
+  try{
+    const r = await apiFetch(`/jobs/${jobId}/applicants/bulk`, {method:'PATCH', body:{applicationIds: ids, status}});
+    toast(`${r.updated}명 ${status==='accepted'?'합격':'불합격'} 처리했어요${r.skipped.length? ` (건너뜀 ${r.skipped.length}명)` : ''}`);
+    selectedApplicantIds = new Set();
+    go('applicants', jobId);
+  }catch(e){ toast(e.message); }
 }
 
 async function uploadResume(input){
@@ -2192,7 +2232,7 @@ async function screenJobDetail(){
     <div style="height:90px;"></div>
   </div>
   <div style="position:absolute; left:0; right:0; bottom:0; padding:14px 20px 22px; background:var(--paper); border-top:1px solid var(--line); display:flex; gap:10px;">
-    ${isCompany? `<div class="star-btn" style="width:52px;height:52px;border-radius:12px; color:var(--danger); border-color:#F3D6D2;" onclick="deleteJob(${j.id})">${I.trash}</div><button class="btn btn-outline" onclick="go('jobPost', ${j.id})">수정</button><button class="btn btn-primary" onclick="go('applicants', ${j.id})">지원자 ${j.applicantCount||0}명</button>`
+    ${isCompany? `<div class="star-btn" style="width:52px;height:52px;border-radius:12px; color:var(--danger); border-color:#F3D6D2;" onclick="deleteJob(${j.id})">${I.trash}</div><div class="star-btn" style="width:52px;height:52px;border-radius:12px;" title="공고 복사" onclick="duplicateJob(${j.id})">${I.copy}</div><button class="btn btn-outline" onclick="go('jobPost', ${j.id})">수정</button><button class="btn btn-primary" onclick="go('applicants', ${j.id})">지원자 ${j.applicantCount||0}명</button>`
     : `<div class="star-btn ${j.saved?'filled':''}" style="width:52px;height:52px;border-radius:12px;" onclick="toggleSaveJob(${j.id}, event)">${I.star}</div>
        <button class="btn btn-outline" style="flex:0 0 auto; width:auto; padding:13px 16px;" onclick="startChatWithCompany(${j.company_id}, ${j.id})">채팅</button>
        <button class="btn ${j.applied?'btn-outline':'btn-primary'}" onclick="${j.applied?`cancelApplication(${j.id})`:`applyToJob(${j.id})`}">${j.applied?'지원 취소':'지원하기'}</button>`}
@@ -2206,7 +2246,10 @@ async function screenTalent(){
   if(talentCat && talentCat!=='전체') qs.set('category', talentCat);
   if(talentGrade && talentGrade!=='전체') qs.set('grade', talentGrade);
   if(talentDuty) qs.set('duty', talentDuty);
-  const data = await apiFetch('/talents?' + qs.toString());
+  const [data, recentTalents] = await Promise.all([
+    apiFetch('/talents?' + qs.toString()),
+    apiFetch('/talents/recent-views').then(r=>r.talents).catch(()=>[]),
+  ]);
   const cats = ["전체", ...Object.keys(STACK_CATALOG)];
   const grades = ["전체","초급","중급","고급","특급"];
   const duties = ["","PM","PL","TA","SA","DBA","개발자","QA","보안","감리","기타"];
@@ -2222,6 +2265,9 @@ async function screenTalent(){
         ${duties.map(d=>`<option value="${d}" ${d===talentDuty?'selected':''}>${d===''?'업무 전체':d}</option>`).join('')}
       </select>
     </div>
+    ${recentTalents.length ? `
+    <div class="section-label">최근 본 인재</div>
+    <div class="hrow">${recentTalents.map(miniTalentCard).join('')}</div>` : ''}
     <div class="section-label">매칭률 순</div>
     <div id="talentList">${data.talents.map(talentCard).join('') || emptyArt(ART.noTalents, '조건에 맞는 인재가 없어요', '검색어나 등급·업무 필터를 바꿔보세요.')}</div>
   </div>${tabbar('talent')}`;
@@ -2788,6 +2834,7 @@ async function screenMyApplications(){
 async function screenApplicants(){
   const nc = await unreadCount();
   const data = await apiFetch('/jobs/' + state.param + '/applicants');
+  selectedApplicantIds = new Set();
   const badge = {
     submitted: `<span class="sbadge pending">${I.clockSm}검토중</span>`,
     accepted: `<span class="sbadge pass">${I.trophy}수락됨</span>`,
@@ -2800,7 +2847,8 @@ async function screenApplicants(){
     ${data.applicants.map(a=>`
       <div class="card">
         <div class="card-top">
-          <div style="display:flex; gap:12px; align-items:center;">
+          <div style="display:flex; gap:12px; align-items:center; min-width:0;">
+            ${a.status==='submitted' ? `<input type="checkbox" onclick="toggleApplicantSelect(${a.application_id}, this.checked)" style="width:18px; height:18px; flex:0 0 auto; accent-color:var(--ink);">` : ''}
             ${autoAvatar(a.name)}
             <div style="min-width:0;">
               <div class="card-title">${esc(a.name)} ${gradeBadge(a.grade)}</div>
@@ -2837,6 +2885,12 @@ async function screenApplicants(){
           <button class="btn btn-primary" style="margin-top:12px;" onclick="go('projects')">프로젝트 관리에서 계약 진행하기</button>
           <div class="page-sub" style="margin-top:6px;">이미 계약이 진행 중이라 수락을 취소할 수 없어요.</div>`) : ''}
       </div>`).join('') || emptyArt(ART.noTalents, '아직 지원자가 없어요', '인재풀에서 직접 포지션을 제안해볼 수도 있어요.')}
+    <div style="height:70px;"></div>
+  </div>
+  <div id="bulkActionBar" hidden style="position:absolute; left:0; right:0; bottom:0; padding:14px 20px 22px; background:var(--paper); border-top:1px solid var(--line); display:flex; align-items:center; gap:10px;">
+    <span id="bulkCount" style="font-family:var(--mono); font-size:12px; color:var(--slate); flex:1;">0명 선택됨</span>
+    <button class="btn btn-outline" style="flex:0 0 auto; width:auto; padding:11px 16px;" onclick="bulkDecideApplicants('rejected')">일괄 거절</button>
+    <button class="btn btn-primary" style="flex:0 0 auto; width:auto; padding:11px 16px;" onclick="bulkDecideApplicants('accepted')">일괄 수락</button>
   </div>`;
 }
 
