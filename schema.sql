@@ -237,3 +237,13 @@ CREATE TABLE IF NOT EXISTS deleted_projects (
   UNIQUE(user_id, project_id)
 );
 CREATE INDEX IF NOT EXISTS idx_deleted_projects_user ON deleted_projects(user_id);
+
+-- 잡코리아 스타일: 프리랜서가 조회한 공고 이력 ("최근 본 공고")
+CREATE TABLE IF NOT EXISTS job_views (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  freelancer_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  job_id        INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+  created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_job_views_freelancer ON job_views(freelancer_id);
+CREATE INDEX IF NOT EXISTS idx_job_views_job ON job_views(job_id);

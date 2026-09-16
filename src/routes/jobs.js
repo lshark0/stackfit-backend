@@ -102,11 +102,19 @@ router.get('/', optionalAuth, async (req, res) => {
     savedJobIds = new Set(saved.map(s => s.job_id));
   }
 
+  // 잡코리아 스타일: 지원자 수(경쟁률)를 카드에서도 보여줍니다.
+  const jobIds = jobs.map((j) => j.id);
+  const applicantCountRows = jobIds.length
+    ? await all(`SELECT job_id, COUNT(*) AS c FROM applications WHERE job_id IN (${jobIds.map(() => '?').join(',')}) GROUP BY job_id`, jobIds)
+    : [];
+  const applicantCountByJobId = Object.fromEntries(applicantCountRows.map((r) => [r.job_id, Number(r.c)]));
+
   const result = jobs.map(j => ({
     ...j,
     match: computeMatch(j.stack, profileStack),
     applied: appliedJobIds.has(j.id),
     saved: savedJobIds.has(j.id),
+    applicantCount: applicantCountByJobId[j.id] || 0,
   }));
   // 프리랜서에게는 매칭률이 높은 공고부터 보여줍니다.
   if (req.user && req.user.role === 'freelancer') {
@@ -122,22 +130,74 @@ router.get('/', optionalAuth, async (req, res) => {
   res.json({ jobs: finalResult });
 });
 
+// 잡코리아 스타일: 프리랜서가 최근 조회한 공고 목록 ("최근 본 공고")
+// /:id 라우트보다 먼저 등록해야 'recent-views'가 :id로 잡히지 않습니다.
+router.get('/recent-views', requireAuth, requireRole('freelancer'), async (req, res) => {
+  const rows = await all(
+    `SELECT j.* FROM jobs j
+     JOIN (
+       SELECT job_id, MAX(created_at) AS viewed_at
+       FROM job_views
+       WHERE freelancer_id = ?
+       GROUP BY job_id
+     ) v ON v.job_id = j.id
+     ORDER BY v.viewed_at DESC
+     LIMIT 10`,
+    [req.user.id]
+  );
+  const p = await get('SELECT stack_json FROM freelancer_profiles WHERE user_id = ?', [req.user.id]);
+  const profileStack = p ? JSON.parse(p.stack_json) : [];
+  const jobs = [];
+  for (const row of rows) {
+    const full = await withCompanyAndStack(row);
+    jobs.push({ ...full, match: computeMatch(full.stack, profileStack) });
+  }
+  res.json({ jobs });
+});
+
+// 잡코리아 스타일: 같은 분야·비슷한 기술스택의 다른 열려있는 공고를 추천합니다.
+async function similarJobsFor(job, profileStack) {
+  const candidates = await all("SELECT * FROM jobs WHERE status = 'open' AND id != ?", [job.id]);
+  const targetStack = JSON.parse(job.stack_json);
+  const scored = candidates
+    .map((c) => ({
+      row: c,
+      dday: dDay(c.deadline),
+      sameCategory: c.category === job.category ? 1 : 0,
+      overlap: computeMatch(targetStack, JSON.parse(c.stack_json)),
+    }))
+    .filter((c) => c.dday !== '마감')
+    .sort((a, b) => b.sameCategory - a.sameCategory || b.overlap - a.overlap || b.row.id - a.row.id)
+    .slice(0, 4);
+
+  const result = [];
+  for (const s of scored) {
+    const full = await withCompanyAndStack(s.row);
+    result.push({ ...full, match: computeMatch(full.stack, profileStack) });
+  }
+  return result;
+}
+
 router.get('/:id', optionalAuth, async (req, res) => {
   const job = await get('SELECT * FROM jobs WHERE id = ?', [req.params.id]);
   if (!job) return res.status(404).json({ error: '공고를 찾을 수 없습니다.' });
   const full = await withCompanyAndStack(job);
 
-  let match = 0, applied = false, saved = false, following = false;
+  let match = 0, applied = false, saved = false, following = false, profileStack = [];
   if (req.user && req.user.role === 'freelancer') {
     const p = await get('SELECT stack_json FROM freelancer_profiles WHERE user_id = ?', [req.user.id]);
-    match = computeMatch(full.stack, p ? JSON.parse(p.stack_json) : []);
+    profileStack = p ? JSON.parse(p.stack_json) : [];
+    match = computeMatch(full.stack, profileStack);
     applied = !!(await get('SELECT id FROM applications WHERE job_id=? AND freelancer_id=?', [job.id, req.user.id]));
     saved = !!(await get('SELECT id FROM saved_jobs WHERE job_id=? AND freelancer_id=?', [job.id, req.user.id]));
     following = !!(await get('SELECT id FROM followed_companies WHERE freelancer_id=? AND company_id=?', [req.user.id, job.company_id]));
+    // 최근 본 공고 이력을 남깁니다.
+    await run('INSERT INTO job_views (freelancer_id, job_id) VALUES (?, ?)', [req.user.id, job.id]);
   }
 
   const applicantCount = (await get('SELECT COUNT(*) AS c FROM applications WHERE job_id = ?', [job.id])).c;
-  res.json({ ...full, match, applied, saved, following, applicantCount: Number(applicantCount) });
+  const similarJobs = await similarJobsFor(job, profileStack);
+  res.json({ ...full, match, applied, saved, following, applicantCount: Number(applicantCount), similarJobs });
 });
 
 router.post('/', requireAuth, requireRole('company'), async (req, res) => {

@@ -243,6 +243,16 @@
   .reco-reason{font-size:10.5px; color:var(--slate); background:var(--paper-dim); border:1px solid var(--line); padding:3px 8px; border-radius:999px;}
   .reco-empty{padding:16px; text-align:center; font-size:12.5px; color:var(--slate); background:var(--card); border:1px dashed var(--line); border-radius:14px; line-height:1.6;}
 
+  /* ── 최근 본 공고 / 비슷한 공고: 가로 스크롤 미니 카드 ── */
+  .hrow{display:flex; gap:10px; overflow-x:auto; padding-bottom:6px; margin:0 0 6px; -ms-overflow-style:none; scrollbar-width:none;}
+  .hrow::-webkit-scrollbar{display:none;}
+  .mini-card{flex:0 0 auto; width:170px; background:var(--card); border:1px solid var(--line); border-radius:var(--radius-md); padding:12px; cursor:pointer;}
+  .mini-card:active{transform:scale(.98);}
+  .mini-card .mc-title{font-size:12px; font-weight:700; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .mini-card .mc-org{font-size:10.5px; color:var(--slate); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .mini-card .mc-meta{margin-top:8px; display:flex; align-items:center; justify-content:space-between;}
+  .sbadge.urgent{background:#FBE2DD; color:var(--danger);}
+
   /* ── 그래픽 컴포넌트 ── */
   .ring-wrap{display:flex; align-items:center; justify-content:center; gap:18px; padding:6px 0;}
   .ring{position:relative; width:104px; height:104px; flex:0 0 auto;}
@@ -524,6 +534,7 @@ const I = {
   star:`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3.5l2.6 5.6 6.1.6-4.6 4.1 1.3 6-5.4-3.1-5.4 3.1 1.3-6-4.6-4.1 6.1-.6Z" stroke-linejoin="round"/></svg>`,
   pin:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 21s-6.5-5.6-6.5-11A6.5 6.5 0 0 1 18.5 10c0 5.4-6.5 11-6.5 11Z"/><circle cx="12" cy="10" r="2"/></svg>`,
   clock:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><path d="M12 8V12L15 14"/></svg>`,
+  usersSm:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="9" cy="8.5" r="3"/><path d="M3.5 18c.6-3 2.7-4.7 5.5-4.7s4.9 1.7 5.5 4.7"/><circle cx="17" cy="8.2" r="2.2"/><path d="M15.5 13.5c1.8.3 3.2 1.7 3.6 4"/></svg>`,
   logout:`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M13 4H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h6"/><path d="M17 16l4-4-4-4"/><path d="M21 12H9"/></svg>`,
   x:`<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 5L19 19M5 19L19 5" stroke-linecap="round"/></svg>`,
   gear:`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M12 3v2.2M12 18.8V21M4.9 4.9l1.5 1.5M17.6 17.6l1.5 1.5M3 12h2.2M18.8 12H21M4.9 19.1l1.5-1.5M17.6 6.4l1.5-1.5"/></svg>`,
@@ -736,6 +747,9 @@ function gauge(pct){
     <div class="gauge-track"><div class="gauge-fill" style="width:${pct}%"></div></div>
     <span class="gauge-value">${pct}%</span></div>`;
 }
+function gaugeSm(pct){
+  return `<span style="font-family:var(--mono); font-weight:700; font-size:11px; color:var(--ink);">${pct}%</span>`;
+}
 function statusbar(){
   return `<div class="statusbar"></div>`;
 }
@@ -898,7 +912,8 @@ function ddayBadge(dday){
   if(!dday) return '';
   const urgent = dday==='오늘마감' || (dday.startsWith('D-') && Number(dday.slice(2))<=3);
   const closed = dday==='마감';
-  const color = closed ? 'var(--slate-light)' : urgent ? 'var(--danger)' : 'var(--cyan)';
+  if(urgent) return `<span class="sbadge urgent">🔥${esc(dday)} 마감임박</span>`;
+  const color = closed ? 'var(--slate-light)' : 'var(--cyan)';
   return `<span style="font-family:var(--mono); font-size:10.5px; font-weight:700; color:${color};">${esc(dday)}</span>`;
 }
 // 업무(직무)별 아이콘 — 역할의 성격을 직관적으로 나타냅니다.
@@ -939,6 +954,16 @@ function ratingBadge(avg, count){
   if(!avg || !count) return `<span style="font-family:var(--mono); font-size:10.5px; color:var(--slate-light);">아직 리뷰 없음</span>`;
   return `<span style="font-family:var(--mono); font-size:10.5px; color:var(--amber-deep); font-weight:700;">★ ${avg.toFixed(1)} <span style="color:var(--slate); font-weight:400;">(${count})</span></span>`;
 }
+// 잡코리아 스타일: 지원자 수로 경쟁 정도를 알려줍니다.
+function applicantBadge(count){
+  const c = Number(count) || 0;
+  let label = '', color = 'var(--slate)';
+  if(c>=10){ label='· 경쟁 치열'; color='var(--danger)'; }
+  else if(c>=4){ label='· 경쟁 보통'; color='var(--amber-deep)'; }
+  return `<span style="display:inline-flex; align-items:center; gap:5px; font-size:11.5px; color:var(--slate);">`
+    + `<span style="color:var(--slate-light); display:inline-flex;">${I.usersSm}</span>`
+    + `지원자 ${c}명 <b style="color:${color}; font-weight:700; font-family:var(--mono);">${label}</b></span>`;
+}
 function jobCard(j){
   return `<div class="card clickable ${j.applied?'is-applied':''}" onclick="go('jobDetail', ${j.id})">
     <div class="card-top">
@@ -954,9 +979,18 @@ function jobCard(j){
       <span class="im">${I.pin}${esc(j.location)}</span>
       <span class="im">${I.wallet}<b>${esc(j.rate)}</b></span>
       <span class="im">${I.clockSm}${esc(j.period)}</span>
+      ${state.role==='freelancer' ? applicantBadge(j.applicantCount) : ''}
     </div>
     <div class="meta-row" style="margin-top:6px;">${ddayBadge(j.d_day)}${ratingBadge(j.rating_avg, j.rating_count)}</div>
     ${state.role==='freelancer' ? gauge(j.match) : ''}
+  </div>`;
+}
+// 잡코리아 스타일: 최근 본 공고 / 비슷한 공고에 쓰는 가로 스크롤용 축약 카드
+function miniJobCard(j){
+  return `<div class="mini-card" onclick="go('jobDetail', ${j.id})">
+    <div class="mc-title">${esc(j.title)}</div>
+    <div class="mc-org">${esc(j.org)}</div>
+    <div class="mc-meta">${ddayBadge(j.d_day)}${state.role==='freelancer' ? gaugeSm(j.match) : ''}</div>
   </div>`;
 }
 function recoJobCard(j){
@@ -2078,7 +2112,10 @@ async function screenJobs(){
   if(jobCat && jobCat!=='전체') qs.set('category', jobCat);
   if(jobGrade && jobGrade!=='전체') qs.set('grade', jobGrade);
   if(jobDuty) qs.set('duty', jobDuty);
-  const data = await apiFetch('/jobs?' + qs.toString());
+  const [data, recentJobs] = await Promise.all([
+    apiFetch('/jobs?' + qs.toString()),
+    isCompany ? Promise.resolve([]) : apiFetch('/jobs/recent-views').then(r=>r.jobs).catch(()=>[]),
+  ]);
   const cats = ["전체", ...Object.keys(STACK_CATALOG)];
   const grades = ["전체","초급","중급","고급","특급"];
   const duties = ["","PM","PL","TA","SA","DBA","개발자","QA","보안","감리","기타"];
@@ -2094,6 +2131,9 @@ async function screenJobs(){
         ${duties.map(d=>`<option value="${d}" ${d===jobDuty?'selected':''}>${d===''?'업무 전체':d}</option>`).join('')}
       </select>
     </div>
+    ${recentJobs.length ? `
+    <div class="section-label">최근 본 공고</div>
+    <div class="hrow">${recentJobs.map(miniJobCard).join('')}</div>` : ''}
     <div class="section-label">${isCompany?"등록 현황":"매칭률 순"}</div>
     <div id="jobList">${data.jobs.map(jobCard).join('') || emptyArt(ART.noJobs, '조건에 맞는 공고가 없어요', '검색어나 필터를 바꿔보세요.')}</div>
   </div>
@@ -2137,6 +2177,7 @@ async function screenJobDetail(){
       ${j.duty?`<div class="kv-box"><div class="kv-lbl">업무</div><div class="kv-val">${dutyBadge(j.duty)}</div></div>`:''}
       ${j.grade?`<div class="kv-box"><div class="kv-lbl">등급</div><div class="kv-val">${gradeBadge(j.grade)}</div></div>`:''}
       <div class="kv-box"><div class="kv-lbl">지원마감</div><div class="kv-val">${ddayBadge(j.d_day) || esc(j.d_day)}</div></div>
+      ${!isCompany?`<div class="kv-box"><div class="kv-lbl">지원 현황</div><div class="kv-val" style="font-size:12.5px;">${applicantBadge(j.applicantCount)}</div></div>`:''}
     </div>
     ${(j.certs && j.certs.length) ? `
       <div class="section-label with-ic">${I.badgeCheck}요구 자격증</div>
@@ -2145,6 +2186,9 @@ async function screenJobDetail(){
     <div class="tag-row">${j.stack.map(s=>`<span class="tag on">${esc(s)}</span>`).join('')}</div>
     <div class="section-label with-ic">${I.checklist}상세 내용</div>
     <div class="para">${esc(j.description) || "상세 설명이 아직 등록되지 않았어요."}</div>
+    ${(!isCompany && j.similarJobs && j.similarJobs.length) ? `
+    <div class="section-label">비슷한 공고</div>
+    <div class="hrow">${j.similarJobs.map(miniJobCard).join('')}</div>` : ''}
     <div style="height:90px;"></div>
   </div>
   <div style="position:absolute; left:0; right:0; bottom:0; padding:14px 20px 22px; background:var(--paper); border-top:1px solid var(--line); display:flex; gap:10px;">
