@@ -344,6 +344,25 @@ router.post('/:id/save', requireAuth, requireRole('freelancer'), async (req, res
   res.json({ saved: true });
 });
 
+// 잡코리아 스타일: 의심스럽거나 부적절한 공고 신고 (프리랜서 전용, 공고당 1회)
+router.post('/:id/report', requireAuth, requireRole('freelancer'), async (req, res) => {
+  const jobId = Number(req.params.id);
+  if (!Number.isInteger(jobId)) return res.status(400).json({ error: '올바르지 않은 공고 ID입니다.' });
+
+  const job = await get('SELECT id FROM jobs WHERE id = ?', [jobId]);
+  if (!job) return res.status(404).json({ error: '공고를 찾을 수 없습니다.' });
+
+  const { reason } = req.body || {};
+  const safeReason = typeof reason === 'string' ? reason.trim().slice(0, 500) : '';
+  if (!safeReason) return res.status(400).json({ error: '신고 사유를 선택해주세요.' });
+
+  const existing = await get('SELECT id FROM job_reports WHERE freelancer_id=? AND job_id=?', [req.user.id, jobId]);
+  if (existing) return res.status(409).json({ error: '이미 신고한 공고예요.' });
+
+  await run('INSERT INTO job_reports (freelancer_id, job_id, reason) VALUES (?,?,?)', [req.user.id, jobId, safeReason]);
+  res.status(201).json({ reported: true });
+});
+
 // 공고 삭제 (기업 전용, 본인이 등록한 공고만)
 router.delete('/:id', requireAuth, requireRole('company'), async (req, res) => {
   const jobId = Number(req.params.id);

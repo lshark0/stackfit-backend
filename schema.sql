@@ -247,3 +247,14 @@ CREATE TABLE IF NOT EXISTS job_views (
 );
 CREATE INDEX IF NOT EXISTS idx_job_views_freelancer ON job_views(freelancer_id);
 CREATE INDEX IF NOT EXISTS idx_job_views_job ON job_views(job_id);
+
+-- 잡코리아 스타일: 프리랜서가 의심스럽거나 부적절한 공고를 신고
+CREATE TABLE IF NOT EXISTS job_reports (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  freelancer_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  job_id        INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+  reason        TEXT NOT NULL DEFAULT '',
+  created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(freelancer_id, job_id)
+);
+CREATE INDEX IF NOT EXISTS idx_job_reports_job ON job_reports(job_id);

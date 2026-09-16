@@ -537,6 +537,7 @@ const I = {
   usersSm:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="9" cy="8.5" r="3"/><path d="M3.5 18c.6-3 2.7-4.7 5.5-4.7s4.9 1.7 5.5 4.7"/><circle cx="17" cy="8.2" r="2.2"/><path d="M15.5 13.5c1.8.3 3.2 1.7 3.6 4"/></svg>`,
   copy:`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   eyeSm:`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="2.8"/></svg>`,
+  flag:`<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" style="vertical-align:-1px; margin-right:3px;"><path d="M5 21V4" stroke-linecap="round"/><path d="M5 4h13l-3 4.5L18 13H5" stroke-linejoin="round"/></svg>`,
   logout:`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M13 4H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h6"/><path d="M17 16l4-4-4-4"/><path d="M21 12H9"/></svg>`,
   x:`<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 5L19 19M5 19L19 5" stroke-linecap="round"/></svg>`,
   gear:`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M12 3v2.2M12 18.8V21M4.9 4.9l1.5 1.5M17.6 17.6l1.5 1.5M3 12h2.2M18.8 12H21M4.9 19.1l1.5-1.5M17.6 6.4l1.5-1.5"/></svg>`,
@@ -576,7 +577,7 @@ function jobDetailBack(){ goBackFrom(jobDetailReturn, 'jobs'); }
 function talentDetailBack(){ goBackFrom(talentDetailReturn, 'talent'); }
 
 // 회원 유형별로만 열 수 있는 화면. 다른 유형의 화면이 열리려 하면(뒤로가기 기록, 예전 알림 등) 홈으로 보냅니다.
-const FREELANCER_ONLY = ['receivedProposals','myApplications','portfolios','portfolioEdit','savedJobs','profileViews','profileEdit','proposalSettings'];
+const FREELANCER_ONLY = ['receivedProposals','myApplications','portfolios','portfolioEdit','savedJobs','followedCompanies','profileViews','profileEdit','proposalSettings'];
 const COMPANY_ONLY = ['talent','talentDetail','applicants','jobPost','companyProfileEdit','proposeForm','sentProposals','savedTalents'];
 function screenAllowed(screen){
   if(state.role==='company' && FREELANCER_ONLY.includes(screen)) return false;
@@ -640,6 +641,7 @@ function drawerMenuContent(){
     ${item(I.checklist,'내 지원 현황','myApplications')}
     ${item(I.bell,'받은 제안','receivedProposals')}
     ${item(I.jobs,'관심프로젝트','savedJobs')}
+    ${item(I.building,'관심기업','followedCompanies')}
     ${item(I.eye,'프로필 열람현황','profileViews')}
   `;
 
@@ -2220,7 +2222,7 @@ async function screenJobDetail(){
   <div class="content" style="padding-top:14px;">
     <div class="back-row" style="padding:0 0 10px;"><div class="back-btn" onclick="jobDetailBack()">${I.back}</div><div class="page-sub">공고 상세</div></div>
     <div class="detail-hero">
-      <div class="org">${esc(j.org)}</div>
+      <div class="org" style="display:flex; align-items:center; gap:6px;">${esc(j.org)}${!isCompany?`<span onclick="toggleFollowCompany(${j.company_id})" style="cursor:pointer; color:${j.following?'var(--amber-deep)':'var(--slate-light)'}; display:inline-flex;" title="관심기업 등록">${I.star}</span>`:''}</div>
       <h2>${esc(j.title)}</h2>
       <div style="margin-top:8px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
         ${j.applied?`<span class="sbadge applied">${I.checkCircle}지원완료</span>`:''}
@@ -2258,6 +2260,7 @@ async function screenJobDetail(){
     ${(!isCompany && j.similarJobs && j.similarJobs.length) ? `
     <div class="section-label">비슷한 공고</div>
     <div class="hrow">${j.similarJobs.map(miniJobCard).join('')}</div>` : ''}
+    ${!isCompany?`<div style="text-align:center; margin-top:22px;"><span onclick="openReportJob(${j.id})" style="font-size:11.5px; color:var(--slate-light); text-decoration:underline; cursor:pointer;">${I.flag}이 공고 신고하기</span></div>`:''}
     <div style="height:90px;"></div>
   </div>
   <div style="position:absolute; left:0; right:0; bottom:0; padding:14px 20px 22px; background:var(--paper); border-top:1px solid var(--line); display:flex; gap:10px;">
@@ -2657,6 +2660,27 @@ async function declineProposal(reason){
   }catch(e){ toast(e.message); }
 }
 
+// 잡코리아 스타일: 의심스럽거나 부적절한 공고를 신고합니다.
+const JOB_REPORT_REASONS = ['허위·과장된 채용 정보', '연락처 도용/사칭', '중복 등록', '차별적인 내용 포함', '기타'];
+function openReportJob(jobId){
+  const box = document.getElementById('confirmOverlay');
+  document.getElementById('confirmMsg').innerHTML =
+    `<div style="font-size:15px; font-weight:700; margin-bottom:12px;">신고 사유를 선택해주세요</div>
+     <div style="display:flex; flex-direction:column; gap:7px; text-align:left;">
+       ${JOB_REPORT_REASONS.map(r=>`<button class="btn btn-outline" style="font-size:13px; padding:11px;" onclick="reportJob(${jobId}, '${jsAttrStr(r)}')">${esc(r)}</button>`).join('')}
+     </div>`;
+  document.getElementById('confirmOkBtn').style.display = 'none';
+  box.classList.add('open');
+}
+async function reportJob(jobId, reason){
+  closeConfirm();
+  document.getElementById('confirmOkBtn').style.display = '';
+  try{
+    await apiFetch(`/jobs/${jobId}/report`, {method:'POST', body:{reason}});
+    toast('신고가 접수됐어요. 검토 후 조치할게요');
+  }catch(e){ toast(e.message); }
+}
+
 /* ---- [프리랜서] 제안 설정 ---- */
 async function screenProposalSettings(){
   const p = await apiFetch('/profile');
@@ -2841,8 +2865,27 @@ async function screenMyApplications(){
     accepted: `<span class="sbadge pass">${I.trophy}합격</span>`,
     rejected: `<span class="sbadge fail">${I.xCircle}불합격</span>`,
   };
+  // 잡코리아 스타일: 지원 현황을 한눈에 볼 수 있는 요약 통계
+  const total = data.applications.length;
+  const counts = { submitted: 0, accepted: 0, rejected: 0 };
+  data.applications.forEach(a => { if(counts[a.status] !== undefined) counts[a.status]++; });
+  const passRate = total ? Math.round((counts.accepted / total) * 100) : 0;
+  const statTile = (label, value) => `<div style="flex:1; text-align:center; padding:12px 4px;">
+    <div style="font-family:var(--mono); font-size:19px; font-weight:700; color:var(--ink);">${value}</div>
+    <div style="font-size:10.5px; color:var(--slate); margin-top:3px;">${label}</div>
+  </div>`;
+  const statsRow = total ? `<div style="display:flex; background:var(--card); border:1px solid var(--line); border-radius:var(--radius-md); margin-bottom:14px;">
+    ${statTile('총 지원', total)}
+    <div style="width:1px; background:var(--line);"></div>
+    ${statTile('검토중', counts.submitted)}
+    <div style="width:1px; background:var(--line);"></div>
+    ${statTile('합격', counts.accepted)}
+    <div style="width:1px; background:var(--line);"></div>
+    ${statTile('합격률', passRate + '%')}
+  </div>` : '';
   return `${statusbar()}${header("내 지원 현황", `${data.applications.length}건 지원`, {back:'home'}, nc)}
   <div class="content">
+    ${statsRow}
     ${data.applications.map(a=>`
       <div class="card clickable" onclick="${a.status==='accepted' ? `go('projects')` : `go('jobDetail', ${a.id})`}">
         <div class="card-top">
@@ -3082,6 +3125,32 @@ async function screenSavedJobs(){
   <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('mypage')">${I.back}</div><div class="page-title" style="font-size:18px;">관심프로젝트</div></div></div>
   <div class="content">
     ${data.jobs.map(jobCard).join('') || emptyArt(ART.noJobs, '아직 저장한 프로젝트가 없어요', '공고 카드의 ★ 버튼으로 저장할 수 있어요.')}
+  </div>`;
+}
+
+// 잡코리아 스타일: 관심 등록한 기업을 모아보는 화면 (프리랜서 전용)
+function viewCompanyJobs(name){ jobQuery = name; go('jobs'); }
+async function toggleFollowCompany(companyId){
+  try{
+    const r = await apiFetch(`/companies/${companyId}/follow`, {method:'POST'});
+    toast(r.following ? '관심기업으로 등록했어요' : '관심기업에서 뺐어요');
+    render();
+  }catch(e){ toast(e.message); }
+}
+async function screenFollowedCompanies(){
+  const data = await apiFetch('/companies/followed');
+  return `${statusbar()}
+  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('mypage')">${I.back}</div><div class="page-title" style="font-size:18px;">관심기업</div></div></div>
+  <div class="content">
+    ${data.companies.map(c=>`
+      <div class="card clickable" onclick="viewCompanyJobs('${jsAttrStr(c.name)}')">
+        <div class="card-top">
+          <div class="card-title">${esc(c.name)}</div>
+          <div class="star-btn filled" onclick="event.stopPropagation(); toggleFollowCompany(${c.user_id})">${I.star}</div>
+        </div>
+        <div class="page-sub" style="margin-top:6px;">${esc(c.description) || '회사 소개가 아직 없어요'}</div>
+        <div class="icon-meta" style="margin-top:8px;"><span class="im">${I.jobs}<b>${c.open_jobs}</b>건 채용중</span></div>
+      </div>`).join('') || emptyArt(ART.noJobs, '아직 관심 등록한 기업이 없어요', '공고 상세에서 기업명 옆 ★ 버튼으로 등록할 수 있어요.')}
   </div>`;
 }
 
@@ -3347,7 +3416,7 @@ async function render(){
       portfolios: screenProfileEdit, portfolioEdit: screenPortfolioEdit,
       proposalSettings: screenProposalSettings,
       sentProposals: screenSentProposals, savedTalents: screenSavedTalents,
-      savedJobs: screenSavedJobs, profileViews: screenProfileViews, receivedProposals: screenReceivedProposals,
+      savedJobs: screenSavedJobs, followedCompanies: screenFollowedCompanies, profileViews: screenProfileViews, receivedProposals: screenReceivedProposals,
       proposeForm: screenProposeForm, pickerScreen: screenPicker,
       reviewForm: screenReviewForm,
     };
