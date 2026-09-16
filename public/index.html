@@ -2819,7 +2819,7 @@ async function screenReportJob(){
         <input id="rp-email" class="form-input" type="email" value="${esc(defaultEmail)}" placeholder="you@example.com"></div>
       <div style="display:flex; gap:10px; margin-top:16px;">
         <button class="btn btn-outline" onclick="go('jobDetail', ${jobId})">취소</button>
-        <button class="btn btn-primary" onclick="submitJobReport(${jobId})">선택</button>
+        <button class="btn btn-primary" onclick="submitJobReport(${jobId})">신고하기</button>
       </div>`}
     ` : `
       ${reportsData.length ? reportsData.map(r=>`
