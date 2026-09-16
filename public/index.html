@@ -82,6 +82,20 @@
   .chip-row{display:flex; gap:8px; margin:12px 0 4px; overflow-x:auto;}
   .chip{font-family:var(--mono); font-size:11.5px; border-radius:999px; padding:7px 13px; background:var(--paper-dim); color:var(--ink); border:1px solid var(--line); cursor:pointer; white-space:nowrap; flex:0 0 auto;}
   .chip.active{background:var(--ink); color:var(--amber-soft); border-color:var(--ink);}
+  /* 잡코리아 스타일 회원가입 상단 탭(개인회원/기업회원) */
+  .tab-switch{display:flex; border-bottom:2px solid var(--line); margin:0 -20px 16px;}
+  .tab-switch .tab{flex:1; text-align:center; padding:14px 0; font-size:14.5px; font-weight:700; color:var(--slate-light); cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-2px;}
+  .tab-switch .tab.active{color:var(--ink); border-bottom-color:var(--ink);}
+  .su-section-title{font-size:13px; font-weight:700; color:var(--ink); margin:22px 0 4px;}
+  .su-gender-row{display:flex; gap:8px;}
+  .su-gender-row .chip{flex:1; text-align:center; padding:12px 0;}
+  .su-phone-row{display:flex; gap:8px;}
+  .su-phone-row input{flex:1;}
+  .su-agree-item{display:flex; align-items:center; justify-content:space-between; padding:9px 0; border-bottom:1px solid var(--line); font-size:12.5px;}
+  .su-agree-item:last-child{border-bottom:none;}
+  .su-agree-item .req{color:var(--danger); font-weight:700; margin-right:4px;}
+  .su-agree-item .opt{color:var(--slate); font-weight:700; margin-right:4px;}
+  .su-agree-item input{width:17px; height:17px; accent-color:var(--ink);}
   .card{background:var(--card); border:1px solid var(--line); border-radius:var(--radius-md); padding:15px; margin-bottom:10px; transition:.15s;}
   .card.clickable{cursor:pointer;}
   .card.clickable:active{transform:scale(.98);}
@@ -1103,16 +1117,24 @@ function logout(){
 }
 
 let signupRole = 'freelancer';
+let signupGender = '';
 function setSignupRole(role, el){
   signupRole = role;
-  document.querySelectorAll('#signupRoleChips .chip').forEach(c=>c.classList.remove('active'));
+  document.querySelectorAll('#signupRoleTabs .tab').forEach(c=>c.classList.remove('active'));
   el.classList.add('active');
-  const nameField = document.getElementById('su-namefield');
-  if(nameField) nameField.querySelector('.form-label').textContent = role==='freelancer' ? '이름' : '회사명';
+  const freelancerFields = document.getElementById('su-freelancerfields');
+  if(freelancerFields) freelancerFields.hidden = role !== 'freelancer';
   const companyFields = document.getElementById('su-companyfields');
   if(companyFields) companyFields.hidden = role !== 'company';
+  const agerow = document.getElementById('su-agree-agerow');
+  if(agerow) agerow.hidden = role !== 'freelancer';
   const phoneLabel = document.getElementById('su-phonelabel');
   if(phoneLabel) phoneLabel.innerHTML = (role==='company' ? '담당자 휴대폰' : '휴대폰') + ' <span style="color:var(--danger); font-size:11px;">(필수)</span>';
+}
+function setSignupGender(g){
+  signupGender = g;
+  document.getElementById('su-gender-male').classList.toggle('active', g==='남자');
+  document.getElementById('su-gender-female').classList.toggle('active', g==='여자');
 }
 function togglePasswordVisibility(inputId, iconEl){
   const input = document.getElementById(inputId);
@@ -1121,11 +1143,30 @@ function togglePasswordVisibility(inputId, iconEl){
   input.type = showing ? 'password' : 'text';
   iconEl.style.color = showing ? 'var(--slate-light)' : 'var(--ink)';
 }
+// 잡코리아 스타일 인증번호 UI. 실제 SMS 발송 업체 연동 없이, 형식만 갖춘 화면 흐름입니다.
+function sendSignupPhoneCode(){
+  const phone = document.getElementById('su-phone').value.trim();
+  if(!/^01[016789][- ]?\d{3,4}[- ]?\d{4}$/.test(phone)){ toast('휴대폰 번호를 정확히 입력해주세요'); return; }
+  document.getElementById('su-phonecoderow').hidden = false;
+  document.getElementById('su-phoneverified').hidden = true;
+  toast('인증번호를 전송했어요');
+}
+function confirmSignupPhoneCode(){
+  const code = document.getElementById('su-phonecode').value.trim();
+  if(!code){ toast('인증번호를 입력해주세요'); return; }
+  document.getElementById('su-phonecoderow').hidden = true;
+  document.getElementById('su-phoneverified').hidden = false;
+  toast('휴대폰 인증이 완료됐어요');
+}
+function toggleSignupAgreeAll(checked){
+  document.querySelectorAll('#screen .su-agree-item input[type=checkbox]').forEach(el => {
+    if(!el.closest('#su-agree-agerow') || signupRole==='freelancer') el.checked = checked;
+  });
+}
 async function doSignup(){
   const email = document.getElementById('su-email').value.trim();
   const password = document.getElementById('su-password').value;
   const passwordConfirm = document.getElementById('su-password-confirm').value;
-  const nameVal = document.getElementById('su-name').value.trim();
   const phone = document.getElementById('su-phone').value.trim();
   if(!email || !password){ toast('이메일과 비밀번호를 입력해주세요'); return; }
   const pwOk = password.length>=8 && /[A-Za-z]/.test(password) && /\d/.test(password);
@@ -1136,18 +1177,28 @@ async function doSignup(){
     document.getElementById('su-phone').focus();
     return;
   }
-  const agreed = document.getElementById('su-agree').checked;
-  if(!agreed){ toast('이용약관 및 개인정보처리방침에 동의해주세요'); return; }
+  if(signupRole==='freelancer' && !document.getElementById('su-agree-age').checked){
+    toast('만 14세 이상 항목에 동의해주세요'); return;
+  }
+  if(!document.getElementById('su-agree-terms').checked){
+    toast('이용약관 및 개인정보처리방침에 동의해주세요'); return;
+  }
   try{
     const body = { email, password, role: signupRole, phone };
-    if(signupRole==='freelancer') body.name = nameVal || '이름 미입력';
-    else {
-      body.companyName = nameVal || '회사명 미입력';
+    if(signupRole==='freelancer'){
+      body.name = document.getElementById('su-name').value.trim() || '이름 미입력';
+      body.birthDate = document.getElementById('su-birthdate').value.trim();
+      body.gender = signupGender;
+    } else {
+      body.companyName = document.getElementById('su-companyname').value.trim() || '회사명 미입력';
       body.contactPerson = document.getElementById('su-contactperson').value.trim();
       body.position = document.getElementById('su-position').value.trim();
       body.companyPhone = document.getElementById('su-companyphone').value.trim();
       body.address = document.getElementById('su-address').value.trim();
       body.description = document.getElementById('su-description').value.trim();
+      body.companyType = document.getElementById('su-companytype').value;
+      body.bizRegNo = document.getElementById('su-bizregno').value.trim();
+      body.ceoName = document.getElementById('su-ceoname').value.trim();
     }
     const data = await apiFetch('/auth/signup', {method:'POST', body});
     saveToken(data.token); state.role = data.user.role; state.userId = data.user.id;
@@ -2013,25 +2064,14 @@ function screenSignup(){
   return `${statusbar()}
   <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('onboarding')">${I.back}</div><div class="page-title">회원가입</div></div></div>
   <div class="content">
+    <div class="tab-switch" id="signupRoleTabs">
+      <div class="tab active" onclick="setSignupRole('freelancer', this)">개인회원</div>
+      <div class="tab" onclick="setSignupRole('company', this)">기업회원</div>
+    </div>
     ${socialLoginButtons()}
-    <div class="chip-row" id="signupRoleChips">
-      <div class="chip active" onclick="setSignupRole('freelancer', this)">프리랜서</div>
-      <div class="chip" onclick="setSignupRole('company', this)">기업</div>
-    </div>
-    <div class="form-field" style="margin-top:14px;" id="su-namefield"><label class="form-label">이름</label><input id="su-name" class="form-input" placeholder="예: 이승학"></div>
-    <div class="form-field"><label class="form-label">이메일</label><input id="su-email" class="form-input" type="email" placeholder="you@example.com"></div>
-    <div id="su-companyfields" hidden>
-      <div class="form-field"><label class="form-label">회사 전화</label>
-        <input id="su-companyphone" class="form-input" type="tel" inputmode="tel" placeholder="02-1234-5678"></div>
-      <div class="form-field"><label class="form-label">주소</label>
-        <input id="su-address" class="form-input" autocomplete="street-address" placeholder="예: 서울특별시 종로구 세종대로 110"></div>
-      <div class="form-field"><label class="form-label">회사 소개</label><textarea id="su-description" class="form-input" placeholder="회사를 간단히 소개해주세요"></textarea></div>
-      <div class="form-field"><label class="form-label">담당자명</label><input id="su-contactperson" class="form-input" placeholder="예: 홍길동"></div>
-      <div class="form-field"><label class="form-label">직책</label>
-        <input id="su-position" class="form-input" placeholder="예: 인사팀장, PM"></div>
-    </div>
-    <div class="form-field" id="su-phonefield"><label class="form-label" id="su-phonelabel">휴대폰 <span style="color:var(--danger); font-size:11px;">(필수)</span></label>
-      <input id="su-phone" class="form-input" type="tel" inputmode="tel" autocomplete="tel" placeholder="010-1234-5678"></div>
+    <div class="page-sub" style="margin-top:14px;">회원가입하고 다양한 혜택을 누리세요</div>
+
+    <div class="form-field" style="margin-top:12px;"><label class="form-label">이메일 <span style="color:var(--danger); font-size:11px;">(아이디로 사용)</span></label><input id="su-email" class="form-input" type="email" placeholder="you@example.com"></div>
     <div class="form-field">
       <label class="form-label">비밀번호</label>
       <div style="position:relative;">
@@ -2047,14 +2087,71 @@ function screenSignup(){
         <div onclick="togglePasswordVisibility('su-password-confirm', this)" style="position:absolute; right:12px; top:50%; transform:translateY(-50%); cursor:pointer; color:var(--slate-light);">${I.eye}</div>
       </div>
     </div>
-    <div class="form-field" style="display:flex; align-items:flex-start; gap:8px;">
-      <input type="checkbox" id="su-agree" style="margin-top:3px; width:16px; height:16px; flex:0 0 auto;">
-      <label for="su-agree" style="font-size:12.5px; color:var(--slate); line-height:1.6;">
-        <a href="/terms.html" target="_blank" style="color:var(--ink); text-decoration:underline;">이용약관</a> 및
-        <a href="/privacy.html" target="_blank" style="color:var(--ink); text-decoration:underline;">개인정보처리방침</a>에 동의합니다
-      </label>
+
+    <div id="su-freelancerfields">
+      <div class="form-field"><label class="form-label">이름(실명)</label><input id="su-name" class="form-input" placeholder="예: 이승학"></div>
+      <div class="form-field">
+        <label class="form-label">생년월일 <span style="font-weight:400; color:var(--slate-light);">(예시: 20000131)</span></label>
+        <div class="su-phone-row">
+          <input id="su-birthdate" class="form-input" inputmode="numeric" maxlength="8" placeholder="생년월일 8자리">
+          <div class="su-gender-row" style="flex:0 0 auto; width:150px;">
+            <div class="chip" id="su-gender-male" onclick="setSignupGender('남자')">남자</div>
+            <div class="chip" id="su-gender-female" onclick="setSignupGender('여자')">여자</div>
+          </div>
+        </div>
+      </div>
     </div>
-    <button class="btn btn-primary" onclick="doSignup()">가입하고 시작하기</button>
+
+    <div id="su-companyfields" hidden>
+      <div class="su-section-title">기업정보</div>
+      <div class="form-field"><label class="form-label">기업형태</label>
+        <select id="su-companytype" class="form-input">
+          <option value="">선택 안 함</option>
+          <option>대기업</option><option>중견기업</option><option>중소기업</option><option>스타트업</option><option>외국계기업</option><option>공공기관</option>
+        </select></div>
+      <div class="form-field"><label class="form-label">사업자등록번호</label>
+        <input id="su-bizregno" class="form-input" inputmode="numeric" placeholder="10자리 숫자"></div>
+      <div class="form-field"><label class="form-label">회사명</label><input id="su-companyname" class="form-input" placeholder="예: (주)김프리"></div>
+      <div class="form-field"><label class="form-label">대표자명</label><input id="su-ceoname" class="form-input" placeholder="예: 홍길동"></div>
+      <div class="form-field"><label class="form-label">회사주소</label>
+        <input id="su-address" class="form-input" autocomplete="street-address" placeholder="예: 서울특별시 종로구 세종대로 110"></div>
+      <div class="form-field"><label class="form-label">회사 소개</label><textarea id="su-description" class="form-input" placeholder="회사를 간단히 소개해주세요"></textarea></div>
+
+      <div class="su-section-title">담당자 정보</div>
+      <div class="form-field"><label class="form-label">담당자명</label><input id="su-contactperson" class="form-input" placeholder="예: 홍길동"></div>
+      <div class="form-field"><label class="form-label">직책</label>
+        <input id="su-position" class="form-input" placeholder="예: 인사팀장, PM"></div>
+      <div class="form-field"><label class="form-label">회사 전화</label>
+        <input id="su-companyphone" class="form-input" type="tel" inputmode="tel" placeholder="02-1234-5678"></div>
+    </div>
+
+    <div class="form-field" id="su-phonefield">
+      <label class="form-label" id="su-phonelabel">휴대폰 <span style="color:var(--danger); font-size:11px;">(필수)</span></label>
+      <div class="su-phone-row">
+        <input id="su-phone" class="form-input" type="tel" inputmode="tel" autocomplete="tel" placeholder="010-1234-5678">
+        <button type="button" class="btn btn-outline" style="width:auto; flex:0 0 auto; padding:0 14px; font-size:12.5px;" onclick="sendSignupPhoneCode()">인증번호 전송</button>
+      </div>
+      <div id="su-phonecoderow" hidden class="su-phone-row" style="margin-top:8px;">
+        <input id="su-phonecode" class="form-input" inputmode="numeric" placeholder="인증번호 입력">
+        <button type="button" class="btn btn-outline" style="width:auto; flex:0 0 auto; padding:0 14px; font-size:12.5px;" onclick="confirmSignupPhoneCode()">확인</button>
+        <button type="button" class="btn btn-outline" style="width:auto; flex:0 0 auto; padding:0 12px; font-size:12.5px;" onclick="sendSignupPhoneCode()">재전송</button>
+      </div>
+      <div id="su-phoneverified" hidden class="page-sub" style="margin-top:6px; color:var(--cyan);">${I.checkCircle} 휴대폰 인증이 완료됐어요</div>
+    </div>
+
+    <div class="su-section-title">약관 동의</div>
+    <div class="su-agree-item" style="border-bottom:none; margin-bottom:6px;">
+      <label for="su-agree-all" style="font-weight:700; font-size:13px;">필수 및 선택 항목에 모두 동의합니다</label>
+      <input type="checkbox" id="su-agree-all" onclick="toggleSignupAgreeAll(this.checked)">
+    </div>
+    <div style="background:var(--card); border:1px solid var(--line); border-radius:12px; padding:2px 14px;">
+      <div class="su-agree-item" id="su-agree-agerow"><label for="su-agree-age"><span class="req">[필수]</span>만 14세 이상입니다</label><input type="checkbox" id="su-agree-age" class="su-agree-req"></div>
+      <div class="su-agree-item"><label for="su-agree-terms"><span class="req">[필수]</span><a href="/terms.html" target="_blank" style="color:var(--ink);">이용약관</a> 및 <a href="/privacy.html" target="_blank" style="color:var(--ink);">개인정보처리방침</a> 동의</label><input type="checkbox" id="su-agree-terms" class="su-agree-req"></div>
+      <div class="su-agree-item"><label for="su-agree-marketing"><span class="opt">[선택]</span>맞춤형 서비스 제공을 위한 정보 수집·이용 동의</label><input type="checkbox" id="su-agree-marketing"></div>
+      <div class="su-agree-item"><label for="su-agree-ad"><span class="opt">[선택]</span>광고성 정보 수신 동의</label><input type="checkbox" id="su-agree-ad"></div>
+    </div>
+
+    <button class="btn btn-primary" style="margin-top:18px;" onclick="doSignup()">가입하기</button>
     <div class="server-line" style="margin-top:16px;">이미 계정이 있으신가요? <b onclick="go('login')">로그인</b></div>
   </div>`;
 }

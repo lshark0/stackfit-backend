@@ -13,8 +13,30 @@ const MIN_PASSWORD_LEN = 8;
 const PASSWORD_RE = /^(?=.*[A-Za-z])(?=.*\d).+$/; // 영문 1자 이상 + 숫자 1자 이상
 const clamp = (v, max) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : '');
 
+// 생년월일: '20000131' 또는 '2000-01-31' 형태를 받아 'YYYY-MM-DD'로 통일. 형식이 틀리면 null.
+function normalizeBirthDate(v) {
+  const s = String(v || '').trim();
+  if (!s) return '';
+  const digits = s.replace(/\D/g, '');
+  if (digits.length !== 8) return null;
+  const y = digits.slice(0, 4), m = digits.slice(4, 6), d = digits.slice(6, 8);
+  const date = new Date(`${y}-${m}-${d}T00:00:00`);
+  if (Number.isNaN(date.getTime()) || date.getFullYear() !== Number(y)) return null;
+  return `${y}-${m}-${d}`;
+}
+
+// 사업자등록번호: 숫자 10자리를 'XXX-XX-XXXXX' 형태로 통일 (국세청 실시간 검증은 하지 않음). 형식이 틀리면 null.
+function normalizeBizRegNo(v) {
+  const digits = String(v || '').replace(/\D/g, '');
+  if (digits.length !== 10) return null;
+  return `${digits.slice(0, 3)}-${digits.slice(3, 5)}-${digits.slice(5)}`;
+}
+
 router.post('/signup', async (req, res) => {
-  let { email, password, role, name, companyName, phone, companyPhone, address, description, contactPerson, position } = req.body || {};
+  let {
+    email, password, role, name, companyName, phone, companyPhone, address, description, contactPerson, position,
+    birthDate, gender, companyType, bizRegNo, ceoName,
+  } = req.body || {};
   email = typeof email === 'string' ? email.trim().toLowerCase() : '';
 
   if (!email || !password || !role) {
@@ -41,6 +63,21 @@ router.post('/signup', async (req, res) => {
       return res.status(400).json({ error: '회사 전화번호를 정확히 입력해주세요. (예: 02-1234-5678)' });
     }
   }
+  let normalizedBirthDate = '';
+  if (role === 'freelancer' && String(birthDate || '').trim() !== '') {
+    normalizedBirthDate = normalizeBirthDate(birthDate);
+    if (normalizedBirthDate === null) {
+      return res.status(400).json({ error: '생년월일을 정확히 입력해주세요. (예: 20000131)' });
+    }
+  }
+  const safeGender = ['남자', '여자'].includes(gender) ? gender : '';
+  let normalizedBizRegNo = '';
+  if (role === 'company' && String(bizRegNo || '').trim() !== '') {
+    normalizedBizRegNo = normalizeBizRegNo(bizRegNo);
+    if (normalizedBizRegNo === null) {
+      return res.status(400).json({ error: '사업자등록번호 10자리를 정확히 입력해주세요.' });
+    }
+  }
   if (await get('SELECT id FROM users WHERE email = ?', [email])) {
     return res.status(409).json({ error: '이미 가입된 이메일입니다.' });
   }
@@ -51,13 +88,13 @@ router.post('/signup', async (req, res) => {
 
   if (role === 'freelancer') {
     await run(
-      'INSERT INTO freelancer_profiles (user_id, name, completion, phone) VALUES (?,?,20,?)',
-      [userId, (name || '이름 미입력').slice(0, 60), normalizedPhone]
+      'INSERT INTO freelancer_profiles (user_id, name, completion, phone, birth_date, gender) VALUES (?,?,20,?,?,?)',
+      [userId, (name || '이름 미입력').slice(0, 60), normalizedPhone, normalizedBirthDate || null, safeGender || null]
     );
   } else {
     await run(
-      `INSERT INTO companies (user_id, name, contact_person, contact_position, company_phone, phone, address, description)
-       VALUES (?,?,?,?,?,?,?,?)`,
+      `INSERT INTO companies (user_id, name, contact_person, contact_position, company_phone, phone, address, description, company_type, biz_reg_no, ceo_name)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
       [
         userId,
         (companyName || '회사명 미입력').slice(0, 60),
@@ -67,6 +104,9 @@ router.post('/signup', async (req, res) => {
         normalizedPhone,
         clamp(address, 200),
         clamp(description, 500),
+        clamp(companyType, 40),
+        normalizedBizRegNo,
+        clamp(ceoName, 60),
       ]
     );
   }
