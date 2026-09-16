@@ -7,7 +7,7 @@ const { computeMatch, breadthMatch } = require('../match');
 const { getRatingSummary, getRatingSummaries } = require('../ratings');
 const { sortPortfoliosByPeriod } = require('../periodSort');
 const { matchesCategory } = require('../stackCatalog');
-const { publicTalent } = require('../contact');
+const { publicTalent, contactFields } = require('../contact');
 const { addNotification } = require('../notify');
 
 const router = express.Router();
@@ -147,7 +147,8 @@ router.get('/:userId', requireAuth, requireRole('company'), async (req, res) => 
 
   const t = await get('SELECT * FROM freelancer_profiles WHERE user_id = ?', [freelancerId]);
   if (!t) return res.status(404).json({ error: '프로필을 찾을 수 없습니다.' });
-  const proposed = !!(await get('SELECT id FROM proposals WHERE company_id=? AND freelancer_id=?', [req.user.id, freelancerId]));
+  const myProposal = await get('SELECT status FROM proposals WHERE company_id=? AND freelancer_id=?', [req.user.id, freelancerId]);
+  const proposed = !!myProposal;
   const saved = !!(await get('SELECT id FROM saved_talents WHERE company_id=? AND freelancer_id=?', [req.user.id, freelancerId]));
 
   // 열람 기록 남기기 + (같은 기업이 최근 6시간 내 이미 봤으면 중복 알림은 생략)
@@ -180,6 +181,8 @@ router.get('/:userId', requireAuth, requireRole('company'), async (req, res) => 
     certs: JSON.parse(t.certs_json || '[]'),
     proposed,
     saved,
+    // 이 기업의 제안을 프리랜서가 실제로 수락한 경우에만 연락처를 내려줍니다.
+    ...contactFields(t, myProposal && myProposal.status === 'accepted'),
     resume_url: signedFileUrl(t.resume_filename),
     portfolios: sortPortfoliosByPeriod(portfolioRows).map((p) => ({ ...p, stack: JSON.parse(p.stack_json) })),
     ...rating,

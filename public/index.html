@@ -1969,11 +1969,11 @@ async function saveProfile(){
       certs: pendingCerts,
     }});
     toast('프로필이 저장됐어요');
-    // 지원하려다 프로필 때문에 막혔던 경우, 저장 후 그 공고로 돌아갑니다.
+    // 지원하려다 프로필 때문에 막혔던 경우, 저장 후 바로 지원까지 이어서 완료합니다.
     if(pendingApplyJobId){
       const jobId = pendingApplyJobId;
       pendingApplyJobId = null; profileMissingFields = [];
-      go('jobDetail', jobId);
+      await applyToJob(jobId);
       return;
     }
     go('mypage');

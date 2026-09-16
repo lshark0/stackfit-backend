@@ -3,7 +3,7 @@ const { run, get, all } = require('../db');
 const { requireAuth, requireRole } = require('../middleware/requireAuth');
 const { wrapAllRoutes } = require('../middleware/asyncHandler');
 const { addNotification, pushTo } = require('../notify');
-const { publicTalent } = require('../contact');
+const { contactFields } = require('../contact');
 
 const router = express.Router();
 wrapAllRoutes(router);
@@ -96,7 +96,7 @@ router.get('/proposals/sent', requireAuth, requireRole('company'), async (req, r
   const fIds = [...new Set(rows.map((r) => r.freelancer_id))];
   const ph = fIds.map(() => '?').join(',');
   const profiles = await all(`SELECT * FROM freelancer_profiles WHERE user_id IN (${ph})`, fIds);
-  const profileById = Object.fromEntries(profiles.map((f) => [f.user_id, publicTalent(f)]));
+  const profileById = Object.fromEntries(profiles.map((f) => [f.user_id, f]));
   const convs = await all(
     `SELECT id, freelancer_id, job_id FROM conversations WHERE company_id = ? AND freelancer_id IN (${ph})`,
     [req.user.id, ...fIds]
@@ -105,6 +105,7 @@ router.get('/proposals/sent', requireAuth, requireRole('company'), async (req, r
   res.json({
     proposals: rows.map((r) => {
       const f = profileById[r.freelancer_id] || null;
+      const accepted = r.status === 'accepted';
       // 제안한 공고의 대화방을 우선 찾고, 없으면 같은 사람과의 다른 대화방이라도 연결합니다.
       const conv = convs.find((c) => c.freelancer_id === r.freelancer_id && (c.job_id || null) === (r.job_id || null))
         || convs.find((c) => c.freelancer_id === r.freelancer_id);
@@ -114,10 +115,9 @@ router.get('/proposals/sent', requireAuth, requireRole('company'), async (req, r
         role_title: f ? f.role_title : '',
         grade: f ? f.grade : null,
         stack: f ? JSON.parse(f.stack_json || '[]') : [],
-        // 수락한 경우에만 프리랜서가 공개로 설정한 연락처를 보여줍니다.
-        contact_phone: r.status === 'accepted' && f ? f.contact_phone : null,
-        contact_email: r.status === 'accepted' && f ? f.contact_email : null,
-        conversation_id: r.status === 'accepted' && conv ? conv.id : null,
+        // 수락한 경우에만, 프리랜서가 공개로 설정해둔 연락처를 보여줍니다.
+        ...contactFields(f, accepted),
+        conversation_id: accepted && conv ? conv.id : null,
       };
     }),
   });

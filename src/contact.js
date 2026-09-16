@@ -37,8 +37,10 @@ function normalizeEmail(v) {
 }
 
 // 기업에게 프리랜서 정보를 보여줄 때 사용합니다.
-// 휴대폰·이메일은 프리랜서가 '제안 설정'에서 공개로 켜둔 경우에만 노출하고,
-// 파일 원본(resume_data) 같은 무거운/민감한 값은 응답에서 제외합니다.
+// 연락처(휴대폰·이메일)는 여기서는 절대 내려주지 않습니다 — 프리랜서가 그 기업의
+// 제안을 실제로 수락하기 전에는 인재풀 탐색만으로 연락처를 알 수 없어야 하기 때문입니다.
+// 필요한 곳(수락된 제안 목록 등)에서는 contactFields()로 별도 계산해 덧붙입니다.
+// 파일 원본(resume_data) 같은 무거운/민감한 값도 응답에서 제외합니다.
 function publicTalent(t) {
   if (!t) return t;
   // eslint-disable-next-line no-unused-vars
@@ -47,9 +49,20 @@ function publicTalent(t) {
   return {
     ...rest,
     accept_proposals: accepting ? 1 : 0,
-    contact_phone: accepting && Number(share_phone) === 1 && phone ? phone : null,
-    contact_email: accepting && Number(share_email) === 1 && email ? email : null,
+    contact_phone: null,
+    contact_email: null,
   };
 }
 
-module.exports = { normalizeMobile, normalizePhone, normalizeEmail, publicTalent, EMAIL_RE };
+// 프리랜서가 이 기업의 제안을 수락한 경우에만 실제 연락처를 계산해 돌려줍니다.
+// accepted가 false면 프리랜서의 공개 설정과 무관하게 항상 null입니다.
+function contactFields(t, accepted) {
+  if (!t || !accepted) return { contact_phone: null, contact_email: null };
+  const accepting = Number(t.accept_proposals ?? 1) === 1;
+  return {
+    contact_phone: accepting && Number(t.share_phone) === 1 && t.phone ? t.phone : null,
+    contact_email: accepting && Number(t.share_email) === 1 && t.email ? t.email : null,
+  };
+}
+
+module.exports = { normalizeMobile, normalizePhone, normalizeEmail, publicTalent, contactFields, EMAIL_RE };
