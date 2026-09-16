@@ -4,6 +4,7 @@ const { hashPassword, verifyPassword, signToken } = require('../auth');
 const { requireAuth } = require('../middleware/requireAuth');
 const { wrapAllRoutes } = require('../middleware/asyncHandler');
 const { normalizeMobile, normalizePhone } = require('../contact');
+const { isAdminEmail } = require('../middleware/requireAdmin');
 
 const router = express.Router();
 wrapAllRoutes(router);
@@ -112,7 +113,7 @@ router.post('/signup', async (req, res) => {
   }
 
   const token = signToken({ id: userId, role, email });
-  res.status(201).json({ token, user: { id: userId, email, role } });
+  res.status(201).json({ token, user: { id: userId, email, role, isAdmin: isAdminEmail(email) } });
 });
 
 router.post('/login', async (req, res) => {
@@ -135,13 +136,13 @@ router.post('/login', async (req, res) => {
   }
 
   const token = signToken({ id: user.id, role: user.role, email: user.email });
-  res.json({ token, user: { id: user.id, email: user.email, role: user.role } });
+  res.json({ token, user: { id: user.id, email: user.email, role: user.role, isAdmin: isAdminEmail(user.email) } });
 });
 
 router.get('/me', requireAuth, async (req, res) => {
   const user = await get('SELECT id, email, role, oauth_provider FROM users WHERE id = ?', [req.user.id]);
   if (!user) return res.status(404).json({ error: '계정을 찾을 수 없습니다.' });
-  res.json({ user: { id: user.id, email: user.email, role: user.role, hasPassword: !user.oauth_provider } });
+  res.json({ user: { id: user.id, email: user.email, role: user.role, hasPassword: !user.oauth_provider, isAdmin: isAdminEmail(user.email) } });
 });
 
 // 비밀번호 변경 (이메일/비밀번호로 가입한 계정만 — 소셜 전용 계정은 대상 아님)

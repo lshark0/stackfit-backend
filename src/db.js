@@ -97,6 +97,10 @@ if (USE_POSTGRES) {
     await ensureColumnPg('companies', 'company_type', "TEXT NOT NULL DEFAULT ''");
     await ensureColumnPg('companies', 'biz_reg_no', "TEXT NOT NULL DEFAULT ''");
     await ensureColumnPg('companies', 'ceo_name', "TEXT NOT NULL DEFAULT ''");
+    // 공고 신고 처리 상태 (관리자가 반려/마감처리/삭제 중 하나로 처리)
+    await ensureColumnPg('job_reports', 'status', "TEXT NOT NULL DEFAULT 'pending'");
+    await ensureColumnPg('job_reports', 'resolved_at', 'TEXT');
+    await ensureColumnPg('job_reports', 'admin_note', 'TEXT');
     await pool.query(
       'CREATE UNIQUE INDEX IF NOT EXISTS idx_users_oauth ON users(oauth_provider, oauth_id) WHERE oauth_provider IS NOT NULL'
     );
@@ -170,6 +174,10 @@ if (USE_POSTGRES) {
     addCol('companies', 'company_type', "TEXT NOT NULL DEFAULT ''");
     addCol('companies', 'biz_reg_no', "TEXT NOT NULL DEFAULT ''");
     addCol('companies', 'ceo_name', "TEXT NOT NULL DEFAULT ''");
+    // 공고 신고 처리 상태 (관리자가 반려/마감처리/삭제 중 하나로 처리)
+    addCol('job_reports', 'status', "TEXT NOT NULL DEFAULT 'pending'");
+    addCol('job_reports', 'resolved_at', 'TEXT');
+    addCol('job_reports', 'admin_note', 'TEXT');
     try {
       db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_oauth ON users(oauth_provider, oauth_id) WHERE oauth_provider IS NOT NULL');
     } catch (e) {}

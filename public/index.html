@@ -675,6 +675,7 @@ function drawerMenuContent(){
     </div>
     <div class="drawer-sec"><div class="drawer-sec-label">탐색</div>${exploreItems}</div>
     <div class="drawer-sec"><div class="drawer-sec-label">내 활동</div>${activityItems}${item(I.bell,'알림','alerts')}${item(I.user,'마이페이지','mypage')}</div>
+    ${state.isAdmin ? `<div class="drawer-sec"><div class="drawer-sec-label">관리자</div>${item(I.flag,'신고 관리','adminReports')}</div>` : ''}
     <div style="height:20px;"></div>
   `;
 }
@@ -1079,7 +1080,7 @@ async function loginAs(role){
     toast('로그인 중...');
     const email = role==='freelancer' ? 'lee@stackfit.dev' : 'hr@hanbit.dev';
     const data = await apiFetch('/auth/login', {method:'POST', body:{email, password:'demo1234'}});
-    saveToken(data.token); state.role = role; state.userId = data.user.id;
+    saveToken(data.token); state.role = role; state.userId = data.user.id; state.isAdmin = !!data.user.isAdmin;
     toast('로그인 성공');
     go('home');
   }catch(e){
@@ -1102,7 +1103,7 @@ function closeConfirm(){
 }
 function signOutNow(){
   detachPushFromAccount(state.token); // 로그아웃한 계정의 알림이 이 기기로 계속 오지 않도록 연결 해제
-  clearToken(); state.role=null; state.userId=null;
+  clearToken(); state.role=null; state.userId=null; state.isAdmin=false;
   // 이전 계정의 화면 이동 기록이 다음 로그인 계정에 섞이지 않도록 비웁니다.
   jobDetailReturn = null; talentDetailReturn = null; pendingDeepLink = null;
   // 화면 밖에 있는 전체메뉴는 자동으로 지워지지 않으므로 직접 비웁니다.
@@ -1201,7 +1202,7 @@ async function doSignup(){
       body.ceoName = document.getElementById('su-ceoname').value.trim();
     }
     const data = await apiFetch('/auth/signup', {method:'POST', body});
-    saveToken(data.token); state.role = data.user.role; state.userId = data.user.id;
+    saveToken(data.token); state.role = data.user.role; state.userId = data.user.id; state.isAdmin = !!data.user.isAdmin;
     toast('가입이 완료됐어요');
     syncPushSubscription();
     go('home');
@@ -1213,7 +1214,7 @@ async function doLogin(){
   if(!email || !password){ toast('이메일과 비밀번호를 입력해주세요'); return; }
   try{
     const data = await apiFetch('/auth/login', {method:'POST', body:{email, password}});
-    saveToken(data.token); state.role = data.user.role; state.userId = data.user.id;
+    saveToken(data.token); state.role = data.user.role; state.userId = data.user.id; state.isAdmin = !!data.user.isAdmin;
     toast('로그인 성공');
     syncPushSubscription(); // 이 기기의 알림을 방금 로그인한 계정으로 연결
     go('home');
@@ -1258,7 +1259,7 @@ async function finishOAuthSignup(){
     const data = await apiFetch('/auth/oauth/finish', {method:'POST', body:{
       pendingToken: oauthPending.token, role: oauthRoleChoice, name,
     }});
-    saveToken(data.token); state.role = data.user.role; state.userId = data.user.id;
+    saveToken(data.token); state.role = data.user.role; state.userId = data.user.id; state.isAdmin = !!data.user.isAdmin;
     oauthPending = null;
     toast('가입이 완료됐어요');
     syncPushSubscription();
@@ -1272,7 +1273,7 @@ async function restoreSession(){
   state.token = saved;
   try{
     const me = await apiFetch('/auth/me');
-    state.role = me.user.role; state.userId = me.user.id;
+    state.role = me.user.role; state.userId = me.user.id; state.isAdmin = !!me.user.isAdmin;
     go('home');
     syncPushSubscription(); // 알림을 켜둔 기기라면 서버 구독을 최신 상태로 유지
     return true;
@@ -1300,7 +1301,7 @@ async function consumeOAuthHash(){
       saveToken(params.get('token'));
       try{
         const me = await apiFetch('/auth/me');
-        state.role = me.user.role; state.userId = me.user.id;
+        state.role = me.user.role; state.userId = me.user.id; state.isAdmin = !!me.user.isAdmin;
         toast('로그인 성공');
         syncPushSubscription();
         go('home');
@@ -3251,6 +3252,51 @@ async function screenFollowedCompanies(){
   </div>`;
 }
 
+// 관리자 전용: 프리랜서가 신고한 공고를 검토해 반려/마감처리/삭제 중 하나로 처리합니다.
+async function screenAdminReports(){
+  const data = await apiFetch('/admin/job-reports');
+  const statusBadge = {
+    pending: `<span class="sbadge pending">${I.clockSm}처리대기</span>`,
+    dismissed: `<span class="sbadge fail">반려됨</span>`,
+    resolved: `<span class="sbadge pass">${I.checkCircle}처리완료</span>`,
+  };
+  return `${statusbar()}
+  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('mypage')">${I.back}</div><div class="page-title" style="font-size:18px;">신고 관리</div></div></div>
+  <div class="content">
+    ${data.reports.map(r=>`
+      <div class="card">
+        <div class="card-top">
+          <div style="min-width:0;">
+            <div class="card-title">${esc(r.job_title)}</div>
+            <div class="card-org">${esc(r.company_name||'알 수 없음')}</div>
+          </div>
+          ${statusBadge[r.status] || ''}
+        </div>
+        <div class="page-sub" style="margin-top:8px;">신고자: ${esc(r.reporter_name||'(탈퇴한 회원)')}</div>
+        <div class="page-sub" style="margin-top:3px;">사유: <b style="color:var(--ink);">${esc(r.reason)}</b></div>
+        <div class="page-sub" style="margin-top:3px;">${(parseServerTime(r.created_at)||new Date()).toLocaleString('ko-KR')}${r.job_status==='closed' ? ' · 현재 공고 상태: 마감됨' : ''}</div>
+        ${r.admin_note ? `<div class="page-sub" style="margin-top:3px;">처리 메모: ${esc(r.admin_note)}</div>` : ''}
+        <button class="btn btn-outline" style="margin-top:10px; font-size:12px;" onclick="go('jobDetail', ${r.job_id})">공고 상세 보기</button>
+        ${r.status==='pending' ? `
+          <div style="display:flex; gap:8px; margin-top:8px;">
+            <button class="btn btn-outline" style="font-size:12.5px;" onclick="resolveJobReport(${r.id}, 'dismiss')">반려</button>
+            <button class="btn btn-outline" style="font-size:12.5px;" onclick="resolveJobReport(${r.id}, 'close_job')">공고 마감</button>
+            <button class="btn btn-outline" style="font-size:12.5px; color:var(--danger); border-color:#F3D6D2;" onclick="resolveJobReport(${r.id}, 'delete_job')">공고 삭제</button>
+          </div>` : ''}
+      </div>`).join('') || emptyArt(ART.noJobs, '접수된 신고가 없어요', '')}
+  </div>`;
+}
+async function resolveJobReport(reportId, action){
+  const labels = {dismiss:'반려', close_job:'공고를 마감 처리', delete_job:'공고를 삭제'};
+  showConfirm(`이 신고를 ${labels[action]}할까요?${action==='delete_job'?'\n삭제하면 되돌릴 수 없어요.':''}`, async () => {
+    try{
+      await apiFetch(`/admin/job-reports/${reportId}/resolve`, {method:'POST', body:{action}});
+      toast('처리했어요');
+      go('adminReports');
+    }catch(e){ toast(e.message); }
+  });
+}
+
 async function screenProfileViews(){
   const data = await apiFetch('/profile/views');
   return `${statusbar()}
@@ -3516,6 +3562,7 @@ async function render(){
       savedJobs: screenSavedJobs, followedCompanies: screenFollowedCompanies, profileViews: screenProfileViews, receivedProposals: screenReceivedProposals,
       proposeForm: screenProposeForm, pickerScreen: screenPicker,
       reviewForm: screenReviewForm,
+      adminReports: screenAdminReports,
     };
     const fn = map[state.screen] || screenOnboarding;
     const html = await fn();

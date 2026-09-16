@@ -4,6 +4,7 @@ const { run, get } = require('../db');
 const { signToken, verifyToken, hashPassword } = require('../auth');
 const { wrapAllRoutes } = require('../middleware/asyncHandler');
 const { PROVIDERS, isConfigured, buildAuthorizeUrl, exchangeCode } = require('../oauth');
+const { isAdminEmail } = require('../middleware/requireAdmin');
 
 const router = express.Router();
 wrapAllRoutes(router);
@@ -106,7 +107,7 @@ router.post('/finish', async (req, res) => {
   }
 
   const token = signToken({ id: userId, role, email });
-  res.status(201).json({ token, user: { id: userId, email, role } });
+  res.status(201).json({ token, user: { id: userId, email, role, isAdmin: isAdminEmail(email) } });
 });
 
 module.exports = router;
