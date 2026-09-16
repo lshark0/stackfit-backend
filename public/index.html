@@ -3289,12 +3289,15 @@ async function screenAdminReports(){
         <div class="page-sub" style="margin-top:3px;">${(parseServerTime(r.created_at)||new Date()).toLocaleString('ko-KR')}${r.job_status==='closed' ? ' · 현재 공고 상태: 마감됨' : ''}</div>
         ${r.admin_note ? `<div class="page-sub" style="margin-top:3px;">처리 메모: ${esc(r.admin_note)}</div>` : ''}
         <button class="btn btn-outline" style="margin-top:10px; font-size:12px;" onclick="go('jobDetail', ${r.job_id})">공고 상세 보기</button>
-        ${r.status==='pending' ? `
-          <div style="display:flex; gap:8px; margin-top:8px;">
-            <button class="btn btn-outline" style="font-size:12.5px;" onclick="resolveJobReport(${r.id}, 'dismiss')">반려</button>
-            <button class="btn btn-outline" style="font-size:12.5px;" onclick="resolveJobReport(${r.id}, 'close_job')">공고 마감</button>
+        ${(() => {
+          const active = r.status==='dismissed' ? 'dismiss' : (r.status==='resolved' && r.job_status==='closed') ? 'close_job' : null;
+          const cls = (a) => a===active ? 'btn-primary' : 'btn-outline';
+          return `<div style="display:flex; gap:8px; margin-top:8px;">
+            <button class="btn ${cls('dismiss')}" style="font-size:12.5px;" onclick="resolveJobReport(${r.id}, 'dismiss')">반려</button>
+            <button class="btn ${cls('close_job')}" style="font-size:12.5px;" onclick="resolveJobReport(${r.id}, 'close_job')">공고 마감</button>
             <button class="btn btn-outline" style="font-size:12.5px; color:var(--danger); border-color:#F3D6D2;" onclick="resolveJobReport(${r.id}, 'delete_job')">공고 삭제</button>
-          </div>` : ''}
+          </div>${r.status!=='pending' ? `<div class="page-sub" style="margin-top:6px;">이미 처리한 신고도 다른 조치로 다시 바꿀 수 있어요 (삭제는 되돌릴 수 없어요).</div>` : ''}`;
+        })()}
       </div>`).join('') || emptyArt(ART.noJobs, '접수된 신고가 없어요', '')}
   </div>`;
 }
