@@ -1,5 +1,13 @@
-const { all, get } = require('./db');
+const { all, get, run } = require('./db');
 const { addNotification, pushTo } = require('./notify');
+
+// 마감일이 지난 공고를 자동으로 마감 처리합니다. 이게 없으면 jobs.status가 계속 'open'으로
+// 남아, 지원 화면(매칭률 순)에서는 d_day로만 걸러지고 기업의 "등록한 공고"에는 계속 활성 상태로
+// 보여서 실제로 마감됐는지 구분이 안 되는 문제가 있었습니다.
+async function closeExpiredJobs() {
+  const todayStr = new Date().toISOString().slice(0, 10);
+  await run("UPDATE jobs SET status = 'closed' WHERE status = 'open' AND deadline IS NOT NULL AND deadline < ?", [todayStr]);
+}
 
 // 잡코리아 스타일: 저장한(관심) 공고의 마감이 내일(D-1)로 임박하면 한 번만 알려줍니다.
 // notifications 테이블에 같은 공고로 이미 보낸 기록이 있으면 건너뛰어, 여러 번 실행돼도 중복 발송되지 않습니다.
@@ -32,4 +40,4 @@ async function checkDeadlineAlerts() {
   }
 }
 
-module.exports = { checkDeadlineAlerts };
+module.exports = { checkDeadlineAlerts, closeExpiredJobs };

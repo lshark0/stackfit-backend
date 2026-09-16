@@ -990,6 +990,7 @@ function jobCard(j){
         <div class="card-title">${esc(j.title)} ${dutyBadge(j.duty)} ${gradeBadge(j.grade)}</div>
         <div class="card-org">${esc(j.org)}</div>
         ${j.applied?`<div style="margin-top:6px;"><span class="sbadge applied">${I.checkCircle}지원완료</span></div>`:''}
+        ${state.role==='company' && j.status==='closed'?`<div style="margin-top:6px;"><span class="sbadge fail">${I.xCircle}마감됨</span></div>`:''}
       </div>
       <div class="star-btn ${j.saved?'filled':''}" onclick="toggleSaveJob(${j.id}, event)">${I.star}</div>
     </div>
@@ -2226,7 +2227,9 @@ async function screenHome(){
       <div class="section-label with-ic">${I.badgeCheck}나에게 맞는 프로젝트</div>
       ${recoData.jobs.length
         ? recoData.jobs.map(recoJobCard).join('')
-        : `<div class="reco-empty">프로필에 기술스택·업무·등급을 채우면<br>딱 맞는 프로젝트를 추천해드려요.<br><b onclick="go('profileEdit')" style="color:var(--ink); text-decoration:underline; cursor:pointer;">프로필 채우러 가기</b></div>`}
+        : (profile.completion >= 100
+            ? `<div class="reco-empty">아직 조건에 맞는 새 프로젝트가 없어요.<br>이미 지원했거나 마감된 공고는 추천에서 빠져요.<br><b onclick="go('jobs')" style="color:var(--ink); text-decoration:underline; cursor:pointer;">전체 공고 보러 가기</b></div>`
+            : `<div class="reco-empty">프로필에 기술스택·업무·등급을 채우면<br>딱 맞는 프로젝트를 추천해드려요.<br><b onclick="go('profileEdit')" style="color:var(--ink); text-decoration:underline; cursor:pointer;">프로필 채우러 가기</b></div>`)}
       <div class="section-label with-ic">${I.jobs}전체 공고</div>
       ${jobs.slice(0,3).map(jobCard).join('') || emptyArt(ART.noJobs, '등록된 공고가 없어요')}
     </div>${tabbar('home')}`;

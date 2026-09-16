@@ -3,7 +3,7 @@ const path = require('path');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const { initDb, get, USE_POSTGRES } = require('./src/db');
-const { checkDeadlineAlerts } = require('./src/deadlineAlerts');
+const { checkDeadlineAlerts, closeExpiredJobs } = require('./src/deadlineAlerts');
 
 const authRoutes = require('./src/routes/auth');
 const profileRoutes = require('./src/routes/profile');
@@ -177,11 +177,13 @@ async function main() {
     console.log(`[김프리] API 서버 실행 중 → http://localhost:${PORT} (DB: ${USE_POSTGRES ? 'PostgreSQL' : 'SQLite'})`);
   });
 
-  // 저장한 공고 마감임박 알림: 기동 직후 한 번, 이후 6시간마다 확인합니다.
-  checkDeadlineAlerts().catch((e) => console.warn('[김프리] 마감임박 알림 확인 실패:', e.message));
-  setInterval(() => {
+  // 마감일이 지난 공고 자동 마감 처리 + 저장한 공고 마감임박 알림: 기동 직후 한 번, 이후 6시간마다 확인합니다.
+  const runScheduledChecks = () => {
+    closeExpiredJobs().catch((e) => console.warn('[김프리] 공고 자동 마감 처리 실패:', e.message));
     checkDeadlineAlerts().catch((e) => console.warn('[김프리] 마감임박 알림 확인 실패:', e.message));
-  }, 6 * 60 * 60 * 1000);
+  };
+  runScheduledChecks();
+  setInterval(runScheduledChecks, 6 * 60 * 60 * 1000);
 }
 
 main().catch((err) => {

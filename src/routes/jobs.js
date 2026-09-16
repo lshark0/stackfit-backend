@@ -55,7 +55,11 @@ function dDay(deadline) {
 
 router.get('/', optionalAuth, async (req, res) => {
   const { q, category, duty, grade, location } = req.query;
-  const rows = await all("SELECT * FROM jobs WHERE status = 'open' ORDER BY created_at DESC, id DESC");
+  // 기업 회원은 "등록한 공고" 화면에서 자신의 공고만, 마감 여부와 관계없이 모두 봐야 합니다.
+  // (마감된 공고를 확인/재등록할 곳이 없다는 문제를 막기 위함) 그 외(프리랜서·비로그인)는 열려있는 공고만 봅니다.
+  const rows = req.user && req.user.role === 'company'
+    ? await all('SELECT * FROM jobs WHERE company_id = ? ORDER BY created_at DESC, id DESC', [req.user.id])
+    : await all("SELECT * FROM jobs WHERE status = 'open' ORDER BY created_at DESC, id DESC");
 
   // N+1 방지: 회사명/평점을 각각 한 번의 쿼리로 일괄 조회한 뒤 메모리에서 조합합니다.
   const companyIds = [...new Set(rows.map((j) => j.company_id))];
