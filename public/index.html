@@ -1107,6 +1107,10 @@ function setSignupRole(role, el){
   el.classList.add('active');
   const nameField = document.getElementById('su-namefield');
   if(nameField) nameField.querySelector('.form-label').textContent = role==='freelancer' ? '이름' : '회사명';
+  const companyFields = document.getElementById('su-companyfields');
+  if(companyFields) companyFields.hidden = role !== 'company';
+  const phoneLabel = document.getElementById('su-phonelabel');
+  if(phoneLabel) phoneLabel.innerHTML = (role==='company' ? '담당자 휴대폰' : '휴대폰') + ' <span style="color:var(--danger); font-size:11px;">(필수)</span>';
 }
 function togglePasswordVisibility(inputId, iconEl){
   const input = document.getElementById(inputId);
@@ -1120,16 +1124,29 @@ async function doSignup(){
   const password = document.getElementById('su-password').value;
   const passwordConfirm = document.getElementById('su-password-confirm').value;
   const nameVal = document.getElementById('su-name').value.trim();
+  const phone = document.getElementById('su-phone').value.trim();
   if(!email || !password){ toast('이메일과 비밀번호를 입력해주세요'); return; }
   const pwOk = password.length>=8 && /[A-Za-z]/.test(password) && /\d/.test(password);
   if(!pwOk){ toast('비밀번호는 영문+숫자 포함 8자 이상이어야 해요'); return; }
   if(password !== passwordConfirm){ toast('비밀번호가 일치하지 않아요'); return; }
+  if(!phone){
+    toast(signupRole==='company' ? '담당자 휴대폰 번호는 필수 항목이에요' : '휴대폰 번호는 필수 항목이에요');
+    document.getElementById('su-phone').focus();
+    return;
+  }
   const agreed = document.getElementById('su-agree').checked;
   if(!agreed){ toast('이용약관 및 개인정보처리방침에 동의해주세요'); return; }
   try{
-    const body = { email, password, role: signupRole };
+    const body = { email, password, role: signupRole, phone };
     if(signupRole==='freelancer') body.name = nameVal || '이름 미입력';
-    else body.companyName = nameVal || '회사명 미입력';
+    else {
+      body.companyName = nameVal || '회사명 미입력';
+      body.contactPerson = document.getElementById('su-contactperson').value.trim();
+      body.position = document.getElementById('su-position').value.trim();
+      body.companyPhone = document.getElementById('su-companyphone').value.trim();
+      body.address = document.getElementById('su-address').value.trim();
+      body.description = document.getElementById('su-description').value.trim();
+    }
     const data = await apiFetch('/auth/signup', {method:'POST', body});
     saveToken(data.token); state.role = data.user.role; state.userId = data.user.id;
     toast('가입이 완료됐어요');
@@ -2001,6 +2018,18 @@ function screenSignup(){
     </div>
     <div class="form-field" style="margin-top:14px;" id="su-namefield"><label class="form-label">이름</label><input id="su-name" class="form-input" placeholder="예: 이승학"></div>
     <div class="form-field"><label class="form-label">이메일</label><input id="su-email" class="form-input" type="email" placeholder="you@example.com"></div>
+    <div id="su-companyfields" hidden>
+      <div class="form-field"><label class="form-label">회사 전화</label>
+        <input id="su-companyphone" class="form-input" type="tel" inputmode="tel" placeholder="02-1234-5678"></div>
+      <div class="form-field"><label class="form-label">주소</label>
+        <input id="su-address" class="form-input" autocomplete="street-address" placeholder="예: 서울특별시 종로구 세종대로 110"></div>
+      <div class="form-field"><label class="form-label">회사 소개</label><textarea id="su-description" class="form-input" placeholder="회사를 간단히 소개해주세요"></textarea></div>
+      <div class="form-field"><label class="form-label">담당자명</label><input id="su-contactperson" class="form-input" placeholder="예: 홍길동"></div>
+      <div class="form-field"><label class="form-label">직책</label>
+        <input id="su-position" class="form-input" placeholder="예: 인사팀장, PM"></div>
+    </div>
+    <div class="form-field" id="su-phonefield"><label class="form-label" id="su-phonelabel">휴대폰 <span style="color:var(--danger); font-size:11px;">(필수)</span></label>
+      <input id="su-phone" class="form-input" type="tel" inputmode="tel" autocomplete="tel" placeholder="010-1234-5678"></div>
     <div class="form-field">
       <label class="form-label">비밀번호</label>
       <div style="position:relative;">

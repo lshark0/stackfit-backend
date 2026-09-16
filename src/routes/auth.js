@@ -3,6 +3,7 @@ const { run, get } = require('../db');
 const { hashPassword, verifyPassword, signToken } = require('../auth');
 const { requireAuth } = require('../middleware/requireAuth');
 const { wrapAllRoutes } = require('../middleware/asyncHandler');
+const { normalizeMobile, normalizePhone } = require('../contact');
 
 const router = express.Router();
 wrapAllRoutes(router);
@@ -10,9 +11,10 @@ wrapAllRoutes(router);
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LEN = 8;
 const PASSWORD_RE = /^(?=.*[A-Za-z])(?=.*\d).+$/; // 영문 1자 이상 + 숫자 1자 이상
+const clamp = (v, max) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : '');
 
 router.post('/signup', async (req, res) => {
-  let { email, password, role, name, companyName } = req.body || {};
+  let { email, password, role, name, companyName, phone, companyPhone, address, description, contactPerson, position } = req.body || {};
   email = typeof email === 'string' ? email.trim().toLowerCase() : '';
 
   if (!email || !password || !role) {
@@ -27,6 +29,18 @@ router.post('/signup', async (req, res) => {
   if (!['freelancer', 'company'].includes(role)) {
     return res.status(400).json({ error: "role은 'freelancer' 또는 'company'여야 합니다." });
   }
+  // 휴대폰은 프리랜서·기업 담당자 모두 가입 시 필수입니다.
+  const normalizedPhone = normalizeMobile(phone);
+  if (!normalizedPhone) {
+    return res.status(400).json({ error: '휴대폰 번호를 정확히 입력해주세요. (예: 010-1234-5678)' });
+  }
+  let normalizedCompanyPhone = '';
+  if (role === 'company' && String(companyPhone || '').trim() !== '') {
+    normalizedCompanyPhone = normalizePhone(companyPhone);
+    if (!normalizedCompanyPhone) {
+      return res.status(400).json({ error: '회사 전화번호를 정확히 입력해주세요. (예: 02-1234-5678)' });
+    }
+  }
   if (await get('SELECT id FROM users WHERE email = ?', [email])) {
     return res.status(409).json({ error: '이미 가입된 이메일입니다.' });
   }
@@ -36,9 +50,25 @@ router.post('/signup', async (req, res) => {
   const userId = Number(r.lastInsertRowid);
 
   if (role === 'freelancer') {
-    await run('INSERT INTO freelancer_profiles (user_id, name, completion) VALUES (?,?,20)', [userId, (name || '이름 미입력').slice(0, 60)]);
+    await run(
+      'INSERT INTO freelancer_profiles (user_id, name, completion, phone) VALUES (?,?,20,?)',
+      [userId, (name || '이름 미입력').slice(0, 60), normalizedPhone]
+    );
   } else {
-    await run('INSERT INTO companies (user_id, name) VALUES (?,?)', [userId, (companyName || '회사명 미입력').slice(0, 60)]);
+    await run(
+      `INSERT INTO companies (user_id, name, contact_person, contact_position, company_phone, phone, address, description)
+       VALUES (?,?,?,?,?,?,?,?)`,
+      [
+        userId,
+        (companyName || '회사명 미입력').slice(0, 60),
+        clamp(contactPerson, 60),
+        clamp(position, 40),
+        normalizedCompanyPhone,
+        normalizedPhone,
+        clamp(address, 200),
+        clamp(description, 500),
+      ]
+    );
   }
 
   const token = signToken({ id: userId, role, email });
