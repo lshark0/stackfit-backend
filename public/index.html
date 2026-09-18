@@ -132,6 +132,33 @@
   .brand-mark .sq::after{top:21px; background:var(--cyan);}
   .brand-name{font-weight:700; font-size:18px; letter-spacing:-.01em; color:var(--ink);}
   .brand-tag{font-family:var(--mono); font-size:10.5px; color:var(--slate); letter-spacing:.08em; text-transform:uppercase;}
+
+  /* 앱 첫 로딩 스플래시: 넷플릭스 로고 인트로처럼, 앱을 켤 때 한 번 로고가 확대·플래시되며 나타남 */
+  #splash{position:fixed; inset:0; background:var(--ink); display:flex; align-items:center; justify-content:center; z-index:999; transition:opacity .45s ease, visibility .45s ease;}
+  #splash.hide{opacity:0; visibility:hidden; pointer-events:none;}
+  #splash-mark{display:flex; flex-direction:column; align-items:center; gap:14px; opacity:0; transform:scale(.55); animation:splashIn 1.7s cubic-bezier(.2,.9,.25,1) forwards;}
+  .splash-sq{width:64px; height:64px; border-radius:18px; background:#232833; position:relative; animation:splashGlow 1.7s ease forwards;}
+  .splash-sq span{position:absolute; left:17px; width:30px; height:5px; border-radius:2.5px;}
+  .splash-sq span:nth-child(1){top:18px; background:var(--amber);}
+  .splash-sq span:nth-child(2){top:29.5px; background:var(--amber);}
+  .splash-sq span:nth-child(3){top:41px; background:var(--cyan);}
+  .splash-name{font-weight:800; font-size:26px; letter-spacing:-.01em; color:#F5EFE4;}
+  .splash-tag{font-family:var(--mono); font-size:11px; color:#8891A0; letter-spacing:.14em; text-transform:uppercase;}
+  @keyframes splashIn{
+    0%{opacity:0; transform:scale(.55);}
+    35%{opacity:1; transform:scale(1.08);}
+    55%{transform:scale(1);}
+    100%{opacity:1; transform:scale(1);}
+  }
+  @keyframes splashGlow{
+    0%,32%{box-shadow:0 0 0 rgba(232,163,61,0);}
+    45%{box-shadow:0 0 46px 6px rgba(232,163,61,.55);}
+    65%,100%{box-shadow:0 0 0 rgba(232,163,61,0);}
+  }
+  @media (prefers-reduced-motion: reduce){
+    #splash-mark{animation:none; opacity:1; transform:none;}
+    .splash-sq{animation:none;}
+  }
   .onb-headline{font-size:24px; font-weight:700; line-height:1.32; color:var(--ink); letter-spacing:-.015em;}
   .onb-headline em{font-style:normal; color:var(--amber-deep);}
   .role-card{background:var(--card); border:1.5px solid var(--line); border-radius:16px; padding:16px; display:flex; align-items:center; gap:14px; cursor:pointer;}
@@ -384,6 +411,14 @@
 </style>
 </head>
 <body>
+
+  <div id="splash">
+    <div id="splash-mark">
+      <div class="splash-sq"><span></span><span></span><span></span></div>
+      <div class="splash-name">김프리</div>
+      <div class="splash-tag">최적의 IT 매칭 솔루션</div>
+    </div>
+  </div>
 
   <div class="app-shell">
     <div class="safe-top"></div>
@@ -3745,6 +3780,17 @@ async function render(){
     el.innerHTML = errorShell(e);
   }
 }
+// 넷플릭스 로고 인트로처럼, 실제 화면 로딩과 별개로 스플래시를 잠깐 보여준 뒤 걷어냅니다.
+(function(){
+  const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  setTimeout(() => {
+    const el = document.getElementById('splash');
+    if(!el) return;
+    el.classList.add('hide');
+    setTimeout(() => el.remove(), 500);
+  }, reduceMotion ? 300 : 1700);
+})();
+
 (async () => {
   const handledOAuth = await consumeOAuthHash();
   if(!handledOAuth){
