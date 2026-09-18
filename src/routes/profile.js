@@ -51,6 +51,7 @@ function isValidDocument(buffer, ext) {
 }
 
 const clamp = (v, max, fallback = '') => (typeof v === 'string' ? v.slice(0, max) : fallback);
+const nowStr = () => new Date().toISOString().slice(0, 19).replace('T', ' ');
 
 // multer/busboy가 multipart 파일명을 기본적으로 latin1로 잘못 해석해서, 한글 등
 // 비-ASCII 파일명이 깨지는 문제(글자 깨짐)를 바로잡습니다. (Node.js/multer의 잘 알려진 이슈)
@@ -174,7 +175,7 @@ router.put('/', requireAuth, async (req, res) => {
       stackCount: nextStack.length, hasResume: !!current.resume_filename,
     });
     await run(
-      `UPDATE freelancer_profiles SET name=?, role_title=?, years=?, rate=?, stack_json=?, certs_json=?, summary=?, grade=?, completion=?, phone=?, email=? WHERE user_id=?`,
+      `UPDATE freelancer_profiles SET name=?, role_title=?, years=?, rate=?, stack_json=?, certs_json=?, summary=?, grade=?, completion=?, phone=?, email=?, updated_at=? WHERE user_id=?`,
       [
         name !== undefined ? clamp(name, 60, current.name) : current.name,
         nextRoleTitle,
@@ -187,6 +188,7 @@ router.put('/', requireAuth, async (req, res) => {
         completion,
         nextPhone,
         nextEmail,
+        nowStr(),
         req.user.id,
       ]
     );
@@ -259,8 +261,8 @@ router.post('/resume', requireAuth, requireRole('freelancer'), (req, res) => {
       stackCount: JSON.parse(current.stack_json).length, hasResume: true,
     });
     await run(
-      'UPDATE freelancer_profiles SET resume_filename=?, resume_original_name=?, resume_data=?, completion=? WHERE user_id=?',
-      [filename, clamp(originalName, 200, 'resume.pdf'), req.file.buffer, completion, req.user.id]
+      'UPDATE freelancer_profiles SET resume_filename=?, resume_original_name=?, resume_data=?, completion=?, updated_at=? WHERE user_id=?',
+      [filename, clamp(originalName, 200, 'resume.pdf'), req.file.buffer, completion, nowStr(), req.user.id]
     );
     res.status(201).json({
       resume_url: signedFileUrl(filename),

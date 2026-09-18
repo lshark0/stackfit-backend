@@ -230,7 +230,7 @@
   .drawer-overlay{position:absolute; inset:0; background:rgba(20,23,28,.45); opacity:0; pointer-events:none; transition:opacity .22s; z-index:48;}
   .confirm-overlay{position:absolute; inset:0; background:rgba(20,23,28,.5); opacity:0; pointer-events:none; transition:opacity .18s; z-index:58; display:flex; align-items:center; justify-content:center; padding:0 32px;}
   .confirm-overlay.open{opacity:1; pointer-events:auto;}
-  .confirm-box{background:var(--paper); border-radius:18px; padding:26px 22px 18px; width:100%; max-width:300px; text-align:center; transform:scale(.92); transition:transform .18s;}
+  .confirm-box{background:var(--paper); border-radius:18px; padding:26px 22px 18px; width:100%; max-width:320px; max-height:85vh; overflow-y:auto; text-align:center; transform:scale(.92); transition:transform .18s;}
   .confirm-overlay.open .confirm-box{transform:scale(1);}
   .confirm-msg{font-size:15px; font-weight:700; color:var(--ink); line-height:1.5; margin-bottom:20px;}
   .confirm-actions{display:flex; gap:8px;}
@@ -1098,9 +1098,11 @@ function showConfirm(message, onConfirm){
 }
 function closeConfirm(){
   document.getElementById('confirmOverlay').classList.remove('open');
-  // 사유 선택 등으로 확인 버튼을 숨겼다면 다시 보이도록 되돌립니다.
+  // 사유 선택 등으로 확인 버튼(또는 버튼 영역 전체)을 숨겼다면 다시 보이도록 되돌립니다.
   const ok = document.getElementById('confirmOkBtn');
   if(ok) ok.style.display = '';
+  const actions = document.querySelector('#confirmOverlay .confirm-actions');
+  if(actions) actions.style.display = '';
 }
 function signOutNow(){
   detachPushFromAccount(state.token); // 로그아웃한 계정의 알림이 이 기기로 계속 오지 않도록 연결 해제
@@ -1352,6 +1354,74 @@ async function applyToJob(id){
     }
     toast(e.message);
   }
+}
+
+// 잡코리아 스타일 "바로 지원하기" 확인 화면: 지원하기 버튼을 누르면 실제 지원 전에
+// 내 프로필 요약 · 연락처 · 개인정보 제공 동의를 한 번 더 확인시켜줍니다.
+let applyConfirmChecked = true;
+let applyConfirmProfile = null;
+function fmtSavedAt(ts){
+  const d = parseServerTime(ts);
+  if(!d) return '아직 저장 안 함';
+  const p2 = (n) => String(n).padStart(2,'0');
+  return `${p2(d.getMonth()+1)}/${p2(d.getDate())} ${p2(d.getHours())}:${p2(d.getMinutes())} 저장`;
+}
+async function openApplyConfirm(jobId){
+  applyConfirmChecked = true;
+  applyConfirmProfile = await apiFetch('/profile').catch(()=>null);
+  renderApplyConfirm(jobId);
+}
+function renderApplyConfirm(jobId){
+  const p = applyConfirmProfile;
+  const phone = (p && p.phone) ? p.phone : '등록된 연락처가 없어요';
+  const email = (p && p.email) ? p.email : '등록된 이메일이 없어요';
+  const saved = p ? fmtSavedAt(p.updated_at) : '아직 저장 안 함';
+  document.getElementById('confirmMsg').innerHTML = `
+    <div style="text-align:left;">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
+        <div style="font-size:17px; font-weight:800; color:var(--ink);">바로 지원하기</div>
+        <span onclick="closeConfirm()" style="cursor:pointer; color:var(--slate); padding:2px;">${I.x}</span>
+      </div>
+      <div style="background:#EEF4FF; border-radius:14px; padding:14px 16px;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div style="font-weight:700; font-size:13px; color:var(--ink);">지원서</div>
+          <span onclick="closeConfirm(); go('profileEdit');" style="font-size:11.5px; color:var(--slate); cursor:pointer;">지원 내용 수정</span>
+        </div>
+        <div onclick="closeConfirm(); go('profileEdit');" style="display:flex; justify-content:space-between; align-items:center; padding:11px 0; border-top:1px solid rgba(20,23,28,.07); margin-top:9px; cursor:pointer;">
+          <div style="font-size:12.5px; font-weight:600; color:var(--ink);">내 프로필</div>
+          <div style="font-size:12px; color:var(--cyan); font-weight:700; display:flex; align-items:center; gap:2px;">${esc(saved)}<span style="transform:scaleX(-1); display:inline-flex;">${I.back}</span></div>
+        </div>
+        <div style="border-top:1px solid rgba(20,23,28,.07); padding-top:10px; margin-top:1px;">
+          <div style="font-size:12px; font-weight:700; color:var(--ink); margin-bottom:6px;">내 연락처 정보</div>
+          <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--slate); padding:3px 0;"><span>연락처</span><span style="color:var(--ink); font-weight:600;">${esc(phone)}</span></div>
+          <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--slate); padding:3px 0;"><span>이메일</span><span style="color:var(--ink); font-weight:600;">${esc(email)}</span></div>
+        </div>
+      </div>
+      <div onclick="toggleApplyConsent(${jobId})" style="display:flex; align-items:center; justify-content:space-between; padding:12px 2px 4px; cursor:pointer;">
+        <div style="display:flex; align-items:center; gap:7px; font-size:12.5px; font-weight:600; color:var(--ink);">
+          <span style="color:${applyConfirmChecked?'var(--cyan)':'var(--slate-light)'};">${I.checkCircle}</span>
+          개인정보 제3자 제공 동의
+        </div>
+        <span style="color:var(--slate-light); transform:scaleX(-1); display:inline-flex;">${I.back}</span>
+      </div>
+      <div onclick="window.open('/privacy.html','_blank')" style="display:flex; align-items:center; justify-content:space-between; padding:8px 2px 2px 27px; cursor:pointer;">
+        <div style="font-size:12.5px; color:var(--slate);">개인정보 수집·이용 동의</div>
+        <span style="color:var(--slate-light); transform:scaleX(-1); display:inline-flex;">${I.back}</span>
+      </div>
+      <button class="btn" style="margin-top:14px; width:100%; ${applyConfirmChecked?'background:var(--ink); color:var(--amber-soft);':'background:var(--paper-dim); color:var(--slate-light); cursor:not-allowed;'}" onclick="submitApplyConfirm(${jobId})">눌러서 지원 완료하기</button>
+    </div>`;
+  const actions = document.querySelector('#confirmOverlay .confirm-actions');
+  if(actions) actions.style.display = 'none';
+  document.getElementById('confirmOverlay').classList.add('open');
+}
+function toggleApplyConsent(jobId){
+  applyConfirmChecked = !applyConfirmChecked;
+  renderApplyConfirm(jobId);
+}
+async function submitApplyConfirm(jobId){
+  if(!applyConfirmChecked){ toast('개인정보 제3자 제공에 동의해주세요'); return; }
+  closeConfirm();
+  await applyToJob(jobId);
 }
 // 브라우저 기본 확인창(confirm)은 상단에 사이트 주소가 함께 표시되므로, 앱 자체 확인창을 사용합니다.
 async function cancelApplication(id){
@@ -2373,7 +2443,7 @@ async function screenJobDetail(){
           ? `<button class="btn btn-outline" onclick="cancelApplication(${j.id})">지원 취소</button>`
           : (isClosed
               ? `<button class="btn btn-outline" disabled style="opacity:.5; cursor:not-allowed;">마감된 공고예요</button>`
-              : `<button class="btn btn-primary" onclick="applyToJob(${j.id})">지원하기</button>`);
+              : `<button class="btn btn-primary" onclick="openApplyConfirm(${j.id})">지원하기</button>`);
         return `<div class="star-btn ${j.saved?'filled':''}" style="width:52px;height:52px;border-radius:12px;" onclick="toggleSaveJob(${j.id}, event)">${I.star}</div>
        <button class="btn btn-outline" style="flex:0 0 auto; width:auto; padding:13px 16px;" onclick="startChatWithCompany(${j.company_id}, ${j.id})">채팅</button>
        ${applyBtn}`;
@@ -3209,7 +3279,7 @@ async function screenMypage(){
     <div class="section-label with-ic">${I.building}약관 및 정책</div>
     <div class="list-item" onclick="window.open('/terms.html','_blank')"><div class="li-l"><div class="li-icon">${I.building}</div><div class="li-tt">이용약관</div></div>${I.back}</div>
     <div class="list-item" onclick="window.open('/privacy.html','_blank')"><div class="li-l"><div class="li-icon">${I.eye}</div><div class="li-tt">개인정보처리방침</div></div>${I.back}</div>
-    <div class="list-item" onclick="window.open('/company.html','_blank')"><div class="li-l"><div class="li-icon">${I.building}</div><div class="li-tt">사업자 정보</div></div>${I.back}</div>
+    ${isCompany?`<div class="list-item" onclick="window.open('/company.html','_blank')"><div class="li-l"><div class="li-icon">${I.building}</div><div class="li-tt">사업자 정보</div></div>${I.back}</div>`:''}
     <div class="section-label with-ic">${I.gear}설정</div>
     ${!isInstalledApp() ? `
     <div class="list-item" onclick="installApp()">

@@ -107,6 +107,8 @@ if (USE_POSTGRES) {
     await ensureColumnPg('job_reports', 'attachment_filename', 'TEXT');
     await ensureColumnPg('job_reports', 'attachment_original_name', 'TEXT');
     await ensureColumnPg('job_reports', 'attachment_data', 'BYTEA');
+    // 잡코리아 스타일 "바로 지원하기" 확인 화면에 "MM/DD HH:mm 저장" 형태로 보여주기 위한 프로필 최종 수정 시각
+    await ensureColumnPg('freelancer_profiles', 'updated_at', 'TEXT');
     await pool.query(
       'CREATE UNIQUE INDEX IF NOT EXISTS idx_users_oauth ON users(oauth_provider, oauth_id) WHERE oauth_provider IS NOT NULL'
     );
@@ -190,6 +192,8 @@ if (USE_POSTGRES) {
     addCol('job_reports', 'attachment_filename', 'TEXT');
     addCol('job_reports', 'attachment_original_name', 'TEXT');
     addCol('job_reports', 'attachment_data', 'BLOB');
+    // 잡코리아 스타일 "바로 지원하기" 확인 화면에 "MM/DD HH:mm 저장" 형태로 보여주기 위한 프로필 최종 수정 시각
+    addCol('freelancer_profiles', 'updated_at', 'TEXT');
     try {
       db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_oauth ON users(oauth_provider, oauth_id) WHERE oauth_provider IS NOT NULL');
     } catch (e) {}

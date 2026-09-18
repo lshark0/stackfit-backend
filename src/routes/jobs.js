@@ -63,11 +63,11 @@ async function withCompanyAndStack(job) {
 
 // 마감일 문자열('YYYY-MM-DD')을 D-day 라벨로 변환 (잡코리아 스타일)
 function dDay(deadline) {
-  if (!deadline) return '상시채용';
+  if (!deadline) return '채용시 마감';
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const target = new Date(deadline + 'T00:00:00');
-  if (Number.isNaN(target.getTime())) return '상시채용';
+  if (Number.isNaN(target.getTime())) return '채용시 마감';
   const diffDays = Math.round((target - today) / (1000 * 60 * 60 * 24));
   if (diffDays < 0) return '마감';
   if (diffDays === 0) return '오늘마감';
