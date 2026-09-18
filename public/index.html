@@ -1360,6 +1360,7 @@ async function applyToJob(id){
 // 내 프로필 요약 · 연락처 · 개인정보 제공 동의를 한 번 더 확인시켜줍니다.
 let applyConfirmChecked = true;
 let applyConfirmProfile = null;
+let applyConfirmReturnJobId = null; // 팝업에서 프로필 수정하러 간 경우, 저장 후 이 공고의 팝업으로 되돌아옴
 function fmtSavedAt(ts){
   const d = parseServerTime(ts);
   if(!d) return '아직 저장 안 함';
@@ -1383,7 +1384,7 @@ function renderApplyConfirm(jobId){
         <span onclick="closeConfirm()" style="cursor:pointer; color:var(--slate); padding:2px;">${I.x}</span>
       </div>
       <div style="background:#EEF4FF; border-radius:14px; padding:14px 16px;">
-        <div onclick="closeConfirm(); go('profileEdit');" style="display:flex; justify-content:space-between; align-items:center; padding-bottom:11px; cursor:pointer;">
+        <div onclick="closeConfirm(); applyConfirmReturnJobId=${jobId}; go('profileEdit');" style="display:flex; justify-content:space-between; align-items:center; padding-bottom:11px; cursor:pointer;">
           <div style="font-size:12.5px; font-weight:600; color:var(--ink);">프로필 수정</div>
           <div style="font-size:12px; color:var(--cyan); font-weight:700; display:flex; align-items:center; gap:2px;">${esc(saved)}<span style="transform:scaleX(-1); display:inline-flex;">${I.back}</span></div>
         </div>
@@ -2040,6 +2041,14 @@ async function saveProfile(){
       const jobId = pendingApplyJobId;
       pendingApplyJobId = null; profileMissingFields = [];
       await applyToJob(jobId);
+      return;
+    }
+    // "바로 지원하기" 팝업에서 프로필을 수정하러 온 경우, 저장 후 그 팝업으로 되돌아갑니다.
+    if(applyConfirmReturnJobId){
+      const jobId = applyConfirmReturnJobId;
+      applyConfirmReturnJobId = null;
+      go('jobDetail', jobId);
+      openApplyConfirm(jobId);
       return;
     }
     go('mypage');
@@ -3483,7 +3492,7 @@ async function screenProfileEdit(){
   }
   profileDraft = null;
   return `${statusbar()}
-  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('mypage')">${I.back}</div><div class="page-title">프로필 수정</div></div></div>
+  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="applyConfirmReturnJobId=null; go('mypage')">${I.back}</div><div class="page-title">프로필 수정</div></div></div>
   <div class="content">
     ${pendingApplyJobId ? `
     <div class="reco-empty" style="text-align:left; border-color:var(--amber); background:#FDF6E9;">
