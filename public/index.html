@@ -143,6 +143,9 @@
   .splash-sq span:nth-child(2){top:29.5px; background:var(--amber);}
   .splash-sq span:nth-child(3){top:41px; background:var(--cyan);}
   .splash-name{font-weight:800; font-size:26px; letter-spacing:-.01em; color:#F5EFE4;}
+  .splash-name span{display:inline-block; opacity:0; transform:translateY(5px);}
+  .splash-name .sw1{animation:splashWordIn .4s ease forwards; animation-delay:.5s;}
+  .splash-name .sw2{animation:splashWordIn .4s ease forwards; animation-delay:.85s;}
   .splash-tag{font-family:var(--mono); font-size:11px; color:#8891A0; letter-spacing:.14em; text-transform:uppercase;}
   @keyframes splashIn{
     0%{opacity:0; transform:scale(.55);}
@@ -155,9 +158,13 @@
     45%{box-shadow:0 0 46px 6px rgba(232,163,61,.55);}
     65%,100%{box-shadow:0 0 0 rgba(232,163,61,0);}
   }
+  @keyframes splashWordIn{
+    to{opacity:1; transform:translateY(0);}
+  }
   @media (prefers-reduced-motion: reduce){
     #splash-mark{animation:none; opacity:1; transform:none;}
     .splash-sq{animation:none;}
+    .splash-name span{animation:none; opacity:1; transform:none;}
   }
   .onb-headline{font-size:24px; font-weight:700; line-height:1.32; color:var(--ink); letter-spacing:-.015em;}
   .onb-headline em{font-style:normal; color:var(--amber-deep);}
@@ -415,7 +422,7 @@
   <div id="splash">
     <div id="splash-mark">
       <div class="splash-sq"><span></span><span></span><span></span></div>
-      <div class="splash-name">김프리</div>
+      <div class="splash-name"><span class="sw1">김</span><span class="sw2">프리</span></div>
       <div class="splash-tag">최적의 IT 매칭 솔루션</div>
     </div>
   </div>
