@@ -189,19 +189,19 @@ async function main() {
   await initDb(); // 스키마 준비 + (필요 시) 데모 데이터 시드까지 끝난 뒤에 요청을 받기 시작
   await initPush(); // 푸시 인증키 준비 (실패해도 서버는 정상 동작)
   app.listen(PORT, () => {
-    console.log(`[김프리] API 서버 실행 중 → http://localhost:${PORT} (DB: ${USE_POSTGRES ? 'PostgreSQL' : 'SQLite'})`);
+    console.log(`[IT Free] API 서버 실행 중 → http://localhost:${PORT} (DB: ${USE_POSTGRES ? 'PostgreSQL' : 'SQLite'})`);
   });
 
   // 마감일이 지난 공고 자동 마감 처리 + 저장한 공고 마감임박 알림: 기동 직후 한 번, 이후 6시간마다 확인합니다.
   const runScheduledChecks = () => {
-    closeExpiredJobs().catch((e) => console.warn('[김프리] 공고 자동 마감 처리 실패:', e.message));
-    checkDeadlineAlerts().catch((e) => console.warn('[김프리] 마감임박 알림 확인 실패:', e.message));
+    closeExpiredJobs().catch((e) => console.warn('[IT Free] 공고 자동 마감 처리 실패:', e.message));
+    checkDeadlineAlerts().catch((e) => console.warn('[IT Free] 마감임박 알림 확인 실패:', e.message));
   };
   runScheduledChecks();
   setInterval(runScheduledChecks, 6 * 60 * 60 * 1000);
 }
 
 main().catch((err) => {
-  console.error('[김프리] 서버 시작 실패:', err);
+  console.error('[IT Free] 서버 시작 실패:', err);
   process.exit(1);
 });

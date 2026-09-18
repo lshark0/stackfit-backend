@@ -18,7 +18,7 @@ async function initPush() {
       await run('INSERT INTO app_settings (key, value) VALUES (?,?)', ['vapid_public_key', keys.publicKey]);
       await run('INSERT INTO app_settings (key, value) VALUES (?,?)', ['vapid_private_key', keys.privateKey]);
       vapid = keys;
-      console.log('[김프리] 푸시 알림 인증키를 새로 생성했습니다.');
+      console.log('[IT Free] 푸시 알림 인증키를 새로 생성했습니다.');
     }
 
     webpush.setVapidDetails(
@@ -26,9 +26,9 @@ async function initPush() {
       vapid.publicKey,
       vapid.privateKey
     );
-    console.log('[김프리] 푸시 알림 준비 완료');
+    console.log('[IT Free] 푸시 알림 준비 완료');
   } catch (e) {
-    console.warn('[김프리] 푸시 알림 초기화 실패 (푸시 없이 계속 동작합니다):', e.message);
+    console.warn('[IT Free] 푸시 알림 초기화 실패 (푸시 없이 계속 동작합니다):', e.message);
     vapid = null;
   }
 }
@@ -48,7 +48,7 @@ async function sendPushToUser(userId, payload) {
     return;
   }
   if (!subs.length) {
-    console.log(`[김프리] 푸시 생략: 사용자 ${userId}에게 등록된 기기가 없음 (${payload && payload.kind})`);
+    console.log(`[IT Free] 푸시 생략: 사용자 ${userId}에게 등록된 기기가 없음 (${payload && payload.kind})`);
     return;
   }
 
@@ -63,7 +63,7 @@ async function sendPushToUser(userId, payload) {
         await webpush.sendNotification(subscription, body);
       } catch (err) {
         const code = err && err.statusCode;
-        console.warn(`[김프리] 푸시 전송 실패: 사용자 ${userId}, 구독 ${s.id}, 상태 ${code || '-'} ${err && err.body ? String(err.body).slice(0, 120) : (err && err.message) || ''}`);
+        console.warn(`[IT Free] 푸시 전송 실패: 사용자 ${userId}, 구독 ${s.id}, 상태 ${code || '-'} ${err && err.body ? String(err.body).slice(0, 120) : (err && err.message) || ''}`);
         if (code === 404 || code === 410) {
           // 사용자가 앱을 지웠거나 알림을 껐을 때 — 더 이상 쓸 수 없는 구독이라 삭제
           await run('DELETE FROM push_subscriptions WHERE id = ?', [s.id]).catch(() => {});

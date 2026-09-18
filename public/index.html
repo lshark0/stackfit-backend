@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>김프리 — 최적의 IT 매칭 솔루션</title>
+<title>IT Free — 최적의 IT 매칭 솔루션</title>
 <meta name="description" content="기술스택으로 정확하게 연결하는 IT 프리랜서 매칭 플랫폼. 자동 매칭 추천, 포트폴리오, 실시간 채팅, 상호 평가까지.">
 
 <!-- 카카오톡·문자·SNS로 링크를 공유할 때 표시되는 미리보기 카드 -->
 <meta property="og:type" content="website">
-<meta property="og:site_name" content="김프리">
-<meta property="og:title" content="김프리 — IT 프리랜서와 기업을 기술스택으로 연결">
+<meta property="og:site_name" content="IT Free">
+<meta property="og:title" content="IT Free — IT 프리랜서와 기업을 기술스택으로 연결">
 <meta property="og:description" content="자동 매칭 추천 · 포트폴리오 · 실시간 채팅 · 상호 평가. 지금 무료로 시작하세요.">
 <meta property="og:url" content="https://stackfit-backend.onrender.com">
 <meta property="og:image" content="https://stackfit-backend.onrender.com/icons/og-image.png">
@@ -17,7 +17,7 @@
 <meta property="og:image:height" content="630">
 <meta property="og:locale" content="ko_KR">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="김프리 — IT 프리랜서와 기업을 기술스택으로 연결">
+<meta name="twitter:title" content="IT Free — IT 프리랜서와 기업을 기술스택으로 연결">
 <meta name="twitter:description" content="자동 매칭 추천 · 포트폴리오 · 실시간 채팅 · 상호 평가.">
 <meta name="twitter:image" content="https://stackfit-backend.onrender.com/icons/og-image.png">
 
@@ -27,7 +27,7 @@
 <meta name="theme-color" content="#0A1633">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="김프리">
+<meta name="apple-mobile-web-app-title" content="IT Free">
 <meta name="mobile-web-app-capable" content="yes">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -133,38 +133,29 @@
   .brand-name{font-weight:700; font-size:18px; letter-spacing:-.01em; color:var(--ink);}
   .brand-tag{font-family:var(--mono); font-size:10.5px; color:var(--slate); letter-spacing:.08em; text-transform:uppercase;}
 
-  /* 앱 첫 로딩 스플래시: 넷플릭스 로고 인트로처럼, 앱을 켤 때 한 번 로고가 확대·플래시되며 나타남 */
+  /* 앱 첫 로딩 스플래시: 육각형 로고가 선을 그리듯 나타난 뒤 워드마크·태그라인이 떠오르는 인트로 애니메이션 */
   #splash{position:fixed; inset:0; background:var(--ink); display:flex; align-items:center; justify-content:center; z-index:999; transition:opacity .45s ease, visibility .45s ease;}
   #splash.hide{opacity:0; visibility:hidden; pointer-events:none;}
-  #splash-mark{display:flex; flex-direction:column; align-items:center; gap:14px; opacity:0; transform:scale(.55); animation:splashIn 1.7s cubic-bezier(.2,.9,.25,1) forwards;}
-  .splash-sq{width:64px; height:64px; border-radius:18px; background:#232833; position:relative; animation:splashGlow 1.7s ease forwards;}
-  .splash-sq span{position:absolute; left:17px; width:30px; height:5px; border-radius:2.5px;}
-  .splash-sq span:nth-child(1){top:18px; background:var(--amber);}
-  .splash-sq span:nth-child(2){top:29.5px; background:var(--amber);}
-  .splash-sq span:nth-child(3){top:41px; background:var(--cyan);}
-  .splash-name{font-weight:800; font-size:26px; letter-spacing:-.01em; color:#F5EFE4;}
-  .splash-name span{display:inline-block; opacity:0; transform:translateY(5px);}
-  .splash-name .sw1{animation:splashWordIn .4s ease forwards; animation-delay:.5s;}
-  .splash-name .sw2{animation:splashWordIn .4s ease forwards; animation-delay:.85s;}
-  .splash-tag{font-family:var(--mono); font-size:11px; color:#8891A0; letter-spacing:.14em; text-transform:uppercase;}
-  @keyframes splashIn{
-    0%{opacity:0; transform:scale(.55);}
-    35%{opacity:1; transform:scale(1.08);}
-    55%{transform:scale(1);}
-    100%{opacity:1; transform:scale(1);}
-  }
-  @keyframes splashGlow{
-    0%,32%{box-shadow:0 0 0 rgba(232,163,61,0);}
-    45%{box-shadow:0 0 46px 6px rgba(232,163,61,.55);}
-    65%,100%{box-shadow:0 0 0 rgba(232,163,61,0);}
-  }
-  @keyframes splashWordIn{
-    to{opacity:1; transform:translateY(0);}
+  #splash-mark{display:flex; flex-direction:column; align-items:center; gap:16px; animation:splashSettle .5s ease-out 2.1s;}
+  .splash-hex{width:92px; height:92px; overflow:visible;}
+  .splash-hex .hex{fill:none; stroke:var(--cyan); stroke-width:6; stroke-linejoin:round; stroke-dasharray:290; stroke-dashoffset:290; animation:splashDraw .9s ease-out forwards;}
+  .splash-hex .arrow-shaft{fill:none; stroke:var(--amber); stroke-width:7; stroke-linecap:round; stroke-linejoin:round; stroke-dasharray:42; stroke-dashoffset:42; animation:splashDraw .35s ease-out .75s forwards;}
+  .splash-hex .arrow-head{fill:none; stroke:var(--amber); stroke-width:7; stroke-linecap:round; stroke-linejoin:round; stroke-dasharray:60; stroke-dashoffset:60; animation:splashDraw .45s ease-out 1.05s forwards;}
+  .splash-name{font-weight:800; font-size:30px; letter-spacing:-.01em; display:flex; gap:8px;}
+  .splash-name span{display:inline-block; opacity:0; transform:translateY(14px);}
+  .splash-name .sw1{color:#F5EFE4; animation:splashRise .5s cubic-bezier(.2,.8,.2,1) 1.35s forwards;}
+  .splash-name .sw2{color:var(--cyan); animation:splashRise .5s cubic-bezier(.2,.8,.2,1) 1.5s forwards;}
+  .splash-tag{font-family:var(--mono); font-size:12px; color:#8891A0; letter-spacing:.02em; opacity:0; transform:translateY(8px); animation:splashRise .5s ease-out 1.85s forwards;}
+  @keyframes splashDraw{ to{stroke-dashoffset:0;} }
+  @keyframes splashRise{ to{opacity:1; transform:translateY(0);} }
+  @keyframes splashSettle{
+    0%{transform:scale(1); filter:drop-shadow(0 0 0 rgba(47,182,166,0));}
+    50%{transform:scale(1.035); filter:drop-shadow(0 0 18px rgba(47,182,166,.5));}
+    100%{transform:scale(1); filter:drop-shadow(0 0 0 rgba(47,182,166,0));}
   }
   @media (prefers-reduced-motion: reduce){
-    #splash-mark{animation:none; opacity:1; transform:none;}
-    .splash-sq{animation:none;}
-    .splash-name span{animation:none; opacity:1; transform:none;}
+    #splash-mark{animation:none;}
+    .splash-hex .hex, .splash-hex .arrow-shaft, .splash-hex .arrow-head, .splash-name span, .splash-tag{animation-duration:.01s !important; animation-delay:0s !important;}
   }
   .onb-headline{font-size:24px; font-weight:700; line-height:1.32; color:var(--ink); letter-spacing:-.015em;}
   .onb-headline em{font-style:normal; color:var(--amber-deep);}
@@ -421,9 +412,13 @@
 
   <div id="splash">
     <div id="splash-mark">
-      <div class="splash-sq"><span></span><span></span><span></span></div>
-      <div class="splash-name"><span class="sw1">김</span><span class="sw2">프리</span></div>
-      <div class="splash-tag">최적의 IT 매칭 솔루션</div>
+      <svg class="splash-hex" viewBox="0 0 120 120" aria-hidden="true">
+        <polygon class="hex" points="106,60 83,99.8 37,99.8 14,60 37,20.2 83,20.2"/>
+        <path class="arrow-shaft" d="M45,75 L75,45"/>
+        <path class="arrow-head" d="M45,45 L75,45 L75,75"/>
+      </svg>
+      <div class="splash-name"><span class="sw1">IT</span><span class="sw2">Free</span></div>
+      <div class="splash-tag">프리랜서와 프로젝트를 잇다</div>
     </div>
   </div>
 
@@ -712,7 +707,7 @@ function drawerMenuContent(){
   return `
     <div class="drawer-head">
       <div class="brand-mark"><div class="sq"><span class="mid"></span></div></div>
-      <div class="nm">김프리</div>
+      <div class="nm">IT Free</div>
       <div class="rl">${roleLabel}</div>
     </div>
     <div class="drawer-sec"><div class="drawer-sec-label">탐색</div>${exploreItems}</div>
@@ -922,7 +917,7 @@ function loadingShell(){
         <path d="M7 3.3c0 4.2 3.1 5.6 5 6.7 1.9-1.1 5-2.5 5-6.7M7 20.7c0-4.2 3.1-5.6 5-6.7 1.9 1.1 5 2.5 5 6.7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
         <circle class="hg-sand" cx="12" cy="12" r="1"/>
       </svg>
-      <div class="loading-name">김프리</div>
+      <div class="loading-name">IT Free</div>
     </div>
   </div></div>`;
 }
@@ -2155,7 +2150,7 @@ async function screenOnboarding(){
     </div>` : '';
   return `${statusbar()}
   <div class="onb-wrap">
-    <div class="brand-mark"><div class="sq"><span class="mid"></span></div><div><div class="brand-name">김프리</div><div class="brand-tag">최적의 IT 매칭 솔루션</div></div></div>
+    <div class="brand-mark"><div class="sq"><span class="mid"></span></div><div><div class="brand-name">IT Free</div><div class="brand-tag">최적의 IT 매칭 솔루션</div></div></div>
     <div class="onb-headline">기술 스택으로<br><em>가장 정확하게</em><br>연결합니다.</div>
     ${errorBanner}
     <div style="display:flex; flex-direction:column; gap:12px;">
@@ -2230,7 +2225,7 @@ function screenSignup(){
         </select></div>
       <div class="form-field"><label class="form-label">사업자등록번호</label>
         <input id="su-bizregno" class="form-input" inputmode="numeric" placeholder="10자리 숫자"></div>
-      <div class="form-field"><label class="form-label">회사명</label><input id="su-companyname" class="form-input" placeholder="예: (주)김프리"></div>
+      <div class="form-field"><label class="form-label">회사명</label><input id="su-companyname" class="form-input" placeholder="예: (주)IT Free"></div>
       <div class="form-field"><label class="form-label">대표자명</label><input id="su-ceoname" class="form-input" placeholder="예: 홍길동"></div>
       <div class="form-field"><label class="form-label">회사주소</label>
         <input id="su-address" class="form-input" autocomplete="street-address" placeholder="예: 서울특별시 종로구 세종대로 110"></div>
@@ -3795,7 +3790,7 @@ async function render(){
     if(!el) return;
     el.classList.add('hide');
     setTimeout(() => el.remove(), 500);
-  }, reduceMotion ? 300 : 1700);
+  }, reduceMotion ? 300 : 2700);
 })();
 
 (async () => {
@@ -3970,7 +3965,7 @@ async function installApp(){
   if(!deferredInstallPrompt){
     showConfirm(
       '이미 설치되어 있거나, 브라우저가 설치를 지원하지 않는 상태예요.\n\n' +
-      '휴대폰 설정 → 애플리케이션에서 "김프리"를 찾아 삭제한 뒤 다시 시도해주세요.',
+      '휴대폰 설정 → 애플리케이션에서 "IT Free"를 찾아 삭제한 뒤 다시 시도해주세요.',
       () => {}
     );
     return;

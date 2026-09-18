@@ -16,7 +16,7 @@ function linkToUrl(link) {
 async function addNotification(userId, { tag, title, body = '', link = null }) {
   await run('INSERT INTO notifications (user_id, tag, title, body, link) VALUES (?,?,?,?,?)', [
     userId, tag, title, body, link,
-  ]).catch((e) => console.warn('[김프리] 알림 저장 실패:', e.message));
+  ]).catch((e) => console.warn('[IT Free] 알림 저장 실패:', e.message));
 }
 
 // 휴대폰 푸시를 보냅니다. link가 있으면 알림을 눌렀을 때 해당 화면으로 이동합니다.
