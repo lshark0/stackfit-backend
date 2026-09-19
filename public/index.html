@@ -625,6 +625,11 @@ function goBackFrom(ret, fallback){
 function jobDetailBack(){ goBackFrom(jobDetailReturn, 'jobs'); }
 function talentDetailBack(){ goBackFrom(talentDetailReturn, 'talent'); }
 
+// 화면 안의 뒤로가기 화살표가 항상 마이페이지로 돌아가는 화면들.
+// 이 화면들은 드로어 메뉴 등 여러 곳에서 열릴 수 있어서, 휴대폰의 '뒤로가기'
+// 제스처도 그 화살표와 똑같이 항상 마이페이지로 보내도록 popstate에서 함께 처리합니다.
+const MYPAGE_CHILD_SCREENS = ['proposalSettings','changePassword','deleteAccount','savedJobs','followedCompanies','adminReports','profileViews','companyProfileEdit','profileEdit'];
+
 // 회원 유형별로만 열 수 있는 화면. 다른 유형의 화면이 열리려 하면(뒤로가기 기록, 예전 알림 등) 홈으로 보냅니다.
 const FREELANCER_ONLY = ['receivedProposals','myApplications','portfolios','portfolioEdit','savedJobs','followedCompanies','profileViews','profileEdit','proposalSettings','reportJob'];
 const COMPANY_ONLY = ['talent','talentDetail','applicants','jobPost','companyProfileEdit','proposeForm','sentProposals','savedTalents'];
@@ -664,6 +669,15 @@ function openPendingDeepLink(){
 
 // 휴대폰의 '뒤로가기' 버튼/제스처를 앱 내 화면 이동과 연결합니다.
 window.addEventListener('popstate', (ev) => {
+  // 마이페이지 하위 화면은 드로어 등 여러 곳에서 열릴 수 있어, 실제 진입 경로와 무관하게
+  // 화면 안 뒤로가기 화살표와 똑같이 항상 마이페이지로 돌아갑니다.
+  if(MYPAGE_CHILD_SCREENS.includes(state.screen)){
+    if(state.screen === 'profileEdit') applyConfirmReturnJobId = null;
+    state.screen = 'mypage'; state.param = null;
+    history.replaceState({screen: state.screen, param: state.param}, '', location.pathname);
+    render();
+    return;
+  }
   const s = ev.state;
   if(s && s.screen){
     state.screen = s.screen; state.param = s.param ?? null;
