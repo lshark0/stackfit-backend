@@ -131,6 +131,18 @@
   .brand-name{font-weight:700; font-size:18px; letter-spacing:-.01em; color:var(--ink);}
   .brand-tag{font-family:var(--mono); font-size:10.5px; color:var(--slate); letter-spacing:.08em; text-transform:uppercase;}
 
+  /* 잡코리아 스타일 홈 화면 하단 사업자 정보 footer */
+  .site-footer{margin:28px -20px -18px; padding:22px 20px 28px; background:var(--paper-dim); border-top:1px solid var(--line);}
+  .site-footer-links{display:flex; align-items:center; gap:8px; font-size:11.5px; color:var(--slate);}
+  .site-footer-links a{color:var(--slate); text-decoration:none;}
+  .site-footer-links .dot{color:var(--line);}
+  .site-footer-co{display:flex; align-items:center; gap:5px; margin-top:14px; font-size:12px; font-weight:700; color:var(--slate); cursor:pointer; width:fit-content;}
+  .site-footer-co .chev{display:inline-block; font-size:10px; transition:transform .2s;}
+  .site-footer-co.open .chev{transform:rotate(180deg);}
+  .site-footer-detail{display:none; margin-top:10px; font-size:11.5px; color:var(--slate-light); line-height:1.9;}
+  .site-footer-co.open + .site-footer-detail{display:block;}
+  .site-footer-detail a{color:var(--slate-light);}
+
   /* 앱 첫 로딩 스플래시: 육각형 로고가 선을 그리듯 나타난 뒤 워드마크·태그라인이 떠오르는 인트로 애니메이션 */
   #splash{position:fixed; inset:0; background:var(--ink); display:flex; align-items:center; justify-content:center; z-index:999; transition:opacity .45s ease, visibility .45s ease;}
   #splash.hide{opacity:0; visibility:hidden; pointer-events:none;}
@@ -2320,6 +2332,21 @@ function screenServerSetup(){
   </div>`;
 }
 
+// 잡코리아 스타일 홈 화면 하단 footer — 약관 링크 + 사업자 정보(접었다 펼치기)
+function siteFooterHtml(){
+  return `<div class="site-footer">
+    <div class="site-footer-links">
+      <a href="/terms.html" target="_blank">이용약관</a><span class="dot">|</span><a href="/privacy.html" target="_blank">개인정보처리방침</a>
+    </div>
+    <div class="site-footer-co" onclick="this.classList.toggle('open')">© 마켓티어 <span class="chev">⌄</span></div>
+    <div class="site-footer-detail">
+      <div>대표: 이승학</div>
+      <div>사업자등록번호: 177-17-01535</div>
+      <div>이메일: <a href="mailto:lshark4541@gmail.com">lshark4541@gmail.com</a></div>
+      <div style="margin-top:8px;"><a href="/company.html" target="_blank" style="text-decoration:underline;">사업자 정보 전체 보기</a></div>
+    </div>
+  </div>`;
+}
 async function screenHome(){
   const nc = await unreadCount();
   if(state.role==="freelancer"){
@@ -2364,6 +2391,7 @@ async function screenHome(){
             : `<div class="reco-empty">프로필에 기술스택·업무·등급을 채우면<br>딱 맞는 프로젝트를 추천해드려요.<br><b onclick="go('profileEdit')" style="color:var(--ink); text-decoration:underline; cursor:pointer;">프로필 채우러 가기</b></div>`)}
       <div class="section-label with-ic">${I.jobs}전체 공고</div>
       ${jobs.slice(0,3).map(jobCard).join('') || emptyArt(ART.noJobs, '등록된 공고가 없어요')}
+      ${siteFooterHtml()}
     </div>${tabbar('home')}`;
   }
   const [company, talentsData, jobsData, recoData] = await Promise.all([
@@ -2405,6 +2433,7 @@ async function screenHome(){
           : '공고를 등록하면 딱 맞는 인재를<br>자동으로 추천해드려요.<br><b onclick="go(\'jobPost\')" style="color:var(--ink); text-decoration:underline; cursor:pointer;">공고 등록하러 가기</b>'}</div>`}
     <div class="section-label with-ic">${I.talent}전체 인재풀</div>
     ${talentsData.talents.slice(0,3).map(talentCard).join('') || emptyArt(ART.noTalents, '등록된 인재가 없어요')}
+    ${siteFooterHtml()}
   </div>${tabbar('home')}`;
 }
 
@@ -3341,7 +3370,6 @@ async function screenMypage(){
     <div class="section-label with-ic">${I.building}약관 및 정책</div>
     <div class="list-item" onclick="window.open('/terms.html','_blank')"><div class="li-l"><div class="li-icon">${I.building}</div><div class="li-tt">이용약관</div></div>${I.back}</div>
     <div class="list-item" onclick="window.open('/privacy.html','_blank')"><div class="li-l"><div class="li-icon">${I.eye}</div><div class="li-tt">개인정보처리방침</div></div>${I.back}</div>
-    ${isCompany?`<div class="list-item" onclick="window.open('/company.html','_blank')"><div class="li-l"><div class="li-icon">${I.building}</div><div class="li-tt">사업자 정보</div></div>${I.back}</div>`:''}
     <div class="section-label with-ic">${I.gear}설정</div>
     ${!isInstalledApp() ? `
     <div class="list-item" onclick="installApp()">
