@@ -133,7 +133,7 @@
 
   /* 잡코리아 스타일 홈 화면 하단 사업자 정보 footer */
   .site-footer{margin:28px -20px -18px; padding:22px 20px 28px; background:var(--paper-dim); border-top:1px solid var(--line);}
-  .site-footer-links{display:flex; align-items:center; gap:8px; font-size:11.5px; color:var(--slate);}
+  .site-footer-links{display:flex; align-items:center; flex-wrap:wrap; gap:6px 8px; font-size:11.5px; color:var(--slate);}
   .site-footer-links a{color:var(--slate); text-decoration:none;}
   .site-footer-links .dot{color:var(--line);}
   .site-footer-co{display:flex; align-items:center; gap:5px; margin-top:14px; font-size:12px; font-weight:700; color:var(--slate); cursor:pointer; width:fit-content;}
@@ -2336,14 +2336,13 @@ function screenServerSetup(){
 function siteFooterHtml(){
   return `<div class="site-footer">
     <div class="site-footer-links">
-      <a href="/terms.html" target="_blank">이용약관</a><span class="dot">|</span><a href="/privacy.html" target="_blank">개인정보처리방침</a>
+      <a href="/terms.html" target="_blank">이용약관</a><span class="dot">|</span><a href="/privacy.html" target="_blank">개인정보처리방침</a><span class="dot">|</span><a href="/location-terms.html" target="_blank">위치기반서비스이용약관</a>
     </div>
     <div class="site-footer-co" onclick="this.classList.toggle('open')">© 마켓티어 <span class="chev">⌄</span></div>
     <div class="site-footer-detail">
       <div>대표: 이승학</div>
       <div>사업자등록번호: 177-17-01535</div>
       <div>이메일: <a href="mailto:lshark4541@gmail.com">lshark4541@gmail.com</a></div>
-      <div style="margin-top:8px;"><a href="/company.html" target="_blank" style="text-decoration:underline;">사업자 정보 전체 보기</a></div>
     </div>
   </div>`;
 }
