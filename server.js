@@ -22,6 +22,7 @@ const { initPush } = require('./src/push');
 const oauthRoutes = require('./src/routes/oauth');
 const adminRoutes = require('./src/routes/admin');
 const supportRoutes = require('./src/routes/support');
+const announcementsRoutes = require('./src/routes/announcements');
 const { verifyToken } = require('./src/auth');
 
 const app = express();
@@ -185,6 +186,7 @@ app.use('/api/portfolios', portfolioRoutes);
 app.use('/api/push', pushRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/support', supportRoutes);
+app.use('/api/announcements', announcementsRoutes);
 
 app.use((req, res) => res.status(404).json({ error: 'Not found' }));
 // eslint-disable-next-line no-unused-vars

@@ -3495,30 +3495,78 @@ async function screenMypage(){
   </div>${tabbar('mypage')}`;
 }
 
-// 고객센터 > 공지사항
-const NOTICES = [
-  { date: '2026-09-18', title: 'IT Free로 새단장했어요', body: '더 나은 서비스를 위해 브랜드를 "IT Free"로 새로 단장했습니다. 앞으로도 프리랜서와 기업을 기술스택으로 정확하게 연결하는 서비스로 계속 발전해나가겠습니다.' },
-];
-async function screenNotices(){
+// 고객센터 > 공지사항 / 이벤트·혜택 (관리자 계정이 작성/수정/삭제)
+async function announcementListScreen(kind, title, emptyTitle, emptySub){
+  const rows = await apiFetch('/announcements?kind=' + kind).then(r=>r.announcements).catch(()=>[]);
   return `${statusbar()}
-  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('mypage')">${I.back}</div><div class="page-title" style="font-size:18px;">공지사항</div></div></div>
+  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('mypage')">${I.back}</div><div class="page-title" style="font-size:18px; flex:1;">${title}</div>
+    ${state.isAdmin ? `<button class="btn btn-primary" style="width:auto; padding:6px 14px; font-size:13px; flex:0 0 auto;" onclick="go('announcementForm', {kind:'${kind}'})">글쓰기</button>` : ''}
+  </div></div>
   <div class="content">
-    ${NOTICES.length ? NOTICES.map(n=>`
+    ${rows.length ? rows.map(n=>`
       <div class="card">
-        <div class="card-title" style="font-size:14px;">${esc(n.title)}</div>
-        <div class="page-sub" style="margin-top:4px;">${esc(n.date)}</div>
-        <div class="para" style="margin-top:8px;">${esc(n.body)}</div>
-      </div>`).join('') : emptyArt(ART.noJobs, '등록된 공지사항이 없어요')}
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
+          <div class="card-title" style="font-size:14px;">${esc(n.title)}</div>
+          ${state.isAdmin ? `
+            <div style="display:flex; gap:6px; flex:0 0 auto;">
+              <span style="font-size:12px; color:var(--slate-light); cursor:pointer; text-decoration:underline;" onclick="go('announcementForm', {kind:'${kind}', id:${n.id}})">수정</span>
+              <span style="font-size:12px; color:var(--danger); cursor:pointer; text-decoration:underline;" onclick="deleteAnnouncement(${n.id}, '${kind}')">삭제</span>
+            </div>` : ''}
+        </div>
+        <div class="page-sub" style="margin-top:4px;">${(parseServerTime(n.created_at)||new Date()).toLocaleDateString('ko-KR')}</div>
+        <div class="para" style="margin-top:8px; white-space:pre-wrap;">${esc(n.body)}</div>
+      </div>`).join('') : emptyArt(ART.noJobs, emptyTitle, emptySub||'')}
   </div>`;
 }
-
-// 고객센터 > 이벤트·혜택
+async function screenNotices(){
+  return announcementListScreen('notice', '공지사항', '등록된 공지사항이 없어요');
+}
 async function screenEvents(){
+  return announcementListScreen('event', '이벤트·혜택', '진행 중인 이벤트가 없어요', '새로운 이벤트가 열리면 공지사항과 알림으로 안내해드릴게요.');
+}
+
+// 고객센터 > 공지사항/이벤트 글쓰기·수정 (관리자 전용)
+async function screenAnnouncementForm(){
+  const { kind, id } = state.param || {};
+  const listScreen = kind === 'event' ? 'events' : 'notices';
+  if(!state.isAdmin){ go(listScreen); return ''; }
+  const existing = id ? await apiFetch('/announcements?kind=' + kind).then(r=>(r.announcements||[]).find(a=>a.id===id)).catch(()=>null) : null;
   return `${statusbar()}
-  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('mypage')">${I.back}</div><div class="page-title" style="font-size:18px;">이벤트·혜택</div></div></div>
+  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('${listScreen}')">${I.back}</div><div class="page-title">${id?'수정':'글쓰기'} · ${kind==='event'?'이벤트·혜택':'공지사항'}</div></div></div>
   <div class="content">
-    ${emptyArt(ART.noJobs, '진행 중인 이벤트가 없어요', '새로운 이벤트가 열리면 공지사항과 알림으로 안내해드릴게요.')}
+    <div class="form-field"><label class="form-label">제목</label>
+      <input id="an-title" class="form-input" value="${esc(existing?.title||'')}" placeholder="제목을 입력하세요"></div>
+    <div class="form-field"><label class="form-label">내용</label>
+      <textarea id="an-body" class="form-input" style="min-height:200px;" placeholder="내용을 입력하세요">${esc(existing?.body||'')}</textarea></div>
+    <div style="display:flex; gap:10px; margin-top:16px;">
+      <button class="btn btn-outline" onclick="go('${listScreen}')">취소</button>
+      <button class="btn btn-primary" onclick="submitAnnouncementForm('${kind}', ${id||'null'})">저장</button>
+    </div>
   </div>`;
+}
+async function submitAnnouncementForm(kind, id){
+  const title = document.getElementById('an-title').value.trim();
+  const body = document.getElementById('an-body').value.trim();
+  if(!title){ toast('제목을 입력해주세요'); return; }
+  if(!body){ toast('내용을 입력해주세요'); return; }
+  try{
+    if(id){
+      await apiFetch('/announcements/' + id, {method:'PUT', body:{ title, body }});
+      toast('수정했어요');
+    }else{
+      await apiFetch('/announcements', {method:'POST', body:{ kind, title, body }});
+      toast('등록했어요');
+    }
+    go(kind==='event' ? 'events' : 'notices');
+  }catch(e){ toast(e.message); }
+}
+async function deleteAnnouncement(id, kind){
+  if(!confirm('삭제하시겠습니까?')) return;
+  try{
+    await apiFetch('/announcements/' + id, {method:'DELETE'});
+    toast('삭제했어요');
+    render();
+  }catch(e){ toast(e.message); }
 }
 
 // 고객센터 > FAQ
@@ -3965,6 +4013,7 @@ async function render(){
       reviewForm: screenReviewForm,
       adminReports: screenAdminReports, reportJob: screenReportJob,
       notices: screenNotices, events: screenEvents, faq: screenFaq, supportInquiry: screenSupportInquiry,
+      announcementForm: screenAnnouncementForm,
     };
     const fn = map[state.screen] || screenOnboarding;
     const html = await fn();

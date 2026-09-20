@@ -275,3 +275,15 @@ CREATE TABLE IF NOT EXISTS support_inquiries (
   created_at                TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_support_inquiries_user ON support_inquiries(user_id);
+
+-- 고객센터 공지사항 / 이벤트·혜택 (관리자 계정이 작성/수정)
+CREATE TABLE IF NOT EXISTS announcements (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  kind        TEXT NOT NULL CHECK (kind IN ('notice','event')),
+  title       TEXT NOT NULL DEFAULT '',
+  body        TEXT NOT NULL DEFAULT '',
+  created_by  INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_announcements_kind ON announcements(kind);
