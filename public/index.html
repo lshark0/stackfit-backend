@@ -748,6 +748,15 @@ function drawerMenuContent(){
     <div class="drawer-sec"><div class="drawer-sec-label">탐색</div>${exploreItems}</div>
     <div class="drawer-sec"><div class="drawer-sec-label">내 활동</div>${activityItems}${item(I.bell,'알림','alerts')}${item(I.user,'마이페이지','mypage')}</div>
     ${state.isAdmin ? `<div class="drawer-sec"><div class="drawer-sec-label">관리자</div>${item(I.flag,'신고 관리','adminReports')}</div>` : ''}
+    <div class="drawer-sec"><div class="drawer-sec-label">고객센터</div>
+      <div class="cs-grid">
+        <div class="cs-item" onclick="closeDrawer(); go('notices');"><span class="ic">📢</span><span class="lbl">공지사항</span></div>
+        <div class="cs-item" onclick="closeDrawer(); go('events');"><span class="ic">🤝</span><span class="lbl">이벤트·혜택</span></div>
+        <div class="cs-item" onclick="window.location.href='mailto:lshark4541@gmail.com'"><span class="ic">🚨</span><span class="lbl">문의·신고</span></div>
+        <div class="cs-item" onclick="window.open('http://talk.naver.com/W4N9B4','_blank')"><span class="ic">💬</span><span class="lbl">톡톡상담</span></div>
+        <div class="cs-item" onclick="closeDrawer(); go('faq');"><span class="ic">🎧</span><span class="lbl">FAQ</span></div>
+      </div>
+    </div>
     <div style="height:20px;"></div>
   `;
 }
@@ -3376,14 +3385,6 @@ async function screenMypage(){
     <div class="section-label with-ic">${I.building}약관 및 정책</div>
     <div class="list-item" onclick="window.open('/terms.html','_blank')"><div class="li-l"><div class="li-icon">${I.building}</div><div class="li-tt">이용약관</div></div>${I.back}</div>
     <div class="list-item" onclick="window.open('/privacy.html','_blank')"><div class="li-l"><div class="li-icon">${I.eye}</div><div class="li-tt">개인정보처리방침</div></div>${I.back}</div>
-    <div class="section-label with-ic">${I.chat}고객센터</div>
-    <div class="cs-grid">
-      <div class="cs-item" onclick="go('notices')"><span class="ic">📢</span><span class="lbl">공지사항</span></div>
-      <div class="cs-item" onclick="go('events')"><span class="ic">🤝</span><span class="lbl">이벤트·혜택</span></div>
-      <div class="cs-item" onclick="window.location.href='mailto:lshark4541@gmail.com'"><span class="ic">🚨</span><span class="lbl">문의·신고</span></div>
-      <div class="cs-item" onclick="window.open('http://talk.naver.com/W4N9B4','_blank')"><span class="ic">💬</span><span class="lbl">톡톡상담</span></div>
-      <div class="cs-item" onclick="go('faq')"><span class="ic">🎧</span><span class="lbl">FAQ</span></div>
-    </div>
     <div class="section-label with-ic">${I.gear}설정</div>
     ${!isInstalledApp() ? `
     <div class="list-item" onclick="installApp()">
