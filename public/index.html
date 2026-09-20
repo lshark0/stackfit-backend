@@ -287,6 +287,13 @@
   .quick-item{display:flex; flex-direction:column; align-items:center; gap:7px; cursor:pointer;}
   .quick-item .qi-ic{width:46px; height:46px; border-radius:14px; background:var(--card); border:1px solid var(--line); display:flex; align-items:center; justify-content:center; color:var(--ink);}
   .quick-item .qi-lbl{font-size:10.5px; color:var(--slate); text-align:center; line-height:1.3;}
+  /* 잡코리아 스타일 고객센터 메뉴 (마이페이지) */
+  .cs-grid{display:grid; grid-template-columns:1fr 1fr; gap:18px 10px; margin-top:4px;}
+  .cs-item{display:flex; align-items:center; gap:10px; cursor:pointer;}
+  .cs-item .ic{font-size:19px; width:24px; text-align:center; flex:0 0 auto; line-height:1;}
+  .cs-item .lbl{font-size:13.5px; font-weight:700; color:var(--ink);}
+  .card.open .faq-a{display:block !important;}
+  .card.open .faq-chev{transform:rotate(180deg);}
   .reco-badge{display:inline-flex; align-items:center; gap:4px; font-family:var(--mono); font-size:10px; font-weight:700; letter-spacing:.04em; padding:3px 8px; border-radius:999px; background:var(--ink); color:var(--amber-soft);}
   .reco-reasons{display:flex; flex-wrap:wrap; gap:5px; margin-top:8px;}
   .reco-reason{font-size:10.5px; color:var(--slate); background:var(--paper-dim); border:1px solid var(--line); padding:3px 8px; border-radius:999px;}
@@ -640,7 +647,7 @@ function talentDetailBack(){ goBackFrom(talentDetailReturn, 'talent'); }
 // 화면 안의 뒤로가기 화살표가 항상 마이페이지로 돌아가는 화면들.
 // 이 화면들은 드로어 메뉴 등 여러 곳에서 열릴 수 있어서, 휴대폰의 '뒤로가기'
 // 제스처도 그 화살표와 똑같이 항상 마이페이지로 보내도록 popstate에서 함께 처리합니다.
-const MYPAGE_CHILD_SCREENS = ['proposalSettings','changePassword','deleteAccount','savedJobs','followedCompanies','adminReports','profileViews','companyProfileEdit','profileEdit'];
+const MYPAGE_CHILD_SCREENS = ['proposalSettings','changePassword','deleteAccount','savedJobs','followedCompanies','adminReports','profileViews','companyProfileEdit','profileEdit','notices','events','faq'];
 
 // 회원 유형별로만 열 수 있는 화면. 다른 유형의 화면이 열리려 하면(뒤로가기 기록, 예전 알림 등) 홈으로 보냅니다.
 const FREELANCER_ONLY = ['receivedProposals','myApplications','portfolios','portfolioEdit','savedJobs','followedCompanies','profileViews','profileEdit','proposalSettings','reportJob'];
@@ -3369,6 +3376,14 @@ async function screenMypage(){
     <div class="section-label with-ic">${I.building}약관 및 정책</div>
     <div class="list-item" onclick="window.open('/terms.html','_blank')"><div class="li-l"><div class="li-icon">${I.building}</div><div class="li-tt">이용약관</div></div>${I.back}</div>
     <div class="list-item" onclick="window.open('/privacy.html','_blank')"><div class="li-l"><div class="li-icon">${I.eye}</div><div class="li-tt">개인정보처리방침</div></div>${I.back}</div>
+    <div class="section-label with-ic">${I.chat}고객센터</div>
+    <div class="cs-grid">
+      <div class="cs-item" onclick="go('notices')"><span class="ic">📢</span><span class="lbl">공지사항</span></div>
+      <div class="cs-item" onclick="go('events')"><span class="ic">🤝</span><span class="lbl">이벤트·혜택</span></div>
+      <div class="cs-item" onclick="window.location.href='mailto:lshark4541@gmail.com'"><span class="ic">🚨</span><span class="lbl">문의·신고</span></div>
+      <div class="cs-item" onclick="window.open('http://talk.naver.com/W4N9B4','_blank')"><span class="ic">💬</span><span class="lbl">톡톡상담</span></div>
+      <div class="cs-item" onclick="go('faq')"><span class="ic">🎧</span><span class="lbl">FAQ</span></div>
+    </div>
     <div class="section-label with-ic">${I.gear}설정</div>
     ${!isInstalledApp() ? `
     <div class="list-item" onclick="installApp()">
@@ -3391,6 +3406,55 @@ async function screenMypage(){
     <div class="list-item" onclick="logout()"><div class="li-l"><div class="li-icon">${I.logout}</div><div class="li-tt">로그아웃</div></div></div>
     <div class="list-item" onclick="go('deleteAccount')"><div class="li-l"><div class="li-icon" style="color:var(--danger);">${I.trash}</div><div class="li-tt" style="color:var(--danger);">회원탈퇴</div></div>${I.back}</div>
   </div>${tabbar('mypage')}`;
+}
+
+// 고객센터 > 공지사항
+const NOTICES = [
+  { date: '2026-09-18', title: 'IT Free로 새단장했어요', body: '더 나은 서비스를 위해 브랜드를 "IT Free"로 새로 단장했습니다. 앞으로도 프리랜서와 기업을 기술스택으로 정확하게 연결하는 서비스로 계속 발전해나가겠습니다.' },
+];
+async function screenNotices(){
+  return `${statusbar()}
+  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('mypage')">${I.back}</div><div class="page-title" style="font-size:18px;">공지사항</div></div></div>
+  <div class="content">
+    ${NOTICES.length ? NOTICES.map(n=>`
+      <div class="card">
+        <div class="card-title" style="font-size:14px;">${esc(n.title)}</div>
+        <div class="page-sub" style="margin-top:4px;">${esc(n.date)}</div>
+        <div class="para" style="margin-top:8px;">${esc(n.body)}</div>
+      </div>`).join('') : emptyArt(ART.noJobs, '등록된 공지사항이 없어요')}
+  </div>`;
+}
+
+// 고객센터 > 이벤트·혜택
+async function screenEvents(){
+  return `${statusbar()}
+  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('mypage')">${I.back}</div><div class="page-title" style="font-size:18px;">이벤트·혜택</div></div></div>
+  <div class="content">
+    ${emptyArt(ART.noJobs, '진행 중인 이벤트가 없어요', '새로운 이벤트가 열리면 공지사항과 알림으로 안내해드릴게요.')}
+  </div>`;
+}
+
+// 고객센터 > FAQ
+const FAQ_ITEMS = [
+  { q: '지원하려면 프로필을 꼭 다 채워야 하나요?', a: '네, 기업이 지원자를 제대로 판단할 수 있도록 업무·등급·희망 단가·기술스택·자기소개·경력기술서·휴대폰번호를 모두 채워야 지원할 수 있어요. 지원하기를 누르면 빠진 항목을 바로 안내해드려요.' },
+  { q: '기업이 보낸 제안을 수락하면 제 연락처가 바로 공개되나요?', a: '아니요. 제안을 실제로 수락한 경우에만, 그리고 MY > 제안 설정에서 공개로 켜둔 연락처(휴대폰·이메일)만 상대 기업에게 보여요.' },
+  { q: '공고를 신고하면 어떻게 처리되나요?', a: '신고 접수 후 운영자가 검토해 반려/공고 마감/공고 삭제 중 하나로 처리하고, 처리 결과는 "문의·신고 내역" 탭에서 확인할 수 있어요.' },
+  { q: '지원을 취소할 수 있나요?', a: '기업이 아직 검토중(합격/불합격 처리 전)인 지원 건에 한해 취소할 수 있어요. 이미 합격·불합격 처리된 지원은 취소할 수 없어요.' },
+  { q: '탈퇴하면 제 정보는 어떻게 되나요?', a: 'MY > 회원탈퇴에서 탈퇴하면 관련 데이터는 지체 없이 삭제돼요. 자세한 내용은 개인정보처리방침을 확인해주세요.' },
+];
+async function screenFaq(){
+  return `${statusbar()}
+  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('mypage')">${I.back}</div><div class="page-title" style="font-size:18px;">FAQ</div></div></div>
+  <div class="content">
+    ${FAQ_ITEMS.map((f,i)=>`
+      <div class="card" style="cursor:pointer;" onclick="this.classList.toggle('open')">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+          <div class="card-title" style="font-size:13.5px;">Q. ${esc(f.q)}</div>
+          <span style="flex:0 0 auto; color:var(--slate-light); transition:transform .2s;" class="faq-chev">⌄</span>
+        </div>
+        <div class="para faq-a" style="margin-top:8px; display:none;">${esc(f.a)}</div>
+      </div>`).join('')}
+  </div>`;
 }
 
 // 눈 아이콘을 누르면 입력한 비밀번호를 보거나 다시 가릴 수 있는 입력칸
@@ -3813,6 +3877,7 @@ async function render(){
       proposeForm: screenProposeForm, pickerScreen: screenPicker,
       reviewForm: screenReviewForm,
       adminReports: screenAdminReports, reportJob: screenReportJob,
+      notices: screenNotices, events: screenEvents, faq: screenFaq,
     };
     const fn = map[state.screen] || screenOnboarding;
     const html = await fn();
