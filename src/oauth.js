@@ -52,23 +52,6 @@ const PROVIDERS = {
       };
     },
   },
-  facebook: {
-    label: '페이스북',
-    clientId: process.env.FACEBOOK_CLIENT_ID,
-    clientSecret: process.env.FACEBOOK_CLIENT_SECRET,
-    authorizeUrl: 'https://www.facebook.com/dialog/oauth',
-    tokenUrl: 'https://graph.facebook.com/oauth/access_token',
-    scope: 'email public_profile',
-    async getProfile(accessToken) {
-      const res = await fetch(`https://graph.facebook.com/me?fields=id,name,email&access_token=${encodeURIComponent(accessToken)}`);
-      const data = await res.json();
-      return {
-        id: data.id,
-        email: data.email || `facebook_${data.id}@stackfit.local`,
-        name: data.name || '페이스북사용자',
-      };
-    },
-  },
 };
 
 function isConfigured(provider) {
