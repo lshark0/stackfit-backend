@@ -647,7 +647,7 @@ function talentDetailBack(){ goBackFrom(talentDetailReturn, 'talent'); }
 // 화면 안의 뒤로가기 화살표가 항상 마이페이지로 돌아가는 화면들.
 // 이 화면들은 드로어 메뉴 등 여러 곳에서 열릴 수 있어서, 휴대폰의 '뒤로가기'
 // 제스처도 그 화살표와 똑같이 항상 마이페이지로 보내도록 popstate에서 함께 처리합니다.
-const MYPAGE_CHILD_SCREENS = ['proposalSettings','changePassword','deleteAccount','savedJobs','followedCompanies','adminReports','profileViews','companyProfileEdit','profileEdit','notices','events','faq'];
+const MYPAGE_CHILD_SCREENS = ['proposalSettings','changePassword','deleteAccount','savedJobs','followedCompanies','adminReports','profileViews','companyProfileEdit','profileEdit','notices','events','faq','supportInquiry'];
 
 // 회원 유형별로만 열 수 있는 화면. 다른 유형의 화면이 열리려 하면(뒤로가기 기록, 예전 알림 등) 홈으로 보냅니다.
 const FREELANCER_ONLY = ['receivedProposals','myApplications','portfolios','portfolioEdit','savedJobs','followedCompanies','profileViews','profileEdit','proposalSettings','reportJob'];
@@ -751,7 +751,7 @@ function drawerMenuContent(){
       <div class="cs-grid">
         <div class="cs-item" onclick="closeDrawer(); go('notices');"><span class="ic">📢</span><span class="lbl">공지사항</span></div>
         <div class="cs-item" onclick="closeDrawer(); go('events');"><span class="ic">🤝</span><span class="lbl">이벤트·혜택</span></div>
-        <div class="cs-item" onclick="window.location.href='mailto:lshark4541@gmail.com'"><span class="ic">🚨</span><span class="lbl">문의·신고</span></div>
+        <div class="cs-item" onclick="closeDrawer(); go('supportInquiry');"><span class="ic">🚨</span><span class="lbl">문의·신고</span></div>
         <div class="cs-item" onclick="window.open('http://talk.naver.com/W4N9B4','_blank')"><span class="ic">💬</span><span class="lbl">톡톡상담</span></div>
         <div class="cs-item" onclick="closeDrawer(); go('faq');"><span class="ic">🎧</span><span class="lbl">FAQ</span></div>
       </div>
@@ -3039,6 +3039,93 @@ async function submitJobReport(jobId){
   }catch(e){ toast(e.message); }
 }
 
+// 고객센터 > 문의·신고 (잡코리아 스타일, 특정 공고에 매이지 않는 일반 문의. 프리랜서·기업 공통)
+let supportTab = 'form';
+let supportAttachmentFile = null;
+function setSupportTab(tab){ supportTab = tab; render(); }
+function onSupportFileChange(input){
+  supportAttachmentFile = input.files && input.files[0] ? input.files[0] : null;
+  const label = document.getElementById('sp-filename');
+  if(label) label.textContent = supportAttachmentFile ? supportAttachmentFile.name : '파일을 추가하세요';
+}
+async function screenSupportInquiry(){
+  const [inquiriesData, profile] = await Promise.all([
+    apiFetch('/support/inquiries').then(r=>r.inquiries).catch(()=>[]),
+    apiFetch('/profile').catch(()=>null),
+  ]);
+  const defaultEmail = (profile && (profile.email || profile.account_email)) || '';
+  const statusBadge = {
+    pending: `<span class="sbadge pending">${I.clockSm}처리대기</span>`,
+    dismissed: `<span class="sbadge fail">반려됨</span>`,
+    resolved: `<span class="sbadge pass">${I.checkCircle}처리완료</span>`,
+  };
+  return `${statusbar()}
+  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('mypage')">${I.back}</div><div class="page-title" style="font-size:18px;">문의·신고</div></div></div>
+  <div class="content">
+    <div class="tab-switch" id="supportTabs">
+      <div class="tab ${supportTab==='form'?'active':''}" onclick="setSupportTab('form')">문의·신고</div>
+      <div class="tab ${supportTab==='history'?'active':''}" onclick="setSupportTab('history')">문의·신고 내역</div>
+    </div>
+    ${supportTab==='form' ? `
+      <div class="form-field"><label class="form-label">문의종류 <span style="color:var(--danger); font-size:11px;">(필수)</span></label>
+        <select id="sp-reason" class="form-input">
+          <option value="">선택</option>
+          ${REPORT_REASONS.map(r=>`<option value="${esc(r)}">${esc(r)}</option>`).join('')}
+        </select></div>
+      <div class="form-field"><label class="form-label">내용 <span style="color:var(--danger); font-size:11px;">(필수)</span></label>
+        <textarea id="sp-content" class="form-input" style="min-height:160px;" placeholder="문의·신고 내용을 자세히 적어주세요"></textarea></div>
+      <div class="form-field"><label class="form-label">파일첨부</label>
+        <label class="btn btn-outline" style="cursor:pointer; justify-content:flex-start; gap:8px;">${I.plus}<span id="sp-filename">파일을 추가하세요</span>
+          <input type="file" accept=".doc,.docx,.xls,.xlsx,.ppt,.pptx,.hwp,.jpg,.jpeg,.gif,.png,.pdf,.zip" style="display:none;" onchange="onSupportFileChange(this)"></label>
+        <div class="page-sub" style="margin-top:5px;">10MB 이내의 MS Office 파일, hwp, jpg, gif, png, pdf, zip 가능</div></div>
+      <div class="form-field"><label class="form-label">답변받을 이메일 <span style="color:var(--danger); font-size:11px;">(필수)</span></label>
+        <input id="sp-email" class="form-input" type="email" value="${esc(defaultEmail)}" placeholder="you@example.com"></div>
+      <div style="display:flex; gap:10px; margin-top:16px;">
+        <button class="btn btn-outline" onclick="go('mypage')">취소</button>
+        <button class="btn btn-primary" onclick="submitSupportInquiry()">신고하기</button>
+      </div>
+    ` : `
+      ${inquiriesData.length ? inquiriesData.map(r=>`
+        <div class="card">
+          <div class="card-top">
+            <div style="min-width:0;"><div class="card-title">${esc(r.reason)}</div></div>
+            ${statusBadge[r.status]||''}
+          </div>
+          <div class="para" style="margin-top:6px;">${esc(r.content)}</div>
+          ${r.attachment_url ? `<a href="${viewerUrl(r.attachment_url)}" target="_blank" style="display:inline-block; margin-top:6px; font-size:12px; color:var(--ink); font-weight:600;">📎 ${esc(r.attachment_original_name||'첨부파일')}</a>` : ''}
+          <div class="page-sub" style="margin-top:6px;">${(parseServerTime(r.created_at)||new Date()).toLocaleString('ko-KR')}</div>
+          ${r.admin_note ? `<div class="page-sub" style="margin-top:4px;">답변: ${esc(r.admin_note)}</div>` : ''}
+        </div>`).join('') : emptyArt(ART.noJobs, '접수한 문의·신고가 없어요', '')}
+    `}
+  </div>`;
+}
+async function submitSupportInquiry(){
+  const reason = document.getElementById('sp-reason').value;
+  const content = document.getElementById('sp-content').value.trim();
+  const email = document.getElementById('sp-email').value.trim();
+  if(!reason){ toast('문의종류를 선택해주세요'); return; }
+  if(!content){ toast('내용을 입력해주세요'); return; }
+  if(!email){ toast('답변받을 이메일을 입력해주세요'); return; }
+  try{
+    const fd = new FormData();
+    fd.append('reason', reason);
+    fd.append('content', content);
+    fd.append('email', email);
+    if(supportAttachmentFile) fd.append('attachment', supportAttachmentFile);
+    const res = await fetch(API_BASE + '/support/inquiries', {
+      method: 'POST',
+      headers: state.token ? {Authorization:'Bearer '+state.token} : {},
+      body: fd,
+    });
+    const data = await res.json().catch(()=>({}));
+    if(!res.ok) throw new Error(data.error || '접수에 실패했어요');
+    toast('문의가 접수됐어요. 검토 후 답변드릴게요');
+    supportAttachmentFile = null;
+    supportTab = 'history';
+    go('supportInquiry');
+  }catch(e){ toast(e.message); }
+}
+
 /* ---- [프리랜서] 제안 설정 ---- */
 async function screenProposalSettings(){
   const p = await apiFetch('/profile');
@@ -3877,7 +3964,7 @@ async function render(){
       proposeForm: screenProposeForm, pickerScreen: screenPicker,
       reviewForm: screenReviewForm,
       adminReports: screenAdminReports, reportJob: screenReportJob,
-      notices: screenNotices, events: screenEvents, faq: screenFaq,
+      notices: screenNotices, events: screenEvents, faq: screenFaq, supportInquiry: screenSupportInquiry,
     };
     const fn = map[state.screen] || screenOnboarding;
     const html = await fn();

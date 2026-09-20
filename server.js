@@ -21,6 +21,7 @@ const pushRoutes = require('./src/routes/push');
 const { initPush } = require('./src/push');
 const oauthRoutes = require('./src/routes/oauth');
 const adminRoutes = require('./src/routes/admin');
+const supportRoutes = require('./src/routes/support');
 const { verifyToken } = require('./src/auth');
 
 const app = express();
@@ -125,7 +126,15 @@ app.get('/uploads/:filename', async (req, res) => {
         'SELECT attachment_data FROM job_reports WHERE attachment_filename = ?',
         [safeName]
       );
-      if (reportRow && reportRow.attachment_data) data = reportRow.attachment_data;
+      if (reportRow && reportRow.attachment_data) {
+        data = reportRow.attachment_data;
+      } else {
+        const inquiryRow = await get(
+          'SELECT attachment_data FROM support_inquiries WHERE attachment_filename = ?',
+          [safeName]
+        );
+        if (inquiryRow && inquiryRow.attachment_data) data = inquiryRow.attachment_data;
+      }
     }
   }
   if (!data) {
@@ -175,6 +184,7 @@ app.use('/api/recommend', recommendRoutes);
 app.use('/api/portfolios', portfolioRoutes);
 app.use('/api/push', pushRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/support', supportRoutes);
 
 app.use((req, res) => res.status(404).json({ error: 'Not found' }));
 // eslint-disable-next-line no-unused-vars

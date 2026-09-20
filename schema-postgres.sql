@@ -257,3 +257,20 @@ CREATE TABLE IF NOT EXISTS job_reports (
   UNIQUE(freelancer_id, job_id)
 );
 CREATE INDEX IF NOT EXISTS idx_job_reports_job ON job_reports(job_id);
+
+-- 잡코리아 스타일: 고객센터의 일반 문의·신고 (특정 공고에 매이지 않음, 프리랜서·기업 회원 공통)
+CREATE TABLE IF NOT EXISTS support_inquiries (
+  id                        SERIAL PRIMARY KEY,
+  user_id                   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  reason                    TEXT NOT NULL DEFAULT '',
+  content                   TEXT NOT NULL DEFAULT '',
+  reply_email               TEXT NOT NULL DEFAULT '',
+  attachment_filename       TEXT,
+  attachment_original_name  TEXT,
+  attachment_data           BYTEA,
+  status                    TEXT NOT NULL DEFAULT 'pending',
+  admin_note                TEXT,
+  resolved_at               TEXT,
+  created_at                TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_support_inquiries_user ON support_inquiries(user_id);
