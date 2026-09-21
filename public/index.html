@@ -294,7 +294,7 @@
   /* 잡코리아 스타일 고객센터 메뉴 (마이페이지) */
   .cs-grid{display:grid; grid-template-columns:1fr 1fr; gap:18px 10px; margin-top:4px;}
   .cs-item{display:flex; align-items:center; gap:10px; cursor:pointer;}
-  .cs-item .ic{font-size:20px; width:24px; text-align:center; flex:0 0 auto; line-height:1;}
+  .cs-item .ic{width:20px; flex:0 0 auto; line-height:1; color:var(--purple); display:inline-flex;}
   .cs-item .lbl{font-size:14.5px; font-weight:700; color:var(--ink);}
   .card.open .faq-a{display:block !important;}
   .card.open .faq-chev{transform:rotate(180deg);}
@@ -613,6 +613,10 @@ const I = {
   logout:`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M13 4H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h6"/><path d="M17 16l4-4-4-4"/><path d="M21 12H9"/></svg>`,
   x:`<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 5L19 19M5 19L19 5" stroke-linecap="round"/></svg>`,
   gear:`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M12 3v2.2M12 18.8V21M4.9 4.9l1.5 1.5M17.6 17.6l1.5 1.5M3 12h2.2M18.8 12H21M4.9 19.1l1.5-1.5M17.6 6.4l1.5-1.5"/></svg>`,
+  megaphone:`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 10v4a1 1 0 0 0 1 1h2l7 4V5L6 9H4a1 1 0 0 0-1 1Z" stroke-linejoin="round"/><path d="M17 9.5a3.5 3.5 0 0 1 0 5M20 7a7 7 0 0 1 0 10" stroke-linecap="round"/></svg>`,
+  gift:`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="9" width="16" height="11" rx="1.5"/><path d="M4 13h16M12 9v11" stroke-linecap="round"/><path d="M12 9c-1.5 0-4-1-4-3a2.2 2.2 0 0 1 4 0 2.2 2.2 0 0 1 4 0c0 2-2.5 3-4 3Z" stroke-linejoin="round"/></svg>`,
+  alertCircle:`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8.5"/><path d="M12 8v5" stroke-linecap="round"/><circle cx="12" cy="16.2" r="1" fill="currentColor" stroke="none"/></svg>`,
+  headset:`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 13v-1a8 8 0 0 1 16 0v1" stroke-linecap="round"/><rect x="3" y="13" width="4" height="6" rx="1.5"/><rect x="17" y="13" width="4" height="6" rx="1.5"/><path d="M19 19v1a2 2 0 0 1-2 2h-3" stroke-linecap="round"/></svg>`,
 };
 
 /* ---------------- Nav / shell ---------------- */
@@ -753,11 +757,11 @@ function drawerMenuContent(){
     <div class="drawer-sec"><div class="drawer-sec-label">내 활동</div>${activityItems}${item(I.bell,'알림','alerts')}${item(I.user,'마이페이지','mypage')}</div>
     <div class="drawer-sec"><div class="drawer-sec-label">고객센터</div>
       <div class="cs-grid">
-        <div class="cs-item" onclick="closeDrawer(); go('notices');"><span class="ic">📢</span><span class="lbl">공지사항</span></div>
-        <div class="cs-item" onclick="closeDrawer(); go('events');"><span class="ic">🤝</span><span class="lbl">이벤트·혜택</span></div>
-        <div class="cs-item" onclick="closeDrawer(); go('supportInquiry');"><span class="ic">🚨</span><span class="lbl">문의·신고</span></div>
-        <div class="cs-item" onclick="window.open('http://talk.naver.com/W4N9B4','_blank')"><span class="ic">💬</span><span class="lbl">톡톡상담</span></div>
-        <div class="cs-item" onclick="closeDrawer(); go('faq');"><span class="ic">🎧</span><span class="lbl">FAQ</span></div>
+        <div class="cs-item" onclick="closeDrawer(); go('notices');"><span class="ic">${I.megaphone}</span><span class="lbl">공지사항</span></div>
+        <div class="cs-item" onclick="closeDrawer(); go('events');"><span class="ic">${I.gift}</span><span class="lbl">이벤트·혜택</span></div>
+        <div class="cs-item" onclick="closeDrawer(); go('supportInquiry');"><span class="ic">${I.alertCircle}</span><span class="lbl">문의·신고</span></div>
+        <div class="cs-item" onclick="window.open('http://talk.naver.com/W4N9B4','_blank')"><span class="ic">${I.chat}</span><span class="lbl">톡톡상담</span></div>
+        <div class="cs-item" onclick="closeDrawer(); go('faq');"><span class="ic">${I.headset}</span><span class="lbl">FAQ</span></div>
       </div>
     </div>
     <div style="height:20px;"></div>
