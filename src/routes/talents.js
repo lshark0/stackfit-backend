@@ -41,7 +41,7 @@ router.get('/', requireAuth, requireRole('company'), async (req, res) => {
 
   let jobStack = [];
   if (jobId) {
-    const job = await get('SELECT stack_json FROM jobs WHERE id = ?', [jobId]);
+    const job = await get('SELECT stack_json FROM jobs WHERE id = ? AND company_id = ?', [jobId, req.user.id]);
     if (job) jobStack = JSON.parse(job.stack_json);
   }
   const proposalRows = await all('SELECT freelancer_id FROM proposals WHERE company_id = ?', [req.user.id]);

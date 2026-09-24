@@ -14,7 +14,8 @@ const GRADE_LEVEL = { 초급: 1, 중급: 2, 고급: 3, 특급: 4 };
 function scoreMatch(job, profile, rating) {
   const reasons = [];
 
-  const stackScore = Math.round((computeMatch(job.stack, profile.stack) / 99) * 60);
+  const match = computeMatch(job.stack, profile.stack);
+  const stackScore = Math.round((match / 99) * 60);
   const overlapCount = job.stack.filter((s) =>
     profile.stack.some((p) => p.toLowerCase() === s.toLowerCase())
   ).length;
@@ -49,7 +50,7 @@ function scoreMatch(job, profile, rating) {
   }
 
   const total = Math.min(100, stackScore + dutyScore + gradeScore + ratingScore);
-  return { score: total, reasons };
+  return { score: total, match, reasons };
 }
 
 // [기업용] 특정 공고에 맞는 프리랜서를 자동 추천합니다.
@@ -63,8 +64,8 @@ async function recommendTalentsForJob(job, limit = 5) {
   return profiles
     .map((p) => {
       const rating = ratingById[p.user_id] || { rating_avg: null, rating_count: 0 };
-      const { score, reasons } = scoreMatch(job, p, rating);
-      return { ...p, ...rating, score, reasons };
+      const { score, match, reasons } = scoreMatch(job, p, rating);
+      return { ...p, ...rating, score, match, reasons };
     })
     .filter((p) => p.score > 0) // 접점이 전혀 없는 사람은 추천하지 않음
     .sort((a, b) => b.score - a.score)
