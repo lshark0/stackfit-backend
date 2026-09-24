@@ -2577,7 +2577,7 @@ async function screenTalent(){
     apiFetch('/talents/recent-views').then(r=>r.talents).catch(()=>[]),
   ]);
   const cats = ["전체", ...Object.keys(STACK_CATALOG)];
-  const grades = ["전체","초급","중급","고급","특급"];
+  const grades = ["전체","초급","중급","고급"];
   const duties = ["","PM","PL","TA","SA","DBA","개발자","QA","보안","감리","기타"];
   return `${statusbar()}${header("인재풀 검색","업무 · 등급 · 기술스택으로 필터링",{}, nc)}
   <div class="content">
