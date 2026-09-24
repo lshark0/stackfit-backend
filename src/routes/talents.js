@@ -3,7 +3,7 @@ const { run, get, all } = require('../db');
 const { signedFileUrl } = require('../fileAccess');
 const { requireAuth, requireRole } = require('../middleware/requireAuth');
 const { wrapAllRoutes } = require('../middleware/asyncHandler');
-const { computeMatch, breadthMatch } = require('../match');
+const { computeMatch } = require('../match');
 const { getRatingSummary, getRatingSummaries } = require('../ratings');
 const { sortPortfoliosByPeriod } = require('../periodSort');
 const { matchesCategory } = require('../stackCatalog');
@@ -12,6 +12,28 @@ const { addNotification } = require('../notify');
 
 const router = express.Router();
 wrapAllRoutes(router);
+
+// 스택매치는 항상 "우리 회사 공고" 기준으로 계산합니다(홈의 인재 추천과 같은 기준).
+// jobId를 지정하면 그 공고, 없으면 가장 최근 등록한 모집중 공고를 씁니다.
+// 기준 공고가 없으면 매치율을 계산하지 않습니다(match: null).
+async function resolveMatchJob(companyId, jobId) {
+  const jobs = await all(
+    "SELECT id, title, stack_json FROM jobs WHERE company_id = ? AND status = 'open' ORDER BY created_at DESC, id DESC",
+    [companyId]
+  );
+  let job = null;
+  const jid = Number(jobId);
+  if (jobId && Number.isInteger(jid)) {
+    job = jobs.find((j) => j.id === jid)
+      || await get('SELECT id, title, stack_json FROM jobs WHERE id = ? AND company_id = ?', [jid, companyId]);
+  }
+  if (!job) job = jobs[0] || null;
+  return {
+    matchJob: job ? { id: job.id, title: job.title } : null,
+    matchJobs: jobs.map((j) => ({ id: j.id, title: j.title })),
+    jobStack: job ? JSON.parse(job.stack_json) : null,
+  };
+}
 
 router.get('/', requireAuth, requireRole('company'), async (req, res) => {
   const { q, category, jobId, grade, duty } = req.query;
@@ -39,11 +61,7 @@ router.get('/', requireAuth, requireRole('company'), async (req, res) => {
     talents = talents.filter(t => String(t.role_title || '').toLowerCase().includes(needle));
   }
 
-  let jobStack = [];
-  if (jobId) {
-    const job = await get('SELECT stack_json FROM jobs WHERE id = ? AND company_id = ?', [jobId, req.user.id]);
-    if (job) jobStack = JSON.parse(job.stack_json);
-  }
+  const { matchJob, matchJobs, jobStack } = await resolveMatchJob(req.user.id, jobId);
   const proposalRows = await all('SELECT freelancer_id FROM proposals WHERE company_id = ?', [req.user.id]);
   const proposedIds = new Set(proposalRows.map(p => p.freelancer_id));
   const savedRows = await all('SELECT freelancer_id FROM saved_talents WHERE company_id = ?', [req.user.id]);
@@ -53,19 +71,20 @@ router.get('/', requireAuth, requireRole('company'), async (req, res) => {
   const ratingById = await getRatingSummaries(talents.map((t) => t.user_id));
   const result = talents.map((t) => ({
     ...publicTalent(t),
-    match: jobStack.length ? computeMatch(jobStack, t.stack) : breadthMatch(t.stack.length),
+    match: jobStack ? computeMatch(jobStack, t.stack) : null,
     proposed: proposedIds.has(t.user_id),
     saved: savedIds.has(t.user_id),
     ...(ratingById[t.user_id] || { rating_avg: null, rating_count: 0 }),
   }));
 
-  result.sort((a, b) => b.match - a.match);
-  res.json({ talents: result });
+  result.sort((a, b) => (b.match ?? -1) - (a.match ?? -1));
+  res.json({ talents: result, matchJob, matchJobs });
 });
 
 // 잡코리아 스타일: 기업이 최근 조회한 인재 목록 ("최근 본 인재")
 // '/:userId'보다 먼저 등록해야 'recent-views'가 :userId로 잡히지 않습니다.
 router.get('/recent-views', requireAuth, requireRole('company'), async (req, res) => {
+  const { matchJob, matchJobs, jobStack } = await resolveMatchJob(req.user.id, req.query.jobId);
   const rows = await all(
     `SELECT f.* FROM freelancer_profiles f
      JOIN (
@@ -84,12 +103,14 @@ router.get('/recent-views', requireAuth, requireRole('company'), async (req, res
   const savedIds = new Set(savedRows.map(s => s.freelancer_id));
   const ratingById = await getRatingSummaries(rows.map((t) => t.user_id));
   res.json({
+    matchJob,
+    matchJobs,
     talents: rows.map((t) => {
       const stack = JSON.parse(t.stack_json);
       return {
         ...publicTalent(t),
         stack,
-        match: breadthMatch(stack.length),
+        match: jobStack ? computeMatch(jobStack, stack) : null,
         proposed: proposedIds.has(t.user_id),
         saved: savedIds.has(t.user_id),
         ...(ratingById[t.user_id] || { rating_avg: null, rating_count: 0 }),
@@ -100,6 +121,7 @@ router.get('/recent-views', requireAuth, requireRole('company'), async (req, res
 
 // [기업] 관심 인재 목록
 router.get('/saved', requireAuth, requireRole('company'), async (req, res) => {
+  const { matchJob, matchJobs, jobStack } = await resolveMatchJob(req.user.id, req.query.jobId);
   const rows = await all(
     `SELECT f.* FROM saved_talents s
      JOIN freelancer_profiles f ON f.user_id = s.freelancer_id
@@ -111,12 +133,14 @@ router.get('/saved', requireAuth, requireRole('company'), async (req, res) => {
   const proposedIds = new Set(proposalRows.map(p => p.freelancer_id));
   const ratingById = await getRatingSummaries(rows.map((t) => t.user_id));
   res.json({
+    matchJob,
+    matchJobs,
     talents: rows.map((t) => {
       const stack = JSON.parse(t.stack_json);
       return {
         ...publicTalent(t),
         stack,
-        match: breadthMatch(stack.length),
+        match: jobStack ? computeMatch(jobStack, stack) : null,
         proposed: proposedIds.has(t.user_id),
         saved: true,
         ...(ratingById[t.user_id] || { rating_avg: null, rating_count: 0 }),
