@@ -661,7 +661,7 @@ const MYPAGE_CHILD_SCREENS = ['proposalSettings','changePassword','deleteAccount
 
 // 회원 유형별로만 열 수 있는 화면. 다른 유형의 화면이 열리려 하면(뒤로가기 기록, 예전 알림 등) 홈으로 보냅니다.
 const FREELANCER_ONLY = ['receivedProposals','myApplications','portfolios','portfolioEdit','savedJobs','followedCompanies','profileViews','profileEdit','proposalSettings','reportJob'];
-const COMPANY_ONLY = ['talent','talentDetail','applicants','jobPost','companyProfileEdit','proposeForm','sentProposals','savedTalents'];
+const COMPANY_ONLY = ['talent','talentDetail','applicants','allApplicants','jobPost','companyProfileEdit','proposeForm','sentProposals','savedTalents'];
 function screenAllowed(screen){
   if(state.role==='company' && FREELANCER_ONLY.includes(screen)) return false;
   if(state.role==='freelancer' && COMPANY_ONLY.includes(screen)) return false;
@@ -2457,7 +2457,7 @@ async function screenHome(){
   <div class="content">
     <div class="hero-stat">
       <div class="hs" onclick="go('jobs')"><div class="hs-num">${jobs.length}</div><div class="hs-lbl">등록 공고</div>${sparkline([1,2,1,2,jobs.length||1])}</div>
-      <div class="hs" onclick="go('jobs')"><div class="hs-num">${applicantSum}</div><div class="hs-lbl">지원자</div>${sparkline([1,1,2,3,applicantSum||1])}</div>
+      <div class="hs" onclick="go('allApplicants')"><div class="hs-num">${applicantSum}</div><div class="hs-lbl">지원자</div>${sparkline([1,1,2,3,applicantSum||1])}</div>
       <div class="hs" onclick="go('talent')"><div class="hs-num">${talentsData.talents.length}</div><div class="hs-lbl">인재풀</div>${sparkline([2,2,3,3,talentsData.talents.length||1])}</div>
     </div>
     ${talentsData.talents.length ? `
@@ -3391,6 +3391,50 @@ async function screenMyApplications(){
   </div>${tabbar('home')}`;
 }
 
+/* ---- [기업] 전체 지원자 (홈 대시보드 '지원자'에서 진입) ---- */
+async function screenAllApplicants(){
+  const nc = await unreadCount();
+  const data = await apiFetch('/company/applicants');
+  const badge = {
+    submitted: `<span class="sbadge pending">${I.clockSm}검토중</span>`,
+    accepted: `<span class="sbadge pass">${I.trophy}수락됨</span>`,
+    rejected: `<span class="sbadge fail">${I.xCircle}거절됨</span>`,
+  };
+  // 공고별로 묶어서 보여주고, 수락·거절은 공고별 지원자 관리 화면에서 하도록 연결합니다.
+  const groups = [];
+  const byJob = {};
+  for(const a of data.applicants){
+    if(!byJob[a.job_id]){ byJob[a.job_id] = { id:a.job_id, title:a.job_title, items:[] }; groups.push(byJob[a.job_id]); }
+    byJob[a.job_id].items.push(a);
+  }
+  const pending = data.applicants.filter(a=>a.status==='submitted').length;
+  return `${statusbar()}${header("지원자", `전체 ${data.applicants.length}명 · 검토중 ${pending}명`, {back:'home'}, nc)}
+  <div class="content">
+    ${groups.map(g=>`
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin:18px 0 10px; font-size:13px;">
+        <span style="min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:700; color:var(--ink);">${esc(g.title)} · ${g.items.length}명</span>
+        <span style="flex:0 0 auto; color:var(--slate); font-weight:700; cursor:pointer;" onclick="go('applicants', ${g.id})">지원자 관리 ›</span>
+      </div>
+      ${g.items.map(a=>`
+        <div class="card clickable" onclick="go('talentDetail', ${a.user_id})">
+          <div class="card-top">
+            <div style="display:flex; gap:12px; align-items:center; min-width:0;">
+              ${autoAvatar(a.name)}
+              <div style="min-width:0;">
+                <div class="card-title">${esc(a.name)} ${gradeBadge(a.grade)}</div>
+                <div style="margin-top:5px; display:flex; flex-wrap:wrap; gap:5px; align-items:center;">${dutyBadge(a.role_title)}</div>
+              </div>
+            </div>
+            ${badge[a.status] || `<span class="sbadge fail">${esc(a.status)}</span>`}
+          </div>
+          <div class="tag-row">${a.stack.map(s=>`<span class="tag">${esc(s)}</span>`).join('')}</div>
+          ${gauge(a.match)}
+        </div>`).join('')}
+    `).join('') || emptyArt(ART.noTalents, '아직 지원자가 없어요', '인재풀에서 직접 포지션을 제안해볼 수도 있어요.')}
+    <div style="height:20px;"></div>
+  </div>${tabbar('')}`;
+}
+
 async function screenApplicants(){
   const nc = await unreadCount();
   const data = await apiFetch('/jobs/' + state.param + '/applicants');
@@ -4052,7 +4096,7 @@ async function render(){
       onboarding: screenOnboarding, serverSetup: screenServerSetup,
       signup: screenSignup, login: screenLogin,
       home: screenHome, jobs: screenJobs, jobDetail: screenJobDetail,
-      talent: screenTalent, talentDetail: screenTalentDetail, projects: screenProjects, projectArchive: screenProjectArchive, applicants: screenApplicants,
+      talent: screenTalent, talentDetail: screenTalentDetail, projects: screenProjects, projectArchive: screenProjectArchive, applicants: screenApplicants, allApplicants: screenAllApplicants,
       chatList: screenChatList, chatRoom: screenChatRoom, mypage: screenMypage,
       profileEdit: screenProfileEdit, alerts: screenAlerts, jobPost: screenJobPost,
       companyProfileEdit: screenCompanyProfileEdit,
