@@ -1163,8 +1163,24 @@ function talentCard(t){
       <span class="im">${I.wallet}<b>${esc(t.rate)}</b></span>
       ${t.rating_count>0?`<span class="im">${ratingBadge(t.rating_avg, t.rating_count)}</span>`:''}
     </div>
-    ${gauge(t.match)}
+    ${t.match!=null ? gauge(t.match) : ''}
   </div>`;
+}
+
+// 인재풀 검색·관심 인재에서 스택매치를 어느 공고 기준으로 계산했는지 보여주고 바꿀 수 있게 합니다.
+let talentMatchJobId = null;
+function matchBasisHtml(data, onChange){
+  if(!data.matchJob){
+    return `<div class="reco-legend">공고를 등록하면 그 공고 기준으로 <b>스택매치 %</b>가 표시돼요.</div>`;
+  }
+  return `<div style="display:flex; align-items:center; gap:8px; margin:6px 0 4px;">
+      <span style="flex:0 0 auto; font-size:12.5px; font-weight:700; color:var(--ink);">스택매치 기준 공고</span>
+      <select class="form-input" style="flex:1; min-width:0; padding:9px 10px; font-size:12.5px;" onchange="talentMatchJobId=Number(this.value); ${onChange}">
+        ${(data.matchJobs.some(j=>j.id===data.matchJob.id) ? data.matchJobs : [data.matchJob, ...data.matchJobs])
+          .map(j=>`<option value="${j.id}" ${j.id===data.matchJob.id?'selected':''}>${esc(j.title)}</option>`).join('')}
+      </select>
+    </div>
+    <div class="reco-legend">· <b>스택매치 %</b>: 선택한 공고 기준으로 기술스택만 본 점수입니다.</div>`;
 }
 
 /* ---------------- Actions ---------------- */
@@ -1858,6 +1874,7 @@ async function refreshTalentList(){
     if(talentCat && talentCat!=='전체') qs.set('category', talentCat);
     if(talentGrade && talentGrade!=='전체') qs.set('grade', talentGrade);
     if(talentDuty) qs.set('duty', talentDuty);
+    if(talentMatchJobId) qs.set('jobId', talentMatchJobId);
     const data = await apiFetch('/talents?' + qs.toString());
     el.innerHTML = data.talents.length ? data.talents.map(talentCard).join('') : emptyHtml('조건에 맞는 인재가 없어요', I.talent);
   }catch(e){ el.innerHTML = emptyHtml(e.message, I.talent); }
@@ -2586,9 +2603,10 @@ async function screenTalent(){
   if(talentCat && talentCat!=='전체') qs.set('category', talentCat);
   if(talentGrade && talentGrade!=='전체') qs.set('grade', talentGrade);
   if(talentDuty) qs.set('duty', talentDuty);
+  if(talentMatchJobId) qs.set('jobId', talentMatchJobId);
   const [data, recentTalents] = await Promise.all([
     apiFetch('/talents?' + qs.toString()),
-    apiFetch('/talents/recent-views').then(r=>r.talents).catch(()=>[]),
+    apiFetch('/talents/recent-views' + (talentMatchJobId ? `?jobId=${talentMatchJobId}` : '')).then(r=>r.talents).catch(()=>[]),
   ]);
   const cats = ["전체", ...Object.keys(STACK_CATALOG)];
   const grades = ["전체","초급","중급","고급"];
@@ -2609,6 +2627,7 @@ async function screenTalent(){
     <div class="section-label">최근 본 인재</div>
     <div class="hrow">${recentTalents.map(miniTalentCard).join('')}</div>` : ''}
     <div class="section-label">매칭률 순</div>
+    ${matchBasisHtml(data, 'render();')}
     <div id="talentList">${data.talents.map(talentCard).join('') || emptyArt(ART.noTalents, '조건에 맞는 인재가 없어요', '검색어나 등급·업무 필터를 바꿔보세요.')}</div>
   </div>${tabbar('talent')}`;
 }
@@ -3252,10 +3271,11 @@ async function startChatWithTalent(freelancerId, jobId){
 /* ---- [기업] 관심 인재 ---- */
 async function screenSavedTalents(){
   const nc = await unreadCount();
-  const data = await apiFetch('/talents/saved');
+  const data = await apiFetch('/talents/saved' + (talentMatchJobId ? `?jobId=${talentMatchJobId}` : ''));
   return `${statusbar()}${header("관심 인재", `${data.talents.length}명 저장됨`, {back:'home'}, nc)}
   <div class="content">
     <div class="page-sub" style="margin-bottom:12px;">인재 카드나 프로필의 ★ 버튼으로 관심 인재를 저장할 수 있어요.</div>
+    ${data.talents.length ? matchBasisHtml(data, 'render();') : ''}
     ${data.talents.map(talentCard).join('') || `${emptyArt(ART.noTalents, '아직 관심 인재가 없어요', '인재풀에서 ★를 눌러 관심 인재로 저장해보세요.')}
       <button class="btn btn-primary" onclick="go('talent')">인재풀 보러 가기</button>`}
     <div style="height:20px;"></div>
