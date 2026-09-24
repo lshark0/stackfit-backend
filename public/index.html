@@ -2433,7 +2433,7 @@ async function screenHome(){
     ${talentsData.talents.length ? `
     <div class="card">
       <div class="card-title" style="font-size:13.5px;">인재풀 등급 분포</div>
-      ${barChart(['초급','중급','고급','특급'].map(g=>({
+      ${barChart(['초급','중급','고급'].map(g=>({
         label:g, value: talentsData.talents.filter(t=>t.grade===g).length
       })), true)}
     </div>` : ''}
