@@ -3801,7 +3801,7 @@ async function screenProfileEdit(){
     <div class="form-field"><label class="form-label">업무</label><input id="pf-role" class="form-input" value="${esc(p.role_title)}"></div>
     <div class="form-field"><label class="form-label">등급</label><select id="pf-grade" class="form-input">
       <option value="">선택 안 함</option>
-      ${['초급','중급','고급','특급'].map(g=>`<option value="${g}" ${p.grade===g?'selected':''}>${g}</option>`).join('')}
+      ${['초급','중급','고급'].map(g=>`<option value="${g}" ${p.grade===g?'selected':''}>${g}</option>`).join('')}
     </select></div>
     <div class="form-field"><label class="form-label">희망 단가</label><input id="pf-rate" class="form-input" value="${esc(p.rate)}"></div>
     <div class="form-field">
