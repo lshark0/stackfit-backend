@@ -3,7 +3,7 @@ const { run, get } = require('../db');
 const { hashPassword, verifyPassword, signToken } = require('../auth');
 const { requireAuth } = require('../middleware/requireAuth');
 const { wrapAllRoutes } = require('../middleware/asyncHandler');
-const { normalizeMobile, normalizePhone } = require('../contact');
+const { normalizeMobile, normalizePhone, normalizeBirthDate } = require('../contact');
 const { isAdminEmail } = require('../middleware/requireAdmin');
 
 const router = express.Router();
@@ -13,18 +13,6 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LEN = 8;
 const PASSWORD_RE = /^(?=.*[A-Za-z])(?=.*\d).+$/; // 영문 1자 이상 + 숫자 1자 이상
 const clamp = (v, max) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : '');
-
-// 생년월일: '20000131' 또는 '2000-01-31' 형태를 받아 'YYYY-MM-DD'로 통일. 형식이 틀리면 null.
-function normalizeBirthDate(v) {
-  const s = String(v || '').trim();
-  if (!s) return '';
-  const digits = s.replace(/\D/g, '');
-  if (digits.length !== 8) return null;
-  const y = digits.slice(0, 4), m = digits.slice(4, 6), d = digits.slice(6, 8);
-  const date = new Date(`${y}-${m}-${d}T00:00:00`);
-  if (Number.isNaN(date.getTime()) || date.getFullYear() !== Number(y)) return null;
-  return `${y}-${m}-${d}`;
-}
 
 // 사업자등록번호: 숫자 10자리를 'XXX-XX-XXXXX' 형태로 통일 (국세청 실시간 검증은 하지 않음). 형식이 틀리면 null.
 function normalizeBizRegNo(v) {

@@ -5,7 +5,7 @@ const { run, get, all } = require('../db');
 const { signedFileUrl } = require('../fileAccess');
 const { requireAuth, requireRole } = require('../middleware/requireAuth');
 const { wrapAllRoutes } = require('../middleware/asyncHandler');
-const { normalizeMobile, normalizePhone, normalizeEmail } = require('../contact');
+const { normalizeMobile, normalizePhone, normalizeEmail, normalizeBirthDate } = require('../contact');
 
 const router = express.Router();
 wrapAllRoutes(router);
@@ -135,7 +135,7 @@ router.put('/proposal-settings', requireAuth, requireRole('freelancer'), async (
 
 router.put('/', requireAuth, async (req, res) => {
   if (req.user.role === 'freelancer') {
-    const { name, role_title, years, rate, stack, summary, grade, certs, phone, email } = req.body || {};
+    const { name, role_title, years, rate, stack, summary, grade, certs, phone, email, birthDate, gender } = req.body || {};
     const current = await get('SELECT * FROM freelancer_profiles WHERE user_id = ?', [req.user.id]);
 
     // 휴대폰은 필수, 이메일은 선택입니다.
@@ -150,6 +150,12 @@ router.put('/', requireAuth, async (req, res) => {
       nextEmail = normalizeEmail(email);
       if (nextEmail === null) return res.status(400).json({ error: '이메일 형식이 올바르지 않아요.' });
     }
+    let nextBirthDate = current.birth_date || '';
+    if (birthDate !== undefined) {
+      nextBirthDate = normalizeBirthDate(birthDate);
+      if (nextBirthDate === null) return res.status(400).json({ error: '생년월일을 정확히 입력해주세요. (예: 20000131)' });
+    }
+    const nextGender = gender === undefined ? (current.gender || '') : (['남자', '여자'].includes(gender) ? gender : '');
 
     let nextStack = Array.isArray(stack) ? stack : JSON.parse(current.stack_json);
     nextStack = nextStack
@@ -175,7 +181,7 @@ router.put('/', requireAuth, async (req, res) => {
       stackCount: nextStack.length, hasResume: !!current.resume_filename,
     });
     await run(
-      `UPDATE freelancer_profiles SET name=?, role_title=?, years=?, rate=?, stack_json=?, certs_json=?, summary=?, grade=?, completion=?, phone=?, email=?, updated_at=? WHERE user_id=?`,
+      `UPDATE freelancer_profiles SET name=?, role_title=?, years=?, rate=?, stack_json=?, certs_json=?, summary=?, grade=?, completion=?, phone=?, email=?, birth_date=?, gender=?, updated_at=? WHERE user_id=?`,
       [
         name !== undefined ? clamp(name, 60, current.name) : current.name,
         nextRoleTitle,
@@ -188,6 +194,8 @@ router.put('/', requireAuth, async (req, res) => {
         completion,
         nextPhone,
         nextEmail,
+        nextBirthDate,
+        nextGender,
         nowStr(),
         req.user.id,
       ]

@@ -1229,6 +1229,12 @@ function setSignupGender(g){
   document.getElementById('su-gender-male').classList.toggle('active', g==='남자');
   document.getElementById('su-gender-female').classList.toggle('active', g==='여자');
 }
+let profileGender = '';
+function setProfileGender(g){
+  profileGender = g;
+  document.getElementById('pf-gender-male').classList.toggle('active', g==='남자');
+  document.getElementById('pf-gender-female').classList.toggle('active', g==='여자');
+}
 function togglePasswordVisibility(inputId, iconEl){
   const input = document.getElementById(inputId);
   if(!input) return;
@@ -2117,6 +2123,8 @@ async function saveProfile(){
       phone,
       email: document.getElementById('pf-email').value.trim(),
       name: document.getElementById('pf-name').value.trim(),
+      birthDate: document.getElementById('pf-birthdate').value.trim(),
+      gender: profileGender,
       role_title: document.getElementById('pf-role').value.trim(),
       grade: document.getElementById('pf-grade').value,
       rate: document.getElementById('pf-rate').value.trim(),
@@ -3781,6 +3789,7 @@ async function screenProfileEdit(){
   if(!profileDraft){
     pendingStack = [...server.stack];
     pendingCerts = [...(server.certs || [])];
+    profileGender = server.gender || '';
   }
   profileDraft = null;
   return `${statusbar()}
@@ -3793,6 +3802,16 @@ async function screenProfileEdit(){
       <div style="margin-top:6px; font-size:11.5px;">저장하면 보던 공고로 다시 돌아가요.</div>
     </div>` : ''}
     <div class="form-field"><label class="form-label">이름</label><input id="pf-name" class="form-input" value="${esc(p.name)}"></div>
+    <div class="form-field">
+      <label class="form-label">생년월일 <span style="font-weight:400; color:var(--slate-light);">(예시: 20000131)</span></label>
+      <div class="su-phone-row">
+        <input id="pf-birthdate" class="form-input" inputmode="numeric" maxlength="8" placeholder="생년월일 8자리" value="${esc((p.birth_date||'').replace(/-/g,''))}">
+        <div class="su-gender-row" style="flex:0 0 auto; width:150px;">
+          <div class="chip ${profileGender==='남자'?'active':''}" id="pf-gender-male" onclick="setProfileGender('남자')">남자</div>
+          <div class="chip ${profileGender==='여자'?'active':''}" id="pf-gender-female" onclick="setProfileGender('여자')">여자</div>
+        </div>
+      </div>
+    </div>
     <div class="form-field"><label class="form-label">휴대폰 <span style="color:var(--danger); font-size:11px;">(필수)</span></label>
       <input id="pf-phone" class="form-input" type="tel" inputmode="tel" autocomplete="tel" placeholder="010-1234-5678" value="${esc(p.phone||'')}"></div>
     <div class="form-field"><label class="form-label">이메일</label>

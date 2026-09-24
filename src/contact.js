@@ -36,6 +36,18 @@ function normalizeEmail(v) {
   return EMAIL_RE.test(s) && s.length <= 120 ? s : null;
 }
 
+// 생년월일: '20000131' 또는 '2000-01-31' 형태를 받아 'YYYY-MM-DD'로 통일. 형식이 틀리면 null.
+function normalizeBirthDate(v) {
+  const s = String(v || '').trim();
+  if (!s) return '';
+  const digits = s.replace(/\D/g, '');
+  if (digits.length !== 8) return null;
+  const y = digits.slice(0, 4), m = digits.slice(4, 6), d = digits.slice(6, 8);
+  const date = new Date(`${y}-${m}-${d}T00:00:00`);
+  if (Number.isNaN(date.getTime()) || date.getFullYear() !== Number(y)) return null;
+  return `${y}-${m}-${d}`;
+}
+
 // 기업에게 프리랜서 정보를 보여줄 때 사용합니다.
 // 연락처(휴대폰·이메일)는 여기서는 절대 내려주지 않습니다 — 프리랜서가 그 기업의
 // 제안을 실제로 수락하기 전에는 인재풀 탐색만으로 연락처를 알 수 없어야 하기 때문입니다.
@@ -44,7 +56,7 @@ function normalizeEmail(v) {
 function publicTalent(t) {
   if (!t) return t;
   // eslint-disable-next-line no-unused-vars
-  const { phone, email, resume_data, share_phone, share_email, ...rest } = t;
+  const { phone, email, resume_data, share_phone, share_email, birth_date, gender, ...rest } = t;
   const accepting = Number(t.accept_proposals ?? 1) === 1;
   return {
     ...rest,
@@ -65,4 +77,4 @@ function contactFields(t, accepted) {
   };
 }
 
-module.exports = { normalizeMobile, normalizePhone, normalizeEmail, publicTalent, contactFields, EMAIL_RE };
+module.exports = { normalizeMobile, normalizePhone, normalizeEmail, normalizeBirthDate, publicTalent, contactFields, EMAIL_RE };
