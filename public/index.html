@@ -1136,6 +1136,7 @@ function recoTalentCard(t){
     </div>
     <div class="tag-row">${t.stack.map(s=>`<span class="tag">${esc(s)}</span>`).join('')}</div>
     <div class="reco-reasons">${(t.reasons||[]).map(r=>`<span class="reco-reason">${esc(r)}</span>`).join('')}</div>
+    ${t.match!=null ? gauge(t.match) : ''}
   </div>`;
 }
 function talentCard(t){
@@ -2425,10 +2426,12 @@ async function screenHome(){
       ${siteFooterHtml()}
     </div>${tabbar('home')}`;
   }
-  const [company, talentsData, jobsData, recoData] = await Promise.all([
-    apiFetch('/profile'), apiFetch('/talents'), apiFetch('/jobs'),
+  const [company, jobsData, recoData] = await Promise.all([
+    apiFetch('/profile'), apiFetch('/jobs'),
     apiFetch('/recommend/talents').catch(()=>({job:null, talents:[]})),
   ]);
+  // 인재풀의 스택매치도 추천과 같은 공고 기준으로 계산해야 두 숫자가 어긋나지 않습니다.
+  const talentsData = await apiFetch('/talents' + (recoData.job ? `?jobId=${recoData.job.id}` : ''));
   const jobs = jobsData.jobs;
   const applicantSum = jobs.reduce((a,j)=>a+(j.applicantCount||0),0);
   return `${statusbar()}${header("오늘의 인재 추천",`${esc(company.name)} · 채용 대시보드`,{roleChip:true}, nc)}
