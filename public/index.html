@@ -2473,7 +2473,7 @@ async function screenJobs(){
     isCompany ? Promise.resolve([]) : apiFetch('/jobs/recent-views').then(r=>r.jobs).catch(()=>[]),
   ]);
   const cats = ["전체", ...Object.keys(STACK_CATALOG)];
-  const grades = ["전체","초급","중급","고급","특급"];
+  const grades = ["전체","초급","중급","고급"];
   const duties = ["","PM","PL","TA","SA","DBA","개발자","QA","보안","감리","기타"];
   return `${statusbar()}${header(isCompany?"등록한 공고":"공고 탐색", `${data.jobs.length}개의 공고`,{}, nc)}
   <div class="content">
@@ -3977,7 +3977,7 @@ async function screenJobPost(){
     </select></div>
     <div class="form-field"><label class="form-label">등급</label><select id="pj-grade" class="form-input">
       <option value="">선택 안 함</option>
-      ${['초급','중급','고급','특급'].map(g=>`<option value="${g}" ${job&&job.grade===g?'selected':''}>${g}</option>`).join('')}
+      ${['초급','중급','고급'].map(g=>`<option value="${g}" ${job&&job.grade===g?'selected':''}>${g}</option>`).join('')}
     </select></div>
     <div class="form-field"><label class="form-label">지원 마감일 (선택)</label><input id="pj-deadline" class="form-input" type="date" value="${job&&job.deadline?job.deadline:''}"></div>
     <div class="form-field"><label class="form-label">상세 내용</label><textarea id="pj-desc" class="form-input" placeholder="업무 범위, 우대사항 등을 입력하세요">${job?esc(job.description):''}</textarea></div>
