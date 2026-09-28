@@ -3588,7 +3588,10 @@ async function screenMypage(){
     </div>
     ${pushBroken ? `<div class="list-item" onclick="repairPush()"><div class="li-l"><div class="li-icon">${I.gear}</div><div><div class="li-tt">알림이 안 오면 여기를 눌러주세요</div><div class="page-sub" style="margin-top:2px;">알림 기능을 처음부터 다시 설치해요</div></div></div>${I.back}</div>` : ''}
     ${!pushOn && Notification.permission === 'denied' ? `<div class="reco-empty" style="margin-top:8px; text-align:left;">알림이 <b>차단</b>되어 있어요.<br>브라우저 주소창 왼쪽 자물쇠 → 알림 → 허용으로 바꿔주세요.</div>` : ''}` :
-    `<div class="reco-empty" style="margin-top:8px; text-align:left;">이 브라우저에서는 푸시 알림을 쓸 수 없어요.<br><b>아이폰</b>은 Safari에서 공유 → "홈 화면에 추가"로 앱을 설치한 뒤 열면 사용할 수 있어요.</div>`}
+    (inAppBrowserName()
+      ? `<div class="reco-empty" style="margin-top:8px; text-align:left;"><b>${esc(inAppBrowserName())}</b> 안의 브라우저에서는 앱 설치·푸시 알림을 쓸 수 없어요.<br>${isIOSDevice() ? 'Safari' : '크롬'}에서 열면 사용할 수 있어요.
+          <button class="btn btn-primary" style="margin-top:10px;" onclick="openInExternalBrowser()">${isIOSDevice() ? 'Safari' : '크롬'}에서 열기</button></div>`
+      : `<div class="reco-empty" style="margin-top:8px; text-align:left;">이 브라우저에서는 푸시 알림을 쓸 수 없어요.<br>${isIOSDevice() ? 'Safari에서 공유 → "홈 화면에 추가"로 앱을 설치한 뒤 열면 사용할 수 있어요.' : '크롬 브라우저에서 열면 사용할 수 있어요.'}</div>`)}
     <div class="list-item" onclick="logout()"><div class="li-l"><div class="li-icon">${I.logout}</div><div class="li-tt">로그아웃</div></div></div>
     <div class="list-item" onclick="go('deleteAccount')"><div class="li-l"><div class="li-icon" style="color:var(--danger);">${I.trash}</div><div class="li-tt" style="color:var(--danger);">회원탈퇴</div></div>${I.back}</div>
   </div>${tabbar('mypage')}`;
@@ -4319,13 +4322,54 @@ window.addEventListener('appinstalled', () => {
 function isInstalledApp(){
   return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
 }
+function isIOSDevice(){
+  return /iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+// 카카오톡·네이버·인스타그램 등 "앱 안의 브라우저"는 앱 설치·푸시 알림을 지원하지 않습니다.
+// 이 경우 크롬/사파리 같은 기본 브라우저로 열도록 안내합니다.
+function inAppBrowserName(){
+  const ua = navigator.userAgent;
+  if(/KAKAOTALK/i.test(ua)) return '카카오톡';
+  if(/NAVER\(inapp/i.test(ua)) return '네이버 앱';
+  if(/Instagram/i.test(ua)) return '인스타그램';
+  if(/FBAN|FBAV|FB_IAB/i.test(ua)) return '페이스북';
+  if(/\bLine\//i.test(ua)) return '라인';
+  if(/BAND\//i.test(ua)) return '밴드';
+  if(/DaumApps/i.test(ua)) return '다음 앱';
+  if(/Android/i.test(ua) && /; wv\)/.test(ua)) return '앱 내부';
+  return '';
+}
+function openInExternalBrowser(){
+  const url = location.href;
+  const ua = navigator.userAgent;
+  if(/KAKAOTALK/i.test(ua)){
+    location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(url);
+    return;
+  }
+  if(/\bLine\//i.test(ua)){
+    location.href = url + (url.includes('?') ? '&' : '?') + 'openExternalBrowser=1';
+    return;
+  }
+  if(/Android/i.test(ua)){
+    location.href = 'intent://' + url.replace(/^https?:\/\//, '') + '#Intent;scheme=https;package=com.android.chrome;end';
+    return;
+  }
+  showConfirm('오른쪽 위(또는 아래) 메뉴 ··· 에서\n"Safari로 열기" 또는 "기본 브라우저로 열기"를 눌러주세요.', () => {});
+}
 async function installApp(){
   if(!deferredInstallPrompt){
-    showConfirm(
-      '이미 설치되어 있거나, 브라우저가 설치를 지원하지 않는 상태예요.\n\n' +
-      '휴대폰 설정 → 애플리케이션에서 "IT Free"를 찾아 삭제한 뒤 다시 시도해주세요.',
-      () => {}
-    );
+    const inApp = inAppBrowserName();
+    if(inApp){
+      showConfirm(`${inApp} 안의 브라우저에서는 앱을 설치할 수 없어요.\n\n확인을 누르면 ${isIOSDevice() ? 'Safari' : '크롬'}에서 IT Free를 열어드려요. 거기서 다시 "홈 화면에 앱 추가"를 눌러주세요.`, openInExternalBrowser);
+    } else if(isIOSDevice()){
+      showConfirm('아이폰은 Safari 아래쪽 공유 버튼(□↑) → "홈 화면에 추가"를 눌러 설치해주세요.', () => {});
+    } else {
+      showConfirm(
+        '브라우저 메뉴(⋮)에서 "홈 화면에 추가" 또는 "앱 설치"를 눌러주세요.\n\n' +
+        '이미 설치했다면 홈 화면의 IT Free 아이콘으로 열면 돼요.',
+        () => {}
+      );
+    }
     return;
   }
   deferredInstallPrompt.prompt();
