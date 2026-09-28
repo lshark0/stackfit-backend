@@ -1273,21 +1273,6 @@ function togglePasswordVisibility(inputId, iconEl){
   input.type = showing ? 'password' : 'text';
   iconEl.style.color = showing ? 'var(--slate-light)' : 'var(--ink)';
 }
-// 잡코리아 스타일 인증번호 UI. 실제 SMS 발송 업체 연동 없이, 형식만 갖춘 화면 흐름입니다.
-function sendSignupPhoneCode(){
-  const phone = document.getElementById('su-phone').value.trim();
-  if(!/^01[016789][- ]?\d{3,4}[- ]?\d{4}$/.test(phone)){ toast('휴대폰 번호를 정확히 입력해주세요'); return; }
-  document.getElementById('su-phonecoderow').hidden = false;
-  document.getElementById('su-phoneverified').hidden = true;
-  toast('인증번호를 전송했어요');
-}
-function confirmSignupPhoneCode(){
-  const code = document.getElementById('su-phonecode').value.trim();
-  if(!code){ toast('인증번호를 입력해주세요'); return; }
-  document.getElementById('su-phonecoderow').hidden = true;
-  document.getElementById('su-phoneverified').hidden = false;
-  toast('휴대폰 인증이 완료됐어요');
-}
 function toggleSignupAgreeAll(checked){
   document.querySelectorAll('#screen .su-agree-item input[type=checkbox]').forEach(el => {
     if(!el.closest('#su-agree-agerow') || signupRole==='freelancer') el.checked = checked;
@@ -1304,6 +1289,11 @@ async function doSignup(){
   if(password !== passwordConfirm){ toast('비밀번호가 일치하지 않아요'); return; }
   if(!phone){
     toast(signupRole==='company' ? '담당자 휴대폰 번호는 필수 항목이에요' : '휴대폰 번호는 필수 항목이에요');
+    document.getElementById('su-phone').focus();
+    return;
+  }
+  if(!/^01[016789][- ]?\d{3,4}[- ]?\d{4}$/.test(phone)){
+    toast('휴대폰 번호를 정확히 입력해주세요');
     document.getElementById('su-phone').focus();
     return;
   }
@@ -2337,16 +2327,7 @@ function screenSignup(){
 
     <div class="form-field" id="su-phonefield">
       <label class="form-label" id="su-phonelabel">휴대폰 <span style="color:var(--danger); font-size:11px;">(필수)</span></label>
-      <div class="su-phone-row">
-        <input id="su-phone" class="form-input" type="tel" inputmode="tel" autocomplete="tel" placeholder="010-1234-5678">
-        <button type="button" class="btn btn-outline" style="width:auto; flex:0 0 auto; padding:0 14px; font-size:12.5px;" onclick="sendSignupPhoneCode()">인증번호 전송</button>
-      </div>
-      <div id="su-phonecoderow" hidden class="su-phone-row" style="margin-top:8px;">
-        <input id="su-phonecode" class="form-input" inputmode="numeric" placeholder="인증번호 입력">
-        <button type="button" class="btn btn-outline" style="width:auto; flex:0 0 auto; padding:0 14px; font-size:12.5px;" onclick="confirmSignupPhoneCode()">확인</button>
-        <button type="button" class="btn btn-outline" style="width:auto; flex:0 0 auto; padding:0 12px; font-size:12.5px;" onclick="sendSignupPhoneCode()">재전송</button>
-      </div>
-      <div id="su-phoneverified" hidden class="page-sub" style="margin-top:6px; color:var(--cyan);">${I.checkCircle} 휴대폰 인증이 완료됐어요</div>
+      <input id="su-phone" class="form-input" type="tel" inputmode="tel" autocomplete="tel" placeholder="010-1234-5678">
     </div>
 
     <div class="su-section-title">약관 동의</div>
