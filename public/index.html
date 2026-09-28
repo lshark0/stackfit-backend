@@ -2562,9 +2562,9 @@ async function screenJobDetail(){
     </div>
     ${(j.certs && j.certs.length) ? `
       <div class="section-label with-ic">${I.badgeCheck}요구 자격증</div>
-      <div class="tag-row">${j.certs.map(c=>`<span class="tag on">${esc(c)}</span>`).join('')}</div>` : ''}
+      <div class="tag-row">${j.certs.map(c=>`<span class="tag">${esc(c)}</span>`).join('')}</div>` : ''}
     <div class="section-label with-ic">${I.layers}요구 기술스택</div>
-    <div class="tag-row">${j.stack.map(s=>`<span class="tag on">${esc(s)}</span>`).join('')}</div>
+    <div class="tag-row">${j.stack.map(s=>`<span class="tag">${esc(s)}</span>`).join('')}</div>
     <div class="section-label with-ic">${I.checklist}상세 내용</div>
     <div class="para">${esc(j.description) || "상세 설명이 아직 등록되지 않았어요."}</div>
     ${(!isCompany && j.similarJobs && j.similarJobs.length) ? `
