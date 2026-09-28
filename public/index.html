@@ -2649,10 +2649,10 @@ async function screenTalentDetail(){
       ${t.grade?`<div class="kv-box"><div class="kv-lbl">등급</div><div class="kv-val">${gradeBadge(t.grade)}</div></div>`:''}
     </div>
     <div class="section-label with-ic">${I.layers}기술스택</div>
-    <div class="tag-row">${t.stack.map(s=>`<span class="tag on">${esc(s)}</span>`).join('')}</div>
+    <div class="tag-row">${t.stack.map(s=>`<span class="tag">${esc(s)}</span>`).join('')}</div>
     ${(t.certs && t.certs.length) ? `
       <div class="section-label with-ic">${I.badgeCheck}자격증</div>
-      <div class="tag-row">${t.certs.map(c=>`<span class="tag on">${esc(c)}</span>`).join('')}</div>` : ''}
+      <div class="tag-row">${t.certs.map(c=>`<span class="tag">${esc(c)}</span>`).join('')}</div>` : ''}
     <div class="section-label with-ic">${I.user}자기 소개</div><div class="para">${esc(t.summary) || '자기 소개가 아직 등록되지 않았어요.'}</div>
     ${(t.contact_phone || t.contact_email) ? `
       <div class="section-label with-ic">${I.chat}연락처</div>
