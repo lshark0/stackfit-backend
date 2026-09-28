@@ -15,7 +15,9 @@ router.get('/jobs', requireAuth, requireRole('freelancer'), async (req, res) => 
   if (!p) return res.json({ jobs: [] });
 
   const profile = { ...p, stack: JSON.parse(p.stack_json) };
-  const jobs = await recommendJobsForProfile(profile, 5);
+  // 홈에서는 추천 목록만 보여주므로 limit으로 더 많이 받을 수 있게 합니다(기본 5, 최대 50).
+  const limit = Math.min(50, Math.max(1, Number.parseInt(req.query.limit, 10) || 5));
+  const jobs = await recommendJobsForProfile(profile, limit);
   res.json({ jobs });
 });
 
