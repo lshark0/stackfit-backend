@@ -1084,7 +1084,7 @@ function jobCard(j){
         <div class="card-title">${esc(j.title)} ${dutyBadge(j.duty)} ${gradeBadge(j.grade)}</div>
         <div class="card-org">${esc(j.org)}</div>
         ${j.applied?`<div style="margin-top:6px;"><span class="sbadge applied">${I.checkCircle}지원완료</span></div>`:''}
-        ${state.role==='company' && j.status==='closed'?`<div style="margin-top:6px;"><span class="sbadge fail">${I.xCircle}마감됨</span></div>`:''}
+        ${j.status==='closed'?`<div style="margin-top:6px;"><span class="sbadge fail">${I.xCircle}마감됨</span></div>`:''}
       </div>
       <div class="star-btn ${j.saved?'filled':''}" onclick="toggleSaveJob(${j.id}, event)">${I.star}</div>
     </div>
@@ -1096,7 +1096,7 @@ function jobCard(j){
       ${state.role==='freelancer' ? applicantBadge(j.applicantCount) : ''}
       ${state.role==='company' ? `<span class="im">${I.eyeSm}<b>${j.viewCount||0}</b>회 조회</span><span class="im">${I.usersSm}<b>${j.applicantCount||0}</b>명 지원</span>` : ''}
     </div>
-    <div class="meta-row" style="margin-top:6px;">${ddayBadge(j.d_day)}${ratingBadge(j.rating_avg, j.rating_count)}</div>
+    <div class="meta-row" style="margin-top:6px;">${j.status==='closed' ? '' : ddayBadge(j.d_day)}${ratingBadge(j.rating_avg, j.rating_count)}</div>
     ${state.role==='freelancer' ? gauge(j.match) : ''}
   </div>`;
 }
@@ -1105,7 +1105,7 @@ function miniJobCard(j){
   return `<div class="mini-card" onclick="go('jobDetail', ${j.id})">
     <div class="mc-title">${esc(j.title)}</div>
     <div class="mc-org">${esc(j.org)}</div>
-    <div class="mc-meta">${ddayBadge(j.d_day)}${state.role==='freelancer' ? gaugeSm(j.match) : ''}</div>
+    <div class="mc-meta">${ddayBadge(j.status==='closed' ? '마감' : j.d_day)}${state.role==='freelancer' ? gaugeSm(j.match) : ''}</div>
   </div>`;
 }
 // 잡코리아 스타일: 최근 본 인재 가로 스크롤용 축약 카드
@@ -2557,7 +2557,7 @@ async function screenJobDetail(){
       <div class="kv-box"><div class="kv-lbl">근무지</div><div class="kv-val">${esc(j.location)}</div></div>
       ${j.duty?`<div class="kv-box"><div class="kv-lbl">업무</div><div class="kv-val">${dutyBadge(j.duty)}</div></div>`:''}
       ${j.grade?`<div class="kv-box"><div class="kv-lbl">등급</div><div class="kv-val">${gradeBadge(j.grade)}</div></div>`:''}
-      <div class="kv-box"><div class="kv-lbl">지원마감</div><div class="kv-val">${ddayBadge(j.d_day) || esc(j.d_day)}</div></div>
+      <div class="kv-box"><div class="kv-lbl">지원마감</div><div class="kv-val">${j.status==='closed' ? `<span class="sbadge fail">${I.xCircle}마감됨</span>` : (ddayBadge(j.d_day) || esc(j.d_day))}</div></div>
       ${!isCompany?`<div class="kv-box"><div class="kv-lbl">지원 현황</div><div class="kv-val" style="font-size:12.5px;">${applicantBadge(j.applicantCount)}</div></div>`:''}
     </div>
     ${(j.certs && j.certs.length) ? `
