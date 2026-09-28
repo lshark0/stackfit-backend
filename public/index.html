@@ -2438,7 +2438,7 @@ async function screenHome(){
   }
   const [company, jobsData, recoData] = await Promise.all([
     apiFetch('/profile'), apiFetch('/jobs'),
-    apiFetch('/recommend/talents').catch(()=>({job:null, talents:[]})),
+    apiFetch('/recommend/talents?limit=20').catch(()=>({job:null, talents:[]})),
   ]);
   // 인재풀의 스택매치도 추천과 같은 공고 기준으로 계산해야 두 숫자가 어긋나지 않습니다.
   const talentsData = await apiFetch('/talents' + (recoData.job ? `?jobId=${recoData.job.id}` : ''));
@@ -2472,12 +2472,10 @@ async function screenHome(){
     <div class="section-label with-ic">${I.badgeCheck}${recoData.job ? `"${esc(recoData.job.title)}"에 맞는 인재` : '맞춤 인재 추천'}</div>
     ${recoData.talents.length
       ? `<div class="reco-legend">· <b>추천 %</b>: 업무·등급·평점까지 합친 종합 점수입니다.<br>· <b>스택매치 %</b>: 기술스택만 본 점수입니다.</div>`
-        + recoData.talents.map(recoTalentCard).join('')
+        + [...recoData.talents].sort((a,b)=>(b.score-a.score) || ((b.match||0)-(a.match||0))).map(recoTalentCard).join('')
       : `<div class="reco-empty">${recoData.job
           ? '아직 조건에 맞는 인재가 없어요.<br>공고의 기술스택·업무·등급을 채우면 정확도가 올라가요.'
           : '공고를 등록하면 딱 맞는 인재를<br>자동으로 추천해드려요.<br><b onclick="go(\'jobPost\')" style="color:var(--ink); text-decoration:underline; cursor:pointer;">공고 등록하러 가기</b>'}</div>`}
-    <div class="section-label with-ic">${I.talent}전체 인재풀</div>
-    ${talentsData.talents.slice(0,3).map(talentCard).join('') || emptyArt(ART.noTalents, '등록된 인재가 없어요')}
     ${siteFooterHtml()}
   </div>${tabbar('home')}`;
 }

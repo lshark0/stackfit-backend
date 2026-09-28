@@ -9,15 +9,18 @@ const { publicTalent } = require('../contact');
 const router = express.Router();
 wrapAllRoutes(router);
 
+// 홈에서는 추천 목록만 보여주므로 limit으로 더 많이 받을 수 있게 합니다(기본 5, 최대 50).
+function parseLimit(v) {
+  return Math.min(50, Math.max(1, Number.parseInt(v, 10) || 5));
+}
+
 // [프리랜서] 내 프로필 기반 맞춤 프로젝트 추천
 router.get('/jobs', requireAuth, requireRole('freelancer'), async (req, res) => {
   const p = await get('SELECT * FROM freelancer_profiles WHERE user_id = ?', [req.user.id]);
   if (!p) return res.json({ jobs: [] });
 
   const profile = { ...p, stack: JSON.parse(p.stack_json) };
-  // 홈에서는 추천 목록만 보여주므로 limit으로 더 많이 받을 수 있게 합니다(기본 5, 최대 50).
-  const limit = Math.min(50, Math.max(1, Number.parseInt(req.query.limit, 10) || 5));
-  const jobs = await recommendJobsForProfile(profile, limit);
+  const jobs = await recommendJobsForProfile(profile, parseLimit(req.query.limit));
   res.json({ jobs });
 });
 
@@ -40,7 +43,7 @@ router.get('/talents', requireAuth, requireRole('company'), async (req, res) => 
   if (!job) return res.json({ job: null, talents: [] });
 
   const target = { ...job, stack: JSON.parse(job.stack_json) };
-  const talents = await recommendTalentsForJob(target, 5);
+  const talents = await recommendTalentsForJob(target, parseLimit(req.query.limit));
   res.json({
     job: { id: job.id, title: job.title },
     talents: talents.map((t) => ({ ...publicTalent(t), resume_url: signedFileUrl(t.resume_filename) })),
