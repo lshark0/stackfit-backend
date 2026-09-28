@@ -2442,7 +2442,7 @@ async function screenHome(){
         <div class="quick-item" onclick="go('savedJobs')"><div class="qi-ic">${I.jobs}</div><div class="qi-lbl">관심프로젝트</div></div>
         <div class="quick-item" onclick="go('profileViews')"><div class="qi-ic">${I.eye}</div><div class="qi-lbl">내 프로필 열람현황</div></div>
       </div>
-      <div class="section-label with-ic">${I.badgeCheck}나에게 맞는 프로젝트</div>
+      <div class="section-label with-ic reco-title">${I.badgeCheck}나에게 맞는 프로젝트</div>
       ${recoData.jobs.length
         ? `<div class="reco-legend">· <b>추천 %</b>: 스택(60) + 업무(20) + 등급(15) + 평점(5)을 합친 종합 점수입니다.<br>· <b>스택매치 %</b>: 요구 기술스택 중 보유한 비율입니다.</div>`
           + [...recoData.jobs].sort((a,b)=>(b.score-a.score) || ((b.match||0)-(a.match||0))).map(recoJobCard).join('')
