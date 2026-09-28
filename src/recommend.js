@@ -15,7 +15,7 @@ function scoreMatch(job, profile, rating) {
   const reasons = [];
 
   const match = computeMatch(job.stack, profile.stack);
-  const stackScore = Math.round((match / 99) * 60);
+  const stackScore = Math.round((match / 100) * 60);
   const matched = matchedStack(job.stack, profile.stack);
   if (matched.length > 0) reasons.push(`기술스택 ${matched.length}개 일치`);
 
@@ -48,7 +48,9 @@ function scoreMatch(job, profile, rating) {
   }
 
   const total = Math.min(100, stackScore + dutyScore + gradeScore + ratingScore);
-  return { score: total, match, matched, reasons };
+  // 화면에 "스택 58 + 업무 20 + 등급 15 + 평점 0"처럼 점수 내역을 보여주기 위한 값
+  const breakdown = { stack: stackScore, duty: dutyScore, grade: gradeScore, rating: ratingScore };
+  return { score: total, match, matched, reasons, breakdown };
 }
 
 // [기업용] 특정 공고에 맞는 프리랜서를 자동 추천합니다.
@@ -62,8 +64,8 @@ async function recommendTalentsForJob(job, limit = 5) {
   return profiles
     .map((p) => {
       const rating = ratingById[p.user_id] || { rating_avg: null, rating_count: 0 };
-      const { score, match, matched, reasons } = scoreMatch(job, p, rating);
-      return { ...p, ...rating, score, match, matchedStack: matched, reasons };
+      const { score, match, matched, reasons, breakdown } = scoreMatch(job, p, rating);
+      return { ...p, ...rating, score, match, matchedStack: matched, reasons, breakdown };
     })
     .filter((p) => p.score > 0) // 접점이 전혀 없는 사람은 추천하지 않음
     .sort((a, b) => b.score - a.score)
@@ -100,7 +102,7 @@ async function recommendJobsForProfile(profile, limit = 5) {
     })
     .map((j) => {
       const rating = ratingById[j.company_id] || { rating_avg: null, rating_count: 0 };
-      const { score, match, matched, reasons } = scoreMatch(j, profile, rating);
+      const { score, match, matched, reasons, breakdown } = scoreMatch(j, profile, rating);
       return {
         ...j,
         org: companyNameById[j.company_id] || '알 수 없음',
@@ -109,6 +111,7 @@ async function recommendJobsForProfile(profile, limit = 5) {
         match,
         matchedStack: matched,
         reasons,
+        breakdown,
       };
     })
     .filter((j) => j.score > 0)

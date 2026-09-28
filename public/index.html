@@ -112,6 +112,9 @@
   .tag.rm{cursor:pointer;}
   .tag.hit{background:var(--green-soft); color:var(--green-deep); border-color:var(--green);}
   .tag.hit::before{content:'✓ ';}
+  .reco-breakdown{margin-top:8px; font-size:11.5px; color:var(--slate); font-family:var(--mono);}
+  .reco-breakdown b{color:var(--ink); font-weight:700;}
+  .reco-breakdown b.total{color:var(--purple-deep);}
   .reco-reason.stack-hit{color:var(--green-deep); background:var(--green-soft); border-color:var(--green);}
   .meta-row{display:flex; align-items:center; gap:12px; margin-top:11px; font-size:12.5px; font-weight:500; color:var(--slate); flex-wrap:wrap;}
   .meta-row span{display:flex; align-items:center; gap:4px;}
@@ -1121,6 +1124,11 @@ function stackTags(stack, matched){
   const hit = new Set((matched||[]).map(s=>String(s).toLowerCase()));
   return `<div class="tag-row">${(stack||[]).map(s=>`<span class="tag${hit.has(String(s).toLowerCase())?' hit':''}">${esc(s)}</span>`).join('')}</div>`;
 }
+// 추천 % 점수 내역: 스택(60) + 업무(20) + 등급(15) + 평점(5)
+function recoBreakdown(b, total){
+  if(!b) return '';
+  return `<div class="reco-breakdown">점수 내역 · 스택 <b>${b.stack}</b> + 업무 <b>${b.duty}</b> + 등급 <b>${b.grade}</b> + 평점 <b>${b.rating}</b> = <b class="total">${total}</b></div>`;
+}
 // 추천 근거 칩. '기술스택 N개 일치'는 강조된 태그와 같은 초록색으로 맞춥니다.
 function recoReasons(reasons){
   return `<div class="reco-reasons">${(reasons||[]).map(r=>`<span class="reco-reason${r.startsWith('기술스택')?' stack-hit':''}">${esc(r)}</span>`).join('')}</div>`;
@@ -1134,6 +1142,7 @@ function recoJobCard(j){
     ${stackTags(j.stack, j.matchedStack)}
     <div class="meta-row"><span>${I.pin}${esc(j.location)}</span><span class="rate">${esc(j.rate)}</span></div>
     ${recoReasons(j.reasons)}
+    ${recoBreakdown(j.breakdown, j.score)}
     ${j.match!=null ? gauge(j.match) : ''}
   </div>`;
 }
@@ -1151,6 +1160,7 @@ function recoTalentCard(t){
     </div>
     ${stackTags(t.stack, t.matchedStack)}
     ${recoReasons(t.reasons)}
+    ${recoBreakdown(t.breakdown, t.score)}
     ${t.match!=null ? gauge(t.match) : ''}
   </div>`;
 }
@@ -2430,7 +2440,7 @@ async function screenHome(){
       </div>
       <div class="section-label with-ic">${I.badgeCheck}나에게 맞는 프로젝트</div>
       ${recoData.jobs.length
-        ? `<div class="reco-legend">· <b>추천 %</b>: 업무·등급·평점까지 합친 종합 점수입니다.<br>· <b>스택매치 %</b>: 기술스택만 본 점수입니다.</div>`
+        ? `<div class="reco-legend">· <b>추천 %</b>: 스택(60) + 업무(20) + 등급(15) + 평점(5)을 합친 종합 점수입니다.<br>· <b>스택매치 %</b>: 요구 기술스택 중 보유한 비율입니다.</div>`
           + [...recoData.jobs].sort((a,b)=>(b.score-a.score) || ((b.match||0)-(a.match||0))).map(recoJobCard).join('')
         : (profile.completion >= 100
             ? `<div class="reco-empty">아직 조건에 맞는 새 프로젝트가 없어요.<br>이미 지원했거나 마감된 공고는 추천에서 빠져요.<br><b onclick="go('jobs')" style="color:var(--ink); text-decoration:underline; cursor:pointer;">전체 공고 보러 가기</b></div>`
@@ -2473,7 +2483,7 @@ async function screenHome(){
     </div>
     <div class="section-label with-ic">${I.badgeCheck}${recoData.job ? `"${esc(recoData.job.title)}"에 맞는 인재` : '맞춤 인재 추천'}</div>
     ${recoData.talents.length
-      ? `<div class="reco-legend">· <b>추천 %</b>: 업무·등급·평점까지 합친 종합 점수입니다.<br>· <b>스택매치 %</b>: 기술스택만 본 점수입니다.</div>`
+      ? `<div class="reco-legend">· <b>추천 %</b>: 스택(60) + 업무(20) + 등급(15) + 평점(5)을 합친 종합 점수입니다.<br>· <b>스택매치 %</b>: 요구 기술스택 중 보유한 비율입니다.</div>`
         + [...recoData.talents].sort((a,b)=>(b.score-a.score) || ((b.match||0)-(a.match||0))).map(recoTalentCard).join('')
       : `<div class="reco-empty">${recoData.job
           ? '아직 조건에 맞는 인재가 없어요.<br>공고의 기술스택·업무·등급을 채우면 정확도가 올라가요.'
