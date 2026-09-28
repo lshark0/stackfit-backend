@@ -1,5 +1,5 @@
 const { all } = require('./db');
-const { computeMatch } = require('./match');
+const { computeMatch, matchedStack } = require('./match');
 const { getRatingSummaries } = require('./ratings');
 
 // 등급을 숫자로 환산 (인접 등급은 부분 점수를 주기 위함)
@@ -16,10 +16,8 @@ function scoreMatch(job, profile, rating) {
 
   const match = computeMatch(job.stack, profile.stack);
   const stackScore = Math.round((match / 99) * 60);
-  const overlapCount = job.stack.filter((s) =>
-    profile.stack.some((p) => p.toLowerCase() === s.toLowerCase())
-  ).length;
-  if (overlapCount > 0) reasons.push(`기술스택 ${overlapCount}개 일치`);
+  const matched = matchedStack(job.stack, profile.stack);
+  if (matched.length > 0) reasons.push(`기술스택 ${matched.length}개 일치`);
 
   let dutyScore = 0;
   if (job.duty && profile.role_title) {
@@ -50,7 +48,7 @@ function scoreMatch(job, profile, rating) {
   }
 
   const total = Math.min(100, stackScore + dutyScore + gradeScore + ratingScore);
-  return { score: total, match, reasons };
+  return { score: total, match, matched, reasons };
 }
 
 // [기업용] 특정 공고에 맞는 프리랜서를 자동 추천합니다.
@@ -64,8 +62,8 @@ async function recommendTalentsForJob(job, limit = 5) {
   return profiles
     .map((p) => {
       const rating = ratingById[p.user_id] || { rating_avg: null, rating_count: 0 };
-      const { score, match, reasons } = scoreMatch(job, p, rating);
-      return { ...p, ...rating, score, match, reasons };
+      const { score, match, matched, reasons } = scoreMatch(job, p, rating);
+      return { ...p, ...rating, score, match, matchedStack: matched, reasons };
     })
     .filter((p) => p.score > 0) // 접점이 전혀 없는 사람은 추천하지 않음
     .sort((a, b) => b.score - a.score)
@@ -102,12 +100,13 @@ async function recommendJobsForProfile(profile, limit = 5) {
     })
     .map((j) => {
       const rating = ratingById[j.company_id] || { rating_avg: null, rating_count: 0 };
-      const { score, reasons } = scoreMatch(j, profile, rating);
+      const { score, matched, reasons } = scoreMatch(j, profile, rating);
       return {
         ...j,
         org: companyNameById[j.company_id] || '알 수 없음',
         ...rating,
         score,
+        matchedStack: matched,
         reasons,
       };
     })

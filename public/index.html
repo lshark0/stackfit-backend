@@ -110,6 +110,9 @@
   .tag{font-family:var(--mono); font-size:11.5px; font-weight:600; padding:4px 8px; border-radius:6px; background:var(--paper-dim); color:var(--ink); border:1px solid var(--line);}
   .tag.on{background:linear-gradient(135deg, var(--blue) 0%, var(--purple) 100%); color:#fff; border-color:transparent;}
   .tag.rm{cursor:pointer;}
+  .tag.hit{background:var(--green-soft); color:var(--green-deep); border-color:var(--green);}
+  .tag.hit::before{content:'✓ ';}
+  .reco-reason.stack-hit{color:var(--green-deep); background:var(--green-soft); border-color:var(--green);}
   .meta-row{display:flex; align-items:center; gap:12px; margin-top:11px; font-size:12.5px; font-weight:500; color:var(--slate); flex-wrap:wrap;}
   .meta-row span{display:flex; align-items:center; gap:4px;}
   .rate{font-family:var(--mono); font-weight:700; color:var(--amber-deep); font-size:14px;}
@@ -1113,15 +1116,24 @@ function miniTalentCard(t){
     <div class="mc-meta">${gradeBadge(t.grade)}</div>
   </div>`;
 }
+// 기술스택 태그. 공고와 일치한 기술(matched, 소문자 목록)은 초록색으로 강조합니다.
+function stackTags(stack, matched){
+  const hit = new Set((matched||[]).map(s=>String(s).toLowerCase()));
+  return `<div class="tag-row">${(stack||[]).map(s=>`<span class="tag${hit.has(String(s).toLowerCase())?' hit':''}">${esc(s)}</span>`).join('')}</div>`;
+}
+// 추천 근거 칩. '기술스택 N개 일치'는 강조된 태그와 같은 초록색으로 맞춥니다.
+function recoReasons(reasons){
+  return `<div class="reco-reasons">${(reasons||[]).map(r=>`<span class="reco-reason${r.startsWith('기술스택')?' stack-hit':''}">${esc(r)}</span>`).join('')}</div>`;
+}
 function recoJobCard(j){
   return `<div class="card clickable" onclick="go('jobDetail', ${j.id})">
     <div class="card-top">
       <div><div class="card-title">${esc(j.title)}</div><div class="card-org">${esc(j.org)}</div></div>
       <span class="reco-badge">추천 ${j.score}%</span>
     </div>
-    <div class="tag-row">${j.stack.map(s=>`<span class="tag">${esc(s)}</span>`).join('')}</div>
+    ${stackTags(j.stack, j.matchedStack)}
     <div class="meta-row"><span>${I.pin}${esc(j.location)}</span><span class="rate">${esc(j.rate)}</span></div>
-    <div class="reco-reasons">${(j.reasons||[]).map(r=>`<span class="reco-reason">${esc(r)}</span>`).join('')}</div>
+    ${recoReasons(j.reasons)}
   </div>`;
 }
 function recoTalentCard(t){
@@ -1136,8 +1148,8 @@ function recoTalentCard(t){
       </div>
       <span class="reco-badge">추천 ${t.score}%</span>
     </div>
-    <div class="tag-row">${t.stack.map(s=>`<span class="tag">${esc(s)}</span>`).join('')}</div>
-    <div class="reco-reasons">${(t.reasons||[]).map(r=>`<span class="reco-reason">${esc(r)}</span>`).join('')}</div>
+    ${stackTags(t.stack, t.matchedStack)}
+    ${recoReasons(t.reasons)}
     ${t.match!=null ? gauge(t.match) : ''}
   </div>`;
 }
@@ -1158,7 +1170,7 @@ function talentCard(t){
       </div>
       ${state.role==='company' ? `<div class="star-btn ${t.saved?'filled':''}" title="관심 인재" onclick="toggleSaveTalent(${t.user_id}, event)">${I.star}</div>` : ''}
     </div>
-    <div class="tag-row">${t.stack.map(s=>`<span class="tag">${esc(s)}</span>`).join('')}</div>
+    ${stackTags(t.stack, t.matchedStack)}
     <div class="icon-meta">
       <span class="im">${I.wallet}<b>${esc(t.rate)}</b></span>
       ${t.rating_count>0?`<span class="im">${ratingBadge(t.rating_avg, t.rating_count)}</span>`:''}

@@ -14,4 +14,10 @@ function computeMatch(jobStack = [], profileStack = []) {
   return Math.max(0, Math.min(99, score));
 }
 
-module.exports = { computeMatch };
+// 공고 요구 스택 중 프리랜서가 보유한 기술 목록(소문자). 화면에서 일치한 태그를 강조하는 데 씁니다.
+function matchedStack(jobStack = [], profileStack = []) {
+  const profSet = new Set(profileStack.map(s => s.toLowerCase()));
+  return [...new Set(jobStack.map(s => s.toLowerCase()))].filter(s => profSet.has(s));
+}
+
+module.exports = { computeMatch, matchedStack };
