@@ -388,6 +388,10 @@
   /* 섹션 제목 앞 아이콘 */
   .section-label.with-ic{display:flex; align-items:center; gap:6px;}
   .section-label.with-ic svg{color:var(--amber-deep); width:14px; height:14px;}
+  /* 추천 섹션 제목: 다른 소제목보다 크고 굵게 */
+  .section-label.reco-title{font-family:inherit; font-size:17px; font-weight:800; letter-spacing:-.01em; text-transform:none; color:var(--ink); line-height:1.35; margin:22px 0 10px; word-break:keep-all;}
+  .section-label.reco-title::after{display:none;}
+  .section-label.reco-title svg{width:18px; height:18px; flex:0 0 auto;}
 
   /* 업무(PM/TA/DBA...) · 등급(초급~특급) 배지 */
   .dbadge{display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:700; font-family:var(--mono); letter-spacing:.02em;
@@ -2481,7 +2485,7 @@ async function screenHome(){
       <div class="quick-item" onclick="go('jobs')"><div class="qi-ic">${I.jobs}</div><div class="qi-lbl">공고 관리</div></div>
       <div class="quick-item" onclick="go('chatList')"><div class="qi-ic">${I.chat}</div><div class="qi-lbl">채팅</div></div>
     </div>
-    <div class="section-label with-ic">${I.badgeCheck}${recoData.job ? `"${esc(recoData.job.title)}"에 맞는 인재` : '맞춤 인재 추천'}</div>
+    <div class="section-label with-ic reco-title">${I.badgeCheck}${recoData.job ?`"${esc(recoData.job.title)}"에 맞는 인재` : '맞춤 인재 추천'}</div>
     ${recoData.talents.length
       ? `<div class="reco-legend">· <b>추천 %</b>: 스택(60) + 업무(20) + 등급(15) + 평점(5)을 합친 종합 점수입니다.<br>· <b>스택매치 %</b>: 요구 기술스택 중 보유한 비율입니다.</div>`
         + [...recoData.talents].sort((a,b)=>(b.score-a.score) || ((b.match||0)-(a.match||0))).map(recoTalentCard).join('')
