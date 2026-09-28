@@ -132,6 +132,36 @@ router.get('/me/applications', requireAuth, requireRole('freelancer'), async (re
   });
 });
 
+// [기업] 내 모든 공고의 지원자를 한 번에 봅니다(홈 대시보드의 '지원자' 수치와 같은 범위).
+router.get('/company/applicants', requireAuth, requireRole('company'), async (req, res) => {
+  const rows = await all(
+    `SELECT a.id AS application_id, a.status, a.created_at AS applied_at, a.freelancer_id,
+            j.id AS job_id, j.title AS job_title, j.stack_json AS job_stack_json, f.*
+     FROM applications a
+     JOIN jobs j ON j.id = a.job_id
+     LEFT JOIN freelancer_profiles f ON f.user_id = a.freelancer_id
+     WHERE j.company_id = ?
+     ORDER BY a.created_at DESC, a.id DESC`,
+    [req.user.id]
+  );
+  res.json({
+    applicants: rows.map((r) => {
+      const stack = r.stack_json ? JSON.parse(r.stack_json) : [];
+      // eslint-disable-next-line no-unused-vars
+      const { job_stack_json, ...rest } = r;
+      return {
+        ...publicTalent(rest),
+        user_id: r.user_id ?? r.freelancer_id,
+        name: r.name || '(탈퇴한 회원)',
+        role_title: r.role_title || '',
+        rate: r.rate || '',
+        stack,
+        match: computeMatch(JSON.parse(r.job_stack_json), stack),
+      };
+    }),
+  });
+});
+
 router.get('/jobs/:id/applicants', requireAuth, requireRole('company'), async (req, res) => {
   const job = await get('SELECT * FROM jobs WHERE id = ? AND company_id = ?', [req.params.id, req.user.id]);
   if (!job) return res.status(404).json({ error: '공고를 찾을 수 없습니다.' });

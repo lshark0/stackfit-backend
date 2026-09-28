@@ -301,6 +301,8 @@
   .reco-badge{display:inline-flex; align-items:center; gap:4px; font-family:var(--mono); font-size:11px; font-weight:700; letter-spacing:.04em; padding:3px 8px; border-radius:999px; background:linear-gradient(135deg, var(--purple) 0%, var(--blue) 100%); color:#fff;}
   .reco-reasons{display:flex; flex-wrap:wrap; gap:5px; margin-top:8px;}
   .reco-reason{font-size:11.5px; font-weight:600; color:var(--purple-deep); background:var(--purple-soft); border:1px solid transparent; padding:3px 8px; border-radius:999px;}
+  .reco-legend{margin:-4px 0 10px; font-size:12px; color:var(--slate); line-height:1.6;}
+  .reco-legend b{color:var(--ink); font-weight:700;}
   .reco-empty{padding:16px; text-align:center; font-size:13.5px; color:var(--slate); background:var(--card); border:1px dashed var(--line); border-radius:14px; line-height:1.6;}
 
   /* ── 최근 본 공고 / 비슷한 공고: 가로 스크롤 미니 카드 ── */
@@ -659,7 +661,7 @@ const MYPAGE_CHILD_SCREENS = ['proposalSettings','changePassword','deleteAccount
 
 // 회원 유형별로만 열 수 있는 화면. 다른 유형의 화면이 열리려 하면(뒤로가기 기록, 예전 알림 등) 홈으로 보냅니다.
 const FREELANCER_ONLY = ['receivedProposals','myApplications','portfolios','portfolioEdit','savedJobs','followedCompanies','profileViews','profileEdit','proposalSettings','reportJob'];
-const COMPANY_ONLY = ['talent','talentDetail','applicants','jobPost','companyProfileEdit','proposeForm','sentProposals','savedTalents'];
+const COMPANY_ONLY = ['talent','talentDetail','applicants','allApplicants','jobPost','companyProfileEdit','proposeForm','sentProposals','savedTalents'];
 function screenAllowed(screen){
   if(state.role==='company' && FREELANCER_ONLY.includes(screen)) return false;
   if(state.role==='freelancer' && COMPANY_ONLY.includes(screen)) return false;
@@ -1136,6 +1138,7 @@ function recoTalentCard(t){
     </div>
     <div class="tag-row">${t.stack.map(s=>`<span class="tag">${esc(s)}</span>`).join('')}</div>
     <div class="reco-reasons">${(t.reasons||[]).map(r=>`<span class="reco-reason">${esc(r)}</span>`).join('')}</div>
+    ${t.match!=null ? gauge(t.match) : ''}
   </div>`;
 }
 function talentCard(t){
@@ -1160,8 +1163,24 @@ function talentCard(t){
       <span class="im">${I.wallet}<b>${esc(t.rate)}</b></span>
       ${t.rating_count>0?`<span class="im">${ratingBadge(t.rating_avg, t.rating_count)}</span>`:''}
     </div>
-    ${gauge(t.match)}
+    ${t.match!=null ? gauge(t.match) : ''}
   </div>`;
+}
+
+// 인재풀 검색·관심 인재에서 스택매치를 어느 공고 기준으로 계산했는지 보여주고 바꿀 수 있게 합니다.
+let talentMatchJobId = null;
+function matchBasisHtml(data, onChange){
+  if(!data.matchJob){
+    return `<div class="reco-legend">공고를 등록하면 그 공고 기준으로 <b>스택매치 %</b>가 표시돼요.</div>`;
+  }
+  return `<div style="display:flex; align-items:center; gap:8px; margin:6px 0 4px;">
+      <span style="flex:0 0 auto; font-size:12.5px; font-weight:700; color:var(--ink);">스택매치 기준 공고</span>
+      <select class="form-input" style="flex:1; min-width:0; padding:9px 10px; font-size:12.5px;" onchange="talentMatchJobId=Number(this.value); ${onChange}">
+        ${(data.matchJobs.some(j=>j.id===data.matchJob.id) ? data.matchJobs : [data.matchJob, ...data.matchJobs])
+          .map(j=>`<option value="${j.id}" ${j.id===data.matchJob.id?'selected':''}>${esc(j.title)}</option>`).join('')}
+      </select>
+    </div>
+    <div class="reco-legend">· <b>스택매치 %</b>: 선택한 공고 기준으로 기술스택만 본 점수입니다.</div>`;
 }
 
 /* ---------------- Actions ---------------- */
@@ -1855,6 +1874,7 @@ async function refreshTalentList(){
     if(talentCat && talentCat!=='전체') qs.set('category', talentCat);
     if(talentGrade && talentGrade!=='전체') qs.set('grade', talentGrade);
     if(talentDuty) qs.set('duty', talentDuty);
+    if(talentMatchJobId) qs.set('jobId', talentMatchJobId);
     const data = await apiFetch('/talents?' + qs.toString());
     el.innerHTML = data.talents.length ? data.talents.map(talentCard).join('') : emptyHtml('조건에 맞는 인재가 없어요', I.talent);
   }catch(e){ el.innerHTML = emptyHtml(e.message, I.talent); }
@@ -2425,17 +2445,19 @@ async function screenHome(){
       ${siteFooterHtml()}
     </div>${tabbar('home')}`;
   }
-  const [company, talentsData, jobsData, recoData] = await Promise.all([
-    apiFetch('/profile'), apiFetch('/talents'), apiFetch('/jobs'),
+  const [company, jobsData, recoData] = await Promise.all([
+    apiFetch('/profile'), apiFetch('/jobs'),
     apiFetch('/recommend/talents').catch(()=>({job:null, talents:[]})),
   ]);
+  // 인재풀의 스택매치도 추천과 같은 공고 기준으로 계산해야 두 숫자가 어긋나지 않습니다.
+  const talentsData = await apiFetch('/talents' + (recoData.job ? `?jobId=${recoData.job.id}` : ''));
   const jobs = jobsData.jobs;
   const applicantSum = jobs.reduce((a,j)=>a+(j.applicantCount||0),0);
   return `${statusbar()}${header("오늘의 인재 추천",`${esc(company.name)} · 채용 대시보드`,{roleChip:true}, nc)}
   <div class="content">
     <div class="hero-stat">
       <div class="hs" onclick="go('jobs')"><div class="hs-num">${jobs.length}</div><div class="hs-lbl">등록 공고</div>${sparkline([1,2,1,2,jobs.length||1])}</div>
-      <div class="hs" onclick="go('jobs')"><div class="hs-num">${applicantSum}</div><div class="hs-lbl">지원자</div>${sparkline([1,1,2,3,applicantSum||1])}</div>
+      <div class="hs" onclick="go('allApplicants')"><div class="hs-num">${applicantSum}</div><div class="hs-lbl">지원자</div>${sparkline([1,1,2,3,applicantSum||1])}</div>
       <div class="hs" onclick="go('talent')"><div class="hs-num">${talentsData.talents.length}</div><div class="hs-lbl">인재풀</div>${sparkline([2,2,3,3,talentsData.talents.length||1])}</div>
     </div>
     ${talentsData.talents.length ? `
@@ -2458,7 +2480,8 @@ async function screenHome(){
     </div>
     <div class="section-label with-ic">${I.badgeCheck}${recoData.job ? `"${esc(recoData.job.title)}"에 맞는 인재` : '맞춤 인재 추천'}</div>
     ${recoData.talents.length
-      ? recoData.talents.map(recoTalentCard).join('')
+      ? `<div class="reco-legend">· <b>추천 %</b>: 업무·등급·평점까지 합친 종합 점수입니다.<br>· <b>스택매치 %</b>: 기술스택만 본 점수입니다.</div>`
+        + recoData.talents.map(recoTalentCard).join('')
       : `<div class="reco-empty">${recoData.job
           ? '아직 조건에 맞는 인재가 없어요.<br>공고의 기술스택·업무·등급을 채우면 정확도가 올라가요.'
           : '공고를 등록하면 딱 맞는 인재를<br>자동으로 추천해드려요.<br><b onclick="go(\'jobPost\')" style="color:var(--ink); text-decoration:underline; cursor:pointer;">공고 등록하러 가기</b>'}</div>`}
@@ -2580,9 +2603,10 @@ async function screenTalent(){
   if(talentCat && talentCat!=='전체') qs.set('category', talentCat);
   if(talentGrade && talentGrade!=='전체') qs.set('grade', talentGrade);
   if(talentDuty) qs.set('duty', talentDuty);
+  if(talentMatchJobId) qs.set('jobId', talentMatchJobId);
   const [data, recentTalents] = await Promise.all([
     apiFetch('/talents?' + qs.toString()),
-    apiFetch('/talents/recent-views').then(r=>r.talents).catch(()=>[]),
+    apiFetch('/talents/recent-views' + (talentMatchJobId ? `?jobId=${talentMatchJobId}` : '')).then(r=>r.talents).catch(()=>[]),
   ]);
   const cats = ["전체", ...Object.keys(STACK_CATALOG)];
   const grades = ["전체","초급","중급","고급"];
@@ -2603,6 +2627,7 @@ async function screenTalent(){
     <div class="section-label">최근 본 인재</div>
     <div class="hrow">${recentTalents.map(miniTalentCard).join('')}</div>` : ''}
     <div class="section-label">매칭률 순</div>
+    ${matchBasisHtml(data, 'render();')}
     <div id="talentList">${data.talents.map(talentCard).join('') || emptyArt(ART.noTalents, '조건에 맞는 인재가 없어요', '검색어나 등급·업무 필터를 바꿔보세요.')}</div>
   </div>${tabbar('talent')}`;
 }
@@ -3246,10 +3271,11 @@ async function startChatWithTalent(freelancerId, jobId){
 /* ---- [기업] 관심 인재 ---- */
 async function screenSavedTalents(){
   const nc = await unreadCount();
-  const data = await apiFetch('/talents/saved');
+  const data = await apiFetch('/talents/saved' + (talentMatchJobId ? `?jobId=${talentMatchJobId}` : ''));
   return `${statusbar()}${header("관심 인재", `${data.talents.length}명 저장됨`, {back:'home'}, nc)}
   <div class="content">
     <div class="page-sub" style="margin-bottom:12px;">인재 카드나 프로필의 ★ 버튼으로 관심 인재를 저장할 수 있어요.</div>
+    ${data.talents.length ? matchBasisHtml(data, 'render();') : ''}
     ${data.talents.map(talentCard).join('') || `${emptyArt(ART.noTalents, '아직 관심 인재가 없어요', '인재풀에서 ★를 눌러 관심 인재로 저장해보세요.')}
       <button class="btn btn-primary" onclick="go('talent')">인재풀 보러 가기</button>`}
     <div style="height:20px;"></div>
@@ -3363,6 +3389,50 @@ async function screenMyApplications(){
         ${a.status==='accepted' ? `<div class="page-sub" style="margin-top:8px;">${acceptedProjectHint(a.projectState)}</div>` : ''}
       </div>`).join('') || emptyArt(ART.noJobs, '아직 지원한 공고가 없어요', '마음에 드는 공고에 지원해보세요.')}
   </div>${tabbar('home')}`;
+}
+
+/* ---- [기업] 전체 지원자 (홈 대시보드 '지원자'에서 진입) ---- */
+async function screenAllApplicants(){
+  const nc = await unreadCount();
+  const data = await apiFetch('/company/applicants');
+  const badge = {
+    submitted: `<span class="sbadge pending">${I.clockSm}검토중</span>`,
+    accepted: `<span class="sbadge pass">${I.trophy}수락됨</span>`,
+    rejected: `<span class="sbadge fail">${I.xCircle}거절됨</span>`,
+  };
+  // 공고별로 묶어서 보여주고, 수락·거절은 공고별 지원자 관리 화면에서 하도록 연결합니다.
+  const groups = [];
+  const byJob = {};
+  for(const a of data.applicants){
+    if(!byJob[a.job_id]){ byJob[a.job_id] = { id:a.job_id, title:a.job_title, items:[] }; groups.push(byJob[a.job_id]); }
+    byJob[a.job_id].items.push(a);
+  }
+  const pending = data.applicants.filter(a=>a.status==='submitted').length;
+  return `${statusbar()}${header("지원자", `전체 ${data.applicants.length}명 · 검토중 ${pending}명`, {back:'home'}, nc)}
+  <div class="content">
+    ${groups.map(g=>`
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin:18px 0 10px; font-size:13px;">
+        <span style="min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:700; color:var(--ink);">${esc(g.title)} · ${g.items.length}명</span>
+        <span style="flex:0 0 auto; color:var(--slate); font-weight:700; cursor:pointer;" onclick="go('applicants', ${g.id})">지원자 관리 ›</span>
+      </div>
+      ${g.items.map(a=>`
+        <div class="card clickable" onclick="go('talentDetail', ${a.user_id})">
+          <div class="card-top">
+            <div style="display:flex; gap:12px; align-items:center; min-width:0;">
+              ${autoAvatar(a.name)}
+              <div style="min-width:0;">
+                <div class="card-title">${esc(a.name)} ${gradeBadge(a.grade)}</div>
+                <div style="margin-top:5px; display:flex; flex-wrap:wrap; gap:5px; align-items:center;">${dutyBadge(a.role_title)}</div>
+              </div>
+            </div>
+            ${badge[a.status] || `<span class="sbadge fail">${esc(a.status)}</span>`}
+          </div>
+          <div class="tag-row">${a.stack.map(s=>`<span class="tag">${esc(s)}</span>`).join('')}</div>
+          ${gauge(a.match)}
+        </div>`).join('')}
+    `).join('') || emptyArt(ART.noTalents, '아직 지원자가 없어요', '인재풀에서 직접 포지션을 제안해볼 수도 있어요.')}
+    <div style="height:20px;"></div>
+  </div>${tabbar('')}`;
 }
 
 async function screenApplicants(){
@@ -4026,7 +4096,7 @@ async function render(){
       onboarding: screenOnboarding, serverSetup: screenServerSetup,
       signup: screenSignup, login: screenLogin,
       home: screenHome, jobs: screenJobs, jobDetail: screenJobDetail,
-      talent: screenTalent, talentDetail: screenTalentDetail, projects: screenProjects, projectArchive: screenProjectArchive, applicants: screenApplicants,
+      talent: screenTalent, talentDetail: screenTalentDetail, projects: screenProjects, projectArchive: screenProjectArchive, applicants: screenApplicants, allApplicants: screenAllApplicants,
       chatList: screenChatList, chatRoom: screenChatRoom, mypage: screenMypage,
       profileEdit: screenProfileEdit, alerts: screenAlerts, jobPost: screenJobPost,
       companyProfileEdit: screenCompanyProfileEdit,

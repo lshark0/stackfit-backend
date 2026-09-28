@@ -14,11 +14,4 @@ function computeMatch(jobStack = [], profileStack = []) {
   return Math.max(0, Math.min(99, score));
 }
 
-// 특정 공고 없이(전체 인재풀·관심 인재) 보유 스택 폭으로만 매기는 매치율.
-// 기술 스택을 하나도 등록하지 않았다면 매치율도 0이어야 합니다.
-function breadthMatch(stackLength = 0) {
-  if (!stackLength) return 0;
-  return Math.max(0, Math.min(99, Math.round(55 + stackLength * 6)));
-}
-
-module.exports = { computeMatch, breadthMatch };
+module.exports = { computeMatch };
