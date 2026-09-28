@@ -100,12 +100,13 @@ async function recommendJobsForProfile(profile, limit = 5) {
     })
     .map((j) => {
       const rating = ratingById[j.company_id] || { rating_avg: null, rating_count: 0 };
-      const { score, matched, reasons } = scoreMatch(j, profile, rating);
+      const { score, match, matched, reasons } = scoreMatch(j, profile, rating);
       return {
         ...j,
         org: companyNameById[j.company_id] || '알 수 없음',
         ...rating,
         score,
+        match,
         matchedStack: matched,
         reasons,
       };
