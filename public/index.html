@@ -1365,11 +1365,12 @@ async function startIdentityVerification(){
       channelKey: cfg.channelKey,
       identityVerificationId: id,
       redirectUrl: location.origin + location.pathname + '?iv_return=1',
+      bypass: { danal: { AGELIMIT: 14, CPTITLE: location.host } },
     });
     if(!resp) return; // 모바일: 인증 후 redirectUrl로 돌아오면서 처리됩니다.
-    if(resp.code){ toast(resp.message || '본인인증이 취소됐어요'); return; }
+    if(resp.code){ showConfirm(resp.message || '본인인증이 취소됐어요', () => {}); return; }
     await completeIdentityVerification(resp.identityVerificationId || id);
-  }catch(e){ toast('본인인증 창을 열지 못했어요: ' + (e.message || e)); }
+  }catch(e){ showConfirm('본인인증 창을 열지 못했어요.\n\n' + (e.message || e), () => {}); }
 }
 async function completeIdentityVerification(id){
   try{
@@ -1387,7 +1388,7 @@ async function handleIvReturn(){
   history.replaceState({screen: 'signup', param: null}, '', location.pathname);
   await render();
   restoreSignupDraft();
-  if(ret.code || !ret.id){ toast(ret.message || '본인인증이 취소됐어요'); return; }
+  if(ret.code || !ret.id){ showConfirm(ret.message || '본인인증이 취소됐어요', () => {}); return; }
   await completeIdentityVerification(ret.id);
 }
 
