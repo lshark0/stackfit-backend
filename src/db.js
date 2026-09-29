@@ -112,6 +112,11 @@ if (USE_POSTGRES) {
     await pool.query(
       'CREATE UNIQUE INDEX IF NOT EXISTS idx_users_oauth ON users(oauth_provider, oauth_id) WHERE oauth_provider IS NOT NULL'
     );
+    // 휴대폰 본인인증(포트원): CI로 1인 1계정을 보장합니다.
+    await ensureColumnPg('users', 'ci', 'TEXT');
+    await ensureColumnPg('users', 'di', 'TEXT');
+    await ensureColumnPg('users', 'identity_verified_at', 'TEXT');
+    await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_ci ON users(ci) WHERE ci IS NOT NULL');
     await removeDemoAccounts();
     await fixRoleToCompany('454145@hanmail.net');
     console.log('[IT Free] PostgreSQL 연결 및 스키마 준비 완료 (영구 저장)');
@@ -197,6 +202,10 @@ if (USE_POSTGRES) {
     try {
       db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_oauth ON users(oauth_provider, oauth_id) WHERE oauth_provider IS NOT NULL');
     } catch (e) {}
+    addCol('users', 'ci', 'TEXT');
+    addCol('users', 'di', 'TEXT');
+    addCol('users', 'identity_verified_at', 'TEXT');
+    try { db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_ci ON users(ci) WHERE ci IS NOT NULL'); } catch (e) {}
     await removeDemoAccounts();
     await fixRoleToCompany('454145@hanmail.net');
     console.log('[IT Free] SQLite 로컬 DB 준비 완료 (data/stackfit.db, 로컬 개발 전용)');
