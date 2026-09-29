@@ -1365,7 +1365,6 @@ async function startIdentityVerification(){
       channelKey: cfg.channelKey,
       identityVerificationId: id,
       redirectUrl: location.origin + location.pathname + '?iv_return=1',
-      bypass: { danal: { AGELIMIT: 14, CPTITLE: location.host } },
     });
     if(!resp) return; // 모바일: 인증 후 redirectUrl로 돌아오면서 처리됩니다.
     if(resp.code){ showConfirm(resp.message || '본인인증이 취소됐어요', () => {}); return; }

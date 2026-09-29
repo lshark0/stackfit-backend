@@ -1,4 +1,4 @@
-// 포트원(PortOne) V2 휴대폰 본인인증 연동
+// 포트원(PortOne) V2 본인인증 연동 (현재: KG이니시스 통합인증 테스트 채널 → 다날 계약 후 채널 키만 교체)
 // - 프론트에서 포트원 인증창으로 본인인증을 마치면 identityVerificationId만 서버로 넘어옵니다.
 // - 서버는 그 ID로 포트원 API를 직접 다시 조회해, 포트원이 확인해준 이름·생년월일·성별·휴대폰·CI/DI만 믿습니다.
 //   (클라이언트가 보낸 이름/생일 값은 위조될 수 있으므로 절대 사용하지 않습니다.)
@@ -7,7 +7,7 @@ const { signToken, verifyToken } = require('./auth');
 const { normalizeMobile, normalizeBirthDate } = require('./contact');
 
 const STORE_ID = process.env.PORTONE_STORE_ID || 'store-92737231-2460-48ed-85c9-16ee322b5b24';
-const CHANNEL_KEY = process.env.PORTONE_CHANNEL_KEY || 'channel-key-2b1babd5-5a20-4372-b634-aebaeb79db1c';
+const CHANNEL_KEY = process.env.PORTONE_CHANNEL_KEY || 'channel-key-c85fb611-92b4-4e0b-b8db-5ba38cf7049a';
 const API_SECRET = (process.env.PORTONE_API_SECRET || '').trim();
 const IV_TOKEN_TTL_SEC = 30 * 60; // 인증 후 30분 안에 가입을 마쳐야 함
 const MIN_AGE = 14;
