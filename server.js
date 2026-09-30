@@ -33,6 +33,8 @@ app.use(
   helmet({
     contentSecurityPolicy: false, // 프론트엔드가 단일 HTML(인라인 script/style)이라 기본 CSP와 충돌함
     crossOriginEmbedderPolicy: false,
+    // 기본값(same-origin)이면 포트원 본인인증 팝업과 opener 연결이 끊겨 창이 비고 즉시 '취소' 처리됨
+    crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' },
   })
 );
 
