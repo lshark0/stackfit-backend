@@ -4055,10 +4055,10 @@ async function screenInvite(){
     </div>
     <button class="btn" style="margin:12px 0 8px; background:#FEE500; color:#191600; border:none; font-weight:800;" onclick="shareKakao('${code}')">
       <span style="display:inline-flex; width:22px; height:22px; border-radius:50%; background:#191600; color:#FEE500; align-items:center; justify-content:center; font-size:12px; margin-right:8px;">💬</span>카카오톡으로 초대하기</button>
-    <div style="display:flex; gap:8px; margin:0 0 4px; font-size:13.5px;">
-      <button class="btn btn-outline" style="flex:1;" onclick="shareInvite('${code}')">공유하기</button>
-      <button class="btn btn-outline" style="flex:1;" onclick="copyText(inviteLink('${code}'), '초대 링크를 복사했어요')">링크 복사</button>
-      <button class="btn btn-outline" style="flex:1;" onclick="copyText('${code}', '초대 코드를 복사했어요')">코드 복사</button>
+    <div style="display:flex; gap:8px; margin:0 0 4px;">
+      <button class="btn btn-outline" style="flex:1; white-space:nowrap; padding-left:6px; padding-right:6px;" onclick="shareInvite('${code}')">공유하기</button>
+      <button class="btn btn-outline" style="flex:1; white-space:nowrap; padding-left:6px; padding-right:6px;" onclick="copyText(inviteLink('${code}'), '초대 링크를 복사했어요')">링크 복사</button>
+      <button class="btn btn-outline" style="flex:1.45; white-space:nowrap; padding-left:6px; padding-right:6px;" onclick="copyText('${code}', '추천인 코드를 복사했어요')">추천인 코드 복사</button>
     </div>
     <div class="page-sub" style="word-break:break-all; margin-bottom:6px;">${esc(inviteLink(data.code))}</div>
     <div class="section-label with-ic">${I.talent}초대로 가입한 친구 <b style="color:var(--ink); margin-left:4px;">${invited.length}명</b></div>
