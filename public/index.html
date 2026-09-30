@@ -774,7 +774,7 @@ function drawerMenuContent(){
       <div class="rl">${roleLabel}</div>
     </div>
     <div class="drawer-sec"><div class="drawer-sec-label">탐색</div>${exploreItems}</div>
-    <div class="drawer-sec"><div class="drawer-sec-label">내 활동</div>${activityItems}${item(I.bell,'알림','alerts')}${item(I.user,'마이페이지','mypage')}</div>
+    <div class="drawer-sec"><div class="drawer-sec-label">내 활동</div>${activityItems}${item(I.bell,'알림','alerts')}${item(I.user,'마이페이지','mypage')}${item(I.gift,'친구 초대','invite')}</div>
     <div class="drawer-sec"><div class="drawer-sec-label">고객센터</div>
       <div class="cs-grid">
         <div class="cs-item" onclick="closeDrawer(); go('notices');"><span class="ic">${I.megaphone}</span><span class="lbl">공지사항</span></div>
@@ -3972,28 +3972,93 @@ async function copyText(text, okMsg){
     ta.remove();
   }
 }
+// 기업회원·프리랜서 모두 같은 초대 기능을 쓰되, 공유 문구만 회원 유형에 맞게 바꿉니다.
+function inviteMessage(code){
+  return state.role === 'company'
+    ? `IT 인재를 기술스택으로 자동 추천받는 매칭 앱 IT Free를 소개합니다. 가입할 때 추천인 코드 ${code}를 입력해주세요.`
+    : `IT 프리랜서에게 딱 맞는 프로젝트를 추천해주는 매칭 앱 IT Free에 초대합니다. 가입할 때 추천인 코드 ${code}를 입력해주세요.`;
+}
 async function shareInvite(code){
   const url = inviteLink(code);
-  const text = `IT 프리랜서·기업 매칭 앱 IT Free에 초대합니다. 가입할 때 추천인 코드 ${code}를 입력해주세요.`;
+  const text = inviteMessage(code);
   if(navigator.share){
     try{ await navigator.share({ title: 'IT Free 초대', text, url }); return; }catch(e){ if(e && e.name==='AbortError') return; }
   }
   copyText(`${text}\n${url}`, '초대 메시지를 복사했어요. 카톡·문자에 붙여넣어 보내주세요.');
 }
+
+/* 카카오톡 공유: 카카오 JavaScript SDK(Kakao.Share)를 씁니다.
+   서버에 KAKAO_JS_KEY가 설정돼 있고, 카카오 개발자 콘솔에 이 사이트 도메인이 등록돼 있어야 동작합니다.
+   준비가 안 된 경우에는 초대 메시지를 복사해 카카오톡에 붙여넣도록 안내합니다. */
+let kakaoReady = null;
+function loadKakaoSdk(){
+  if(kakaoReady) return kakaoReady;
+  kakaoReady = (async () => {
+    const cfg = await apiFetch('/referral/share-config').catch(() => ({}));
+    if(!cfg.kakaoJsKey) return false;
+    if(!window.Kakao){
+      // 버전 하나가 CDN에서 빠져도 동작하도록 순서대로 시도합니다.
+      for(const v of ['2.7.5', '2.7.4', '2.7.2']){
+        const ok = await new Promise((resolve) => {
+          const sc = document.createElement('script');
+          sc.src = `https://t1.kakaocdn.net/kakao_js_sdk/${v}/kakao.min.js`;
+          sc.crossOrigin = 'anonymous';
+          sc.onload = () => resolve(!!window.Kakao);
+          sc.onerror = () => { sc.remove(); resolve(false); };
+          document.head.appendChild(sc);
+        });
+        if(ok) break;
+      }
+    }
+    if(!window.Kakao) return false;
+    try{ if(!Kakao.isInitialized()) Kakao.init(cfg.kakaoJsKey); }catch(e){ return false; }
+    return !!(Kakao.Share && Kakao.isInitialized());
+  })();
+  return kakaoReady;
+}
+async function shareKakao(code){
+  const url = inviteLink(code);
+  const text = inviteMessage(code);
+  const ready = await loadKakaoSdk().catch(() => false);
+  if(ready){
+    try{
+      Kakao.Share.sendDefault({
+        objectType: 'feed',
+        content: {
+          title: state.role === 'company' ? 'IT Free — IT 인재 자동 추천 매칭' : 'IT Free — 나에게 맞는 IT 프로젝트 추천',
+          description: `추천인 코드 ${code} · 링크로 가입하면 자동 입력돼요`,
+          imageUrl: `${location.origin}/icons/og-image.png`,
+          link: { mobileWebUrl: url, webUrl: url },
+        },
+        buttons: [{ title: 'IT Free 가입하기', link: { mobileWebUrl: url, webUrl: url } }],
+      });
+      return;
+    }catch(e){ /* 아래 복사 방식으로 대체 */ }
+  }
+  copyText(`${text}\n${url}`, '초대 메시지를 복사했어요. 카카오톡 대화방에 붙여넣어 보내주세요.');
+}
 async function screenInvite(){
   const data = await apiFetch('/referral/me');
   const invited = data.invited || [];
+  loadKakaoSdk(); // 버튼을 누르기 전에 미리 불러둡니다.
+  const isCompany = state.role === 'company';
+  const code = jsAttrStr(data.code);
   return `${statusbar()}
   <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('mypage')">${I.back}</div><div class="page-title" style="font-size:19.5px;">친구 초대</div></div></div>
   <div class="content">
     <div class="banner light" style="cursor:default;">
       <div class="banner-eyebrow">My Invite Code</div>
       <div style="font-family:var(--mono); font-size:30px; font-weight:800; letter-spacing:.14em; color:var(--ink); margin:6px 0 4px;">${esc(data.code)}</div>
-      <div class="banner-sub" style="color:var(--slate);">함께 일했던 동료 프리랜서나 기업 담당자에게 공유해보세요.<br>가입할 때 이 코드를 입력하거나, 아래 링크로 들어오면 자동으로 연결돼요.</div>
+      <div class="banner-sub" style="color:var(--slate);">${isCompany
+        ? '협력사 · 거래처 담당자나 함께 일했던 프리랜서에게 공유해보세요.'
+        : '함께 일했던 동료 프리랜서나 기업 담당자에게 공유해보세요.'}<br>가입할 때 이 코드를 입력하거나, 아래 링크로 들어오면 자동으로 연결돼요.</div>
     </div>
-    <div style="display:flex; gap:8px; margin:12px 0 4px;">
-      <button class="btn btn-primary" style="flex:1;" onclick="shareInvite('${jsAttrStr(data.code)}')">초대 링크 공유</button>
-      <button class="btn btn-outline" style="flex:1;" onclick="copyText('${jsAttrStr(data.code)}', '초대 코드를 복사했어요')">코드 복사</button>
+    <button class="btn" style="margin:12px 0 8px; background:#FEE500; color:#191600; border:none; font-weight:800;" onclick="shareKakao('${code}')">
+      <span style="display:inline-flex; width:22px; height:22px; border-radius:50%; background:#191600; color:#FEE500; align-items:center; justify-content:center; font-size:12px; margin-right:8px;">💬</span>카카오톡으로 초대하기</button>
+    <div style="display:flex; gap:8px; margin:0 0 4px; font-size:13.5px;">
+      <button class="btn btn-outline" style="flex:1;" onclick="shareInvite('${code}')">공유하기</button>
+      <button class="btn btn-outline" style="flex:1;" onclick="copyText(inviteLink('${code}'), '초대 링크를 복사했어요')">링크 복사</button>
+      <button class="btn btn-outline" style="flex:1;" onclick="copyText('${code}', '초대 코드를 복사했어요')">코드 복사</button>
     </div>
     <div class="page-sub" style="word-break:break-all; margin-bottom:6px;">${esc(inviteLink(data.code))}</div>
     <div class="section-label with-ic">${I.talent}초대로 가입한 친구 <b style="color:var(--ink); margin-left:4px;">${invited.length}명</b></div>
