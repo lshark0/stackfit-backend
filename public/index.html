@@ -675,7 +675,7 @@ function talentDetailBack(){ goBackFrom(talentDetailReturn, 'talent'); }
 // 화면 안의 뒤로가기 화살표가 항상 마이페이지로 돌아가는 화면들.
 // 이 화면들은 드로어 메뉴 등 여러 곳에서 열릴 수 있어서, 휴대폰의 '뒤로가기'
 // 제스처도 그 화살표와 똑같이 항상 마이페이지로 보내도록 popstate에서 함께 처리합니다.
-const MYPAGE_CHILD_SCREENS = ['proposalSettings','changePassword','deleteAccount','savedJobs','followedCompanies','adminReports','adminSignupStats','invite','profileViews','companyProfileEdit','profileEdit','notices','events','faq','supportInquiry'];
+const MYPAGE_CHILD_SCREENS = ['proposalSettings','changePassword','deleteAccount','savedJobs','followedCompanies','adminReports','adminSignupStats','profileViews','companyProfileEdit','profileEdit','notices','events','faq','supportInquiry'];
 
 // 회원 유형별로만 열 수 있는 화면. 다른 유형의 화면이 열리려 하면(뒤로가기 기록, 예전 알림 등) 홈으로 보냅니다.
 const FREELANCER_ONLY = ['receivedProposals','myApplications','portfolios','portfolioEdit','savedJobs','followedCompanies','profileViews','profileEdit','proposalSettings','reportJob'];
@@ -3723,8 +3723,6 @@ async function screenMypage(){
     <div class="list-item" onclick="go('proposalSettings')"><div class="li-l"><div class="li-icon">${I.gear}</div>
       <div><div class="li-tt">제안 설정</div><div class="page-sub" style="margin-top:2px;">${Number(profile.accept_proposals ?? 1)===1 ? '제안 받는 중' : '제안 받지 않음'}</div></div></div>${I.back}</div>` : ''}
     ${me.user.hasPassword ? `<div class="list-item" onclick="go('changePassword')"><div class="li-l"><div class="li-icon">${I.gear}</div><div class="li-tt">비밀번호 변경</div></div>${I.back}</div>` : ''}
-    <div class="list-item" onclick="go('invite')"><div class="li-l"><div class="li-icon">${I.gift}</div>
-      <div><div class="li-tt">친구 초대</div><div class="page-sub" style="margin-top:2px;">내 초대 코드로 동료를 초대해보세요</div></div></div>${I.back}</div>
     ${state.isAdmin ? `
     <div class="section-label with-ic">${I.gear}관리자</div>
     <div class="list-item" onclick="go('adminSignupStats')"><div class="li-l"><div class="li-icon">${I.talent}</div><div class="li-tt">가입 경로 통계</div></div>${I.back}</div>
@@ -4044,7 +4042,7 @@ async function screenInvite(){
   const isCompany = state.role === 'company';
   const code = jsAttrStr(data.code);
   return `${statusbar()}
-  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('mypage')">${I.back}</div><div class="page-title" style="font-size:19.5px;">친구 초대</div></div></div>
+  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('home')">${I.back}</div><div class="page-title" style="font-size:19.5px;">친구 초대</div></div></div>
   <div class="content">
     <div class="banner light" style="cursor:default;">
       <div class="banner-eyebrow">My Invite Code</div>
