@@ -1044,6 +1044,19 @@ function ddayBadge(dday){
   const color = closed ? 'var(--slate-light)' : 'var(--cyan)';
   return `<span style="font-family:var(--mono); font-size:10.5px; font-weight:700; color:${color};">${esc(dday)}</span>`;
 }
+// 업무(직무) 선택 목록 — 공고 등록·프로필·수행 프로젝트에서 같은 값을 써야 매칭(업무 일치)이 정확해집니다.
+const DUTY_OPTIONS = ['PM','PL','TA','SA','DBA','개발자','QA','보안','감리','기타'];
+// 목록에 없는 예전 직접 입력 값(예: "백엔드 개발자")은 선택된 채로 보여줘, 저장해도 지워지지 않게 합니다.
+function dutySelect(id, current, emptyLabel){
+  const cur = String(current || '').trim();
+  const legacy = cur && !DUTY_OPTIONS.includes(cur)
+    ? `<option value="${esc(cur)}" selected>${esc(cur)} (기존 입력)</option>` : '';
+  return `<select id="${id}" class="form-input">
+    <option value="" ${cur?'':'selected'}>${emptyLabel || '업무를 선택하세요'}</option>
+    ${legacy}
+    ${DUTY_OPTIONS.map(d=>`<option value="${d}" ${d===cur?'selected':''}>${d}</option>`).join('')}
+  </select>`;
+}
 // 업무(직무)별 아이콘 — 역할의 성격을 직관적으로 나타냅니다.
 const DUTY_ICON = {
   PM:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 19V6M4 6l7-2 6 2 3-1v11l-3 1-6-2-7 2" stroke-linejoin="round"/></svg>`,
@@ -3463,7 +3476,7 @@ async function screenPortfolioEdit(){
   <div class="content">
     <div class="form-field"><label class="form-label">프로젝트명</label><input id="pf2-title" class="form-input" placeholder="예: 대형 유통사 클라우드 전환" value="${esc(p.title)}"></div>
     <div class="form-field"><label class="form-label">고객사 / 발주처</label><input id="pf2-client" class="form-input" placeholder="예: ○○그룹" value="${esc(p.client)}"></div>
-    <div class="form-field"><label class="form-label">담당 업무</label><input id="pf2-role" class="form-input" placeholder="예: DBA, 인프라 설계" value="${esc(p.role_title)}"></div>
+    <div class="form-field"><label class="form-label">담당 업무</label>${dutySelect('pf2-role', p.role_title)}</div>
     <div class="form-field"><label class="form-label">참여 기간</label><input id="pf2-period" class="form-input" placeholder="예: 2024.03 ~ 2024.09 (7개월)" value="${esc(p.period)}"><div class="page-sub" style="margin-top:5px;">연도를 포함해 입력하면 최신 프로젝트가 위로 정렬돼요. (진행 중이면 "2025.06 ~ 진행중")</div></div>
     <div class="form-field"><label class="form-label">사용 기술 (콤마로 구분)</label><input id="pf2-stack" class="form-input" placeholder="예: AWS, Kubernetes, Oracle" value="${esc(p.stack.join(', '))}"></div>
     <div class="form-field"><label class="form-label">상세 내용 / 성과</label><textarea id="pf2-desc" class="form-input" placeholder="맡았던 역할과 성과를 구체적으로 적어주세요">${esc(p.description)}</textarea></div>
@@ -4239,7 +4252,7 @@ async function screenProfileEdit(){
     <div class="form-field"><label class="form-label">이메일</label>
       <input id="pf-email" class="form-input" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" value="${esc(p.email || (profileDraftUsedEmail(p) ? '' : (p.account_email||'')))}">
       <div class="page-sub" style="margin-top:5px;">연락처를 기업에 공개할지는 MY › 제안 설정에서 정할 수 있어요.</div></div>
-    <div class="form-field"><label class="form-label">업무</label><input id="pf-role" class="form-input" value="${esc(p.role_title)}"></div>
+    <div class="form-field"><label class="form-label">업무</label>${dutySelect('pf-role', p.role_title)}</div>
     <div class="form-field"><label class="form-label">등급</label><select id="pf-grade" class="form-input">
       <option value="">선택 안 함</option>
       ${['초급','중급','고급'].map(g=>`<option value="${g}" ${p.grade===g?'selected':''}>${g}</option>`).join('')}
@@ -4412,10 +4425,7 @@ async function screenJobPost(){
     <div class="form-field"><label class="form-label">단가</label><input id="pj-rate" class="form-input" placeholder="예: 600만원/월" value="${job?esc(job.rate):''}"></div>
     <div class="form-field"><label class="form-label">근무 형태</label><input id="pj-type" class="form-input" placeholder="예: 상주 · 주5일" value="${job?esc(job.work_type):''}"></div>
     <div class="form-field"><label class="form-label">근무지</label><input id="pj-location" class="form-input" placeholder="예: 서울 종로, 원격 가능" value="${job?esc(job.location):''}"></div>
-    <div class="form-field"><label class="form-label">업무</label><select id="pj-duty" class="form-input">
-      <option value="">선택 안 함</option>
-      ${['PM','PL','TA','SA','DBA','개발자','QA','보안','감리','기타'].map(d=>`<option value="${d}" ${job&&job.duty===d?'selected':''}>${d}</option>`).join('')}
-    </select></div>
+    <div class="form-field"><label class="form-label">업무</label>${dutySelect('pj-duty', job && job.duty, '선택 안 함')}</div>
     <div class="form-field"><label class="form-label">등급</label><select id="pj-grade" class="form-input">
       <option value="">선택 안 함</option>
       ${['초급','중급','고급'].map(g=>`<option value="${g}" ${job&&job.grade===g?'selected':''}>${g}</option>`).join('')}
