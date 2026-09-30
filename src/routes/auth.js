@@ -6,6 +6,7 @@ const { wrapAllRoutes } = require('../middleware/asyncHandler');
 const { normalizeMobile, normalizePhone, normalizeBirthDate } = require('../contact');
 const { isAdminEmail } = require('../middleware/requireAdmin');
 const { recordSignupAttribution } = require('../attribution');
+const identity = require('../identity');
 
 const router = express.Router();
 wrapAllRoutes(router);
@@ -22,12 +23,54 @@ function normalizeBizRegNo(v) {
   return `${digits.slice(0, 3)}-${digits.slice(3, 5)}-${digits.slice(5)}`;
 }
 
+// ---------- 휴대폰 본인인증 (포트원) ----------
+router.get('/identity/config', (req, res) => {
+  res.json(identity.publicConfig());
+});
+
+router.post('/identity/verify', async (req, res) => {
+  try {
+    const v = await identity.fetchVerifiedCustomer((req.body || {}).identityVerificationId);
+    if (v.ci) {
+      const dup = await get('SELECT email, oauth_provider FROM users WHERE ci = ?', [v.ci]);
+      if (dup) {
+        const how = dup.oauth_provider ? `${dup.oauth_provider} 소셜 로그인` : identity.maskEmail(dup.email);
+        return res.status(409).json({ error: `이미 가입된 회원이에요. (${how})\n로그인하거나 비밀번호 찾기를 이용해주세요.` });
+      }
+    }
+    res.json({
+      ivToken: identity.issueIvToken(v),
+      name: v.name, phone: v.phone, birthDate: v.birthDate, gender: v.gender,
+    });
+  } catch (e) {
+    if (e instanceof identity.IdentityError) return res.status(e.status).json({ error: e.message });
+    throw e;
+  }
+});
+
 router.post('/signup', async (req, res) => {
   let {
     email, password, role, name, companyName, phone, companyPhone, address, description, contactPerson, position,
     birthDate, gender, companyType, bizRegNo, ceoName,
   } = req.body || {};
   email = typeof email === 'string' ? email.trim().toLowerCase() : '';
+
+  // 본인인증이 켜져 있으면, 이름·생년월일·성별·휴대폰은 포트원이 확인해준 값만 사용합니다.
+  let verified = null;
+  if (identity.identityEnabled()) {
+    verified = identity.readIvToken((req.body || {}).ivToken);
+    if (!verified) {
+      return res.status(400).json({ error: '휴대폰 본인인증을 먼저 완료해주세요. (인증 후 30분이 지났다면 다시 인증해주세요)' });
+    }
+    phone = verified.phone;
+    if (role === 'freelancer') {
+      name = verified.name;
+      birthDate = verified.birthDate.replace(/-/g, '');
+      gender = verified.gender;
+    } else {
+      contactPerson = verified.name;
+    }
+  }
 
   if (!email || !password || !role) {
     return res.status(400).json({ error: 'email, password, role은 필수입니다.' });
@@ -72,8 +115,24 @@ router.post('/signup', async (req, res) => {
     return res.status(409).json({ error: '이미 가입된 이메일입니다.' });
   }
 
+  if (verified && verified.ci && (await get('SELECT id FROM users WHERE ci = ?', [verified.ci]))) {
+    return res.status(409).json({ error: '이미 본인인증으로 가입된 회원이에요.' });
+  }
+
   const { hash, salt } = hashPassword(password);
-  const r = await run('INSERT INTO users (email, password_hash, password_salt, role) VALUES (?,?,?,?)', [email, hash, salt, role]);
+  let r;
+  try {
+    r = await run(
+      'INSERT INTO users (email, password_hash, password_salt, role, ci, di, identity_verified_at) VALUES (?,?,?,?,?,?,?)',
+      [email, hash, salt, role, verified ? verified.ci : null, verified ? verified.di : null, verified ? new Date().toISOString() : null]
+    );
+  } catch (e) {
+    // 동시에 같은 사람이 두 번 가입을 누른 경우 (CI 유니크 인덱스 위반)
+    if (e && (e.code === '23505' || /UNIQUE/i.test(e.message || ''))) {
+      return res.status(409).json({ error: '이미 가입된 회원이에요.' });
+    }
+    throw e;
+  }
   const userId = Number(r.lastInsertRowid);
 
   if (role === 'freelancer') {

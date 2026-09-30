@@ -447,6 +447,7 @@
   svg{display:block;}
   button{font-family:inherit;}
 </style>
+<script src="https://cdn.portone.io/v2/browser-sdk.js" defer></script>
 </head>
 <body>
 
@@ -1281,6 +1282,7 @@ function setSignupRole(role, el){
   const agerow = document.getElementById('su-agree-agerow');
   if(agerow) agerow.hidden = role !== 'freelancer';
   const phoneLabel = document.getElementById('su-phonelabel');
+  refreshIdentityBox();
   if(phoneLabel) phoneLabel.innerHTML = (role==='company' ? '담당자 휴대폰' : '휴대폰') + ' <span style="color:var(--danger); font-size:11px;">(필수)</span>';
 }
 function setSignupGender(g){
@@ -1306,24 +1308,118 @@ function toggleSignupAgreeAll(checked){
     if(!el.closest('#su-agree-agerow') || signupRole==='freelancer') el.checked = checked;
   });
 }
+/* ---------------- 휴대폰 본인인증 (포트원 + 다날) ---------------- */
+// 서버에 PORTONE_API_SECRET이 설정돼 있을 때만 켜집니다. 꺼져 있으면 기존처럼 직접 입력합니다.
+let identityCfg = null;      // { enabled, storeId, channelKey }
+let signupIv = null;         // 인증 결과 { ivToken, name, phone, birthDate, gender }
+async function loadIdentityConfig(){
+  if(identityCfg) return identityCfg;
+  try{ identityCfg = await apiFetch('/auth/identity/config'); }
+  catch(e){ identityCfg = { enabled:false }; }
+  return identityCfg;
+}
+loadIdentityConfig();
+// 모바일은 인증 후 이 주소로 되돌아옵니다(?iv_return=1&identityVerificationId=...&code=...).
+let pendingIvReturn = (() => {
+  try{
+    const qs = new URLSearchParams(location.search);
+    if(!qs.has('iv_return')) return null;
+    return { id: qs.get('identityVerificationId') || '', code: qs.get('code') || '', message: qs.get('message') || '' };
+  }catch(e){ return null; }
+})();
+const SIGNUP_DRAFT_FIELDS = ['su-email','su-companytype','su-bizregno','su-companyname','su-ceoname','su-address','su-description','su-position','su-companyphone'];
+function saveSignupDraft(){
+  const draft = { role: signupRole, fields:{} };
+  SIGNUP_DRAFT_FIELDS.forEach(id => { const el = document.getElementById(id); if(el) draft.fields[id] = el.value; });
+  try{ sessionStorage.setItem('signupDraft', JSON.stringify(draft)); }catch(e){}
+}
+function restoreSignupDraft(){
+  let draft = null;
+  try{ draft = JSON.parse(sessionStorage.getItem('signupDraft') || 'null'); }catch(e){}
+  if(!draft) return;
+  const tabs = document.querySelectorAll('#signupRoleTabs .tab');
+  if(draft.role === 'company' && tabs[1]) setSignupRole('company', tabs[1]);
+  Object.entries(draft.fields || {}).forEach(([id, v]) => { const el = document.getElementById(id); if(el && v) el.value = v; });
+}
+function identityBoxHtml(){
+  if(signupIv){
+    const extra = signupRole === 'freelancer'
+      ? ` · ${esc(signupIv.birthDate.replace(/-/g,'.'))}${signupIv.gender ? ' · ' + esc(signupIv.gender) : ''}` : '';
+    return `<div style="background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px;">
+      <div style="font-weight:700; color:var(--ink);">✓ 본인인증 완료</div>
+      <div class="page-sub" style="margin-top:6px;">${esc(signupIv.name)} · ${esc(signupIv.phone)}${extra}</div>
+      <div class="page-sub" style="margin-top:4px;">이름·생년월일·휴대폰은 인증된 정보로 저장돼요.</div>
+    </div>`;
+  }
+  return `<button type="button" class="btn btn-primary" onclick="startIdentityVerification()">휴대폰 본인인증</button>
+    <div class="page-sub" style="margin-top:6px;">PASS 앱 또는 문자로 본인 확인 후 이름·생년월일·휴대폰이 자동으로 입력돼요.</div>`;
+}
+function refreshIdentityBox(){
+  const box = document.getElementById('su-identity-box');
+  if(box) box.innerHTML = identityBoxHtml();
+}
+async function startIdentityVerification(){
+  const cfg = await loadIdentityConfig();
+  if(!cfg.enabled){ toast('본인인증 기능이 아직 준비 중이에요'); return; }
+  if(typeof PortOne === 'undefined'){ toast('본인인증 모듈을 불러오는 중이에요. 잠시 후 다시 눌러주세요'); return; }
+  saveSignupDraft();
+  const id = 'iv-' + (crypto.randomUUID ? crypto.randomUUID() : (Date.now() + '-' + Math.random().toString(36).slice(2)));
+  try{
+    const resp = await PortOne.requestIdentityVerification({
+      storeId: cfg.storeId,
+      channelKey: cfg.channelKey,
+      identityVerificationId: id,
+      redirectUrl: location.origin + location.pathname + '?iv_return=1',
+    });
+    if(!resp) return; // 모바일: 인증 후 redirectUrl로 돌아오면서 처리됩니다.
+    if(resp.code){ showConfirm(resp.message || '본인인증이 취소됐어요', () => {}); return; }
+    await completeIdentityVerification(resp.identityVerificationId || id);
+  }catch(e){ showConfirm('본인인증 창을 열지 못했어요.\n\n' + (e.message || e), () => {}); }
+}
+async function completeIdentityVerification(id){
+  try{
+    const data = await apiFetch('/auth/identity/verify', { method:'POST', body:{ identityVerificationId: id } });
+    signupIv = data;
+    refreshIdentityBox();
+    toast('본인인증이 완료됐어요');
+  }catch(e){ showConfirm(e.message, () => {}); }
+}
+async function handleIvReturn(){
+  if(!pendingIvReturn) return;
+  const ret = pendingIvReturn; pendingIvReturn = null;
+  if(state.token) return; // 이미 로그인된 상태면 무시
+  state.screen = 'signup'; state.param = null;
+  history.replaceState({screen: 'signup', param: null}, '', location.pathname);
+  await render();
+  restoreSignupDraft();
+  if(ret.code || !ret.id){ showConfirm(ret.message || '본인인증이 취소됐어요', () => {}); return; }
+  await completeIdentityVerification(ret.id);
+}
+
 async function doSignup(){
   const email = document.getElementById('su-email').value.trim();
   const password = document.getElementById('su-password').value;
   const passwordConfirm = document.getElementById('su-password-confirm').value;
-  const phone = document.getElementById('su-phone').value.trim();
+  const phoneEl = document.getElementById('su-phone');
+  const phone = phoneEl ? phoneEl.value.trim() : '';
   if(!email || !password){ toast('이메일과 비밀번호를 입력해주세요'); return; }
   const pwOk = password.length>=8 && /[A-Za-z]/.test(password) && /\d/.test(password);
   if(!pwOk){ toast('비밀번호는 영문+숫자 포함 8자 이상이어야 해요'); return; }
   if(password !== passwordConfirm){ toast('비밀번호가 일치하지 않아요'); return; }
-  if(!phone){
-    toast(signupRole==='company' ? '담당자 휴대폰 번호는 필수 항목이에요' : '휴대폰 번호는 필수 항목이에요');
-    document.getElementById('su-phone').focus();
-    return;
-  }
-  if(!/^01[016789][- ]?\d{3,4}[- ]?\d{4}$/.test(phone)){
-    toast('휴대폰 번호를 정확히 입력해주세요');
-    document.getElementById('su-phone').focus();
-    return;
+  const ivOn = !!(identityCfg && identityCfg.enabled);
+  if(ivOn){
+    if(!signupIv){ toast('휴대폰 본인인증을 먼저 완료해주세요'); return; }
+  } else {
+    if(!phone){
+      toast(signupRole==='company' ? '담당자 휴대폰 번호는 필수 항목이에요' : '휴대폰 번호는 필수 항목이에요');
+      document.getElementById('su-phone').focus();
+      return;
+    }
+    if(!/^01[016789][- ]?\d{3,4}[- ]?\d{4}$/.test(phone)){
+      toast('휴대폰 번호를 정확히 입력해주세요');
+      document.getElementById('su-phone').focus();
+      return;
+    }
   }
   if(signupRole==='freelancer' && !document.getElementById('su-agree-age').checked){
     toast('만 14세 이상 항목에 동의해주세요'); return;
@@ -1333,13 +1429,20 @@ async function doSignup(){
   }
   try{
     const body = { email, password, role: signupRole, phone, attribution: signupAttribution('su-refcode') };
+    if(ivOn){
+      body.ivToken = signupIv.ivToken; // 서버는 이 토큰 안의 인증된 값만 사용합니다
+      body.phone = signupIv.phone;
+    }
     if(signupRole==='freelancer'){
-      body.name = document.getElementById('su-name').value.trim() || '이름 미입력';
-      body.birthDate = document.getElementById('su-birthdate').value.trim();
-      body.gender = signupGender;
+      if(!ivOn){
+        body.name = document.getElementById('su-name').value.trim() || '이름 미입력';
+        body.birthDate = document.getElementById('su-birthdate').value.trim();
+        body.gender = signupGender;
+      }
     } else {
       body.companyName = document.getElementById('su-companyname').value.trim() || '회사명 미입력';
-      body.contactPerson = document.getElementById('su-contactperson').value.trim();
+      const cpEl = document.getElementById('su-contactperson');
+      body.contactPerson = cpEl ? cpEl.value.trim() : '';
       body.position = document.getElementById('su-position').value.trim();
       body.companyPhone = document.getElementById('su-companyphone').value.trim();
       body.address = document.getElementById('su-address').value.trim();
@@ -1349,6 +1452,8 @@ async function doSignup(){
       body.ceoName = document.getElementById('su-ceoname').value.trim();
     }
     const data = await apiFetch('/auth/signup', {method:'POST', body});
+    signupIv = null;
+    try{ sessionStorage.removeItem('signupDraft'); }catch(e){}
     saveToken(data.token); state.role = data.user.role; state.userId = data.user.id; state.isAdmin = !!data.user.isAdmin;
     clearAttribution();
     toast('가입이 완료됐어요');
@@ -2330,6 +2435,8 @@ function socialLoginButtons(){
   </div>`;
 }
 function screenSignup(){
+  const ivOn = !!(identityCfg && identityCfg.enabled);
+  if(!identityCfg) loadIdentityConfig().then(c => { if(c.enabled && state.screen === 'signup') render(); });
   return `${statusbar()}
   <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('onboarding')">${I.back}</div><div class="page-title">회원가입</div></div></div>
   <div class="content">
@@ -2339,6 +2446,7 @@ function screenSignup(){
     </div>
     ${socialLoginButtons()}
     <div class="page-sub" style="margin-top:14px;">회원가입하고 다양한 혜택을 누리세요</div>
+    ${ivOn ? `<div class="form-field" style="margin-top:12px;"><label class="form-label">본인인증 <span style="color:var(--danger); font-size:11px;">(필수)</span></label><div id="su-identity-box">${identityBoxHtml()}</div></div>` : ''}
 
     <div class="form-field" style="margin-top:12px;"><label class="form-label">이메일 <span style="color:var(--danger); font-size:11px;">(아이디로 사용)</span></label><input id="su-email" class="form-input" type="email" placeholder="you@example.com"></div>
     <div class="form-field">
@@ -2358,7 +2466,7 @@ function screenSignup(){
     </div>
 
     <div id="su-freelancerfields">
-      <div class="form-field"><label class="form-label">이름(실명)</label><input id="su-name" class="form-input" placeholder="예: 이승학"></div>
+      ${ivOn ? '' : `<div class="form-field"><label class="form-label">이름(실명)</label><input id="su-name" class="form-input" placeholder="예: 이승학"></div>
       <div class="form-field">
         <label class="form-label">생년월일 <span style="font-weight:400; color:var(--slate-light);">(예시: 20000131)</span></label>
         <div class="su-phone-row">
@@ -2368,7 +2476,7 @@ function screenSignup(){
             <div class="chip" id="su-gender-female" onclick="setSignupGender('여자')">여자</div>
           </div>
         </div>
-      </div>
+      </div>`}
     </div>
 
     <div id="su-companyfields" hidden>
@@ -2387,17 +2495,17 @@ function screenSignup(){
       <div class="form-field"><label class="form-label">회사 소개</label><textarea id="su-description" class="form-input" placeholder="회사를 간단히 소개해주세요"></textarea></div>
 
       <div class="su-section-title">담당자 정보</div>
-      <div class="form-field"><label class="form-label">담당자명</label><input id="su-contactperson" class="form-input" placeholder="예: 홍길동"></div>
+      ${ivOn ? '' : `<div class="form-field"><label class="form-label">담당자명</label><input id="su-contactperson" class="form-input" placeholder="예: 홍길동"></div>`}
       <div class="form-field"><label class="form-label">직책</label>
         <input id="su-position" class="form-input" placeholder="예: 인사팀장, PM"></div>
       <div class="form-field"><label class="form-label">회사 전화</label>
         <input id="su-companyphone" class="form-input" type="tel" inputmode="tel" placeholder="02-1234-5678"></div>
     </div>
 
-    <div class="form-field" id="su-phonefield">
+    ${ivOn ? '' : `<div class="form-field" id="su-phonefield">
       <label class="form-label" id="su-phonelabel">휴대폰 <span style="color:var(--danger); font-size:11px;">(필수)</span></label>
       <input id="su-phone" class="form-input" type="tel" inputmode="tel" autocomplete="tel" placeholder="010-1234-5678">
-    </div>
+    </div>`}
     ${refCodeField('su-refcode')}
 
     <div class="su-section-title">약관 동의</div>
@@ -4319,6 +4427,8 @@ async function render(){
     if(!restored) render();
   }
   history.replaceState({screen: state.screen, param: state.param}, '', location.pathname);
+  await loadIdentityConfig();
+  await handleIvReturn(); // 모바일 본인인증 후 돌아온 경우 가입 화면으로 복귀
   openPendingDeepLink(); // 푸시 알림을 눌러 열었다면 해당 화면으로 이동
 })();
 
