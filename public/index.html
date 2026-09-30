@@ -3985,60 +3985,9 @@ async function shareInvite(code){
   copyText(`${text}\n${url}`, '초대 메시지를 복사했어요. 카톡·문자에 붙여넣어 보내주세요.');
 }
 
-/* 카카오톡 공유: 카카오 JavaScript SDK(Kakao.Share)를 씁니다.
-   서버에 KAKAO_JS_KEY가 설정돼 있고, 카카오 개발자 콘솔에 이 사이트 도메인이 등록돼 있어야 동작합니다.
-   준비가 안 된 경우에는 초대 메시지를 복사해 카카오톡에 붙여넣도록 안내합니다. */
-let kakaoReady = null;
-function loadKakaoSdk(){
-  if(kakaoReady) return kakaoReady;
-  kakaoReady = (async () => {
-    const cfg = await apiFetch('/referral/share-config').catch(() => ({}));
-    if(!cfg.kakaoJsKey) return false;
-    if(!window.Kakao){
-      // 버전 하나가 CDN에서 빠져도 동작하도록 순서대로 시도합니다.
-      for(const v of ['2.7.5', '2.7.4', '2.7.2']){
-        const ok = await new Promise((resolve) => {
-          const sc = document.createElement('script');
-          sc.src = `https://t1.kakaocdn.net/kakao_js_sdk/${v}/kakao.min.js`;
-          sc.crossOrigin = 'anonymous';
-          sc.onload = () => resolve(!!window.Kakao);
-          sc.onerror = () => { sc.remove(); resolve(false); };
-          document.head.appendChild(sc);
-        });
-        if(ok) break;
-      }
-    }
-    if(!window.Kakao) return false;
-    try{ if(!Kakao.isInitialized()) Kakao.init(cfg.kakaoJsKey); }catch(e){ return false; }
-    return !!(Kakao.Share && Kakao.isInitialized());
-  })();
-  return kakaoReady;
-}
-async function shareKakao(code){
-  const url = inviteLink(code);
-  const text = inviteMessage(code);
-  const ready = await loadKakaoSdk().catch(() => false);
-  if(ready){
-    try{
-      Kakao.Share.sendDefault({
-        objectType: 'feed',
-        content: {
-          title: state.role === 'company' ? 'IT Free — IT 인재 자동 추천 매칭' : 'IT Free — 나에게 맞는 IT 프로젝트 추천',
-          description: `추천인 코드 ${code} · 링크로 가입하면 자동 입력돼요`,
-          imageUrl: `${location.origin}/icons/og-image.png`,
-          link: { mobileWebUrl: url, webUrl: url },
-        },
-        buttons: [{ title: 'IT Free 가입하기', link: { mobileWebUrl: url, webUrl: url } }],
-      });
-      return;
-    }catch(e){ /* 아래 복사 방식으로 대체 */ }
-  }
-  copyText(`${text}\n${url}`, '초대 메시지를 복사했어요. 카카오톡 대화방에 붙여넣어 보내주세요.');
-}
 async function screenInvite(){
   const data = await apiFetch('/referral/me');
   const invited = data.invited || [];
-  loadKakaoSdk(); // 버튼을 누르기 전에 미리 불러둡니다.
   const isCompany = state.role === 'company';
   const code = jsAttrStr(data.code);
   return `${statusbar()}
@@ -4051,9 +4000,7 @@ async function screenInvite(){
         ? '협력사 · 거래처 담당자나 함께 일했던 프리랜서에게 공유해보세요.'
         : '함께 일했던 동료 프리랜서나 기업 담당자에게 공유해보세요.'}<br>가입할 때 이 코드를 입력하거나, 아래 링크로 들어오면 자동으로 연결돼요.</div>
     </div>
-    <button class="btn" style="margin:12px 0 8px; background:#FEE500; color:#191600; border:none; font-weight:800;" onclick="shareKakao('${code}')">
-      <span style="display:inline-flex; width:22px; height:22px; border-radius:50%; background:#191600; color:#FEE500; align-items:center; justify-content:center; font-size:12px; margin-right:8px;">💬</span>카카오톡으로 초대하기</button>
-    <div style="display:flex; gap:8px; margin:0 0 4px;">
+    <div style="display:flex; gap:8px; margin:12px 0 4px;">
       <button class="btn btn-outline" style="flex:1; white-space:nowrap; padding-left:6px; padding-right:6px;" onclick="shareInvite('${code}')">공유하기</button>
       <button class="btn btn-outline" style="flex:1; white-space:nowrap; padding-left:6px; padding-right:6px;" onclick="copyText(inviteLink('${code}'), '초대 링크를 복사했어요')">링크 복사</button>
       <button class="btn btn-outline" style="flex:1.45; white-space:nowrap; padding-left:6px; padding-right:6px;" onclick="copyText('${code}', '추천인 코드를 복사했어요')">추천인 코드 복사</button>

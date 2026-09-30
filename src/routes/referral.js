@@ -16,11 +16,6 @@ function maskName(name) {
   return s[0] + '*'.repeat(s.length - 2) + s[s.length - 1];
 }
 
-// 카카오톡 공유용 JavaScript 키(공개용 키라 화면에 내려줘도 됨). 설정 전이면 null → 화면은 '복사해서 보내기'로 대체
-router.get('/share-config', (req, res) => {
-  res.json({ kakaoJsKey: process.env.KAKAO_JS_KEY || null });
-});
-
 // 내 초대 코드와 내가 초대해 가입한 친구 목록
 router.get('/me', requireAuth, async (req, res) => {
   const code = await ensureReferralCode(req.user.id);
