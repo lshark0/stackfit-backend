@@ -4027,6 +4027,9 @@ async function shareKakao(code){
           title: state.role === 'company' ? 'IT Free — IT 인재 자동 추천 매칭' : 'IT Free — 나에게 맞는 IT 프로젝트 추천',
           description: `추천인 코드 ${code} · 링크로 가입하면 자동 입력돼요`,
           imageUrl: `${location.origin}/icons/og-image.png`,
+          // 크기를 알려주지 않으면 카카오가 정사각형에 가깝게 잘라 보여주므로 원본 비율(1200×630)을 지정합니다.
+          imageWidth: 1200,
+          imageHeight: 630,
           link: { mobileWebUrl: url, webUrl: url },
         },
         buttons: [{ title: 'IT Free 가입하기', link: { mobileWebUrl: url, webUrl: url } }],
