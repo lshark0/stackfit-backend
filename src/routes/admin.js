@@ -105,4 +105,68 @@ router.post('/job-reports/:id/resolve', requireAuth, requireAdmin, async (req, r
   res.json({ status: resolvedStatus, action });
 });
 
+// 가입 경로 통계: 기간(days) 동안 가입한 회원을 채널(signup_source)·캠페인·유형별로 집계합니다.
+// 회원 수가 많지 않은 초기 단계라 DB별 날짜 함수 차이를 피하려고 필요한 컬럼만 읽어 메모리에서 집계합니다.
+const toKstDate = (v) => {
+  const d = v instanceof Date ? v : new Date(String(v).replace(' ', 'T') + (/[zZ]|[+-]\d\d:?\d\d$/.test(String(v)) ? '' : 'Z'));
+  return Number.isNaN(d.getTime()) ? null : new Date(d.getTime() + 9 * 3600 * 1000);
+};
+router.get('/signup-stats', requireAuth, requireAdmin, async (req, res) => {
+  const days = Math.min(3650, Math.max(1, Number.parseInt(req.query.days, 10) || 30));
+  const since = new Date(Date.now() - days * 24 * 3600 * 1000);
+  const users = await all(
+    'SELECT id, role, created_at, signup_source, signup_medium, signup_campaign, referred_by FROM users'
+  );
+  const inPeriod = users.filter((u) => {
+    const d = toKstDate(u.created_at);
+    return d && d.getTime() - 9 * 3600 * 1000 >= since.getTime();
+  });
+
+  const bump = (map, key, role) => {
+    const k = key || '';
+    if (!map[k]) map[k] = { key: k, total: 0, freelancer: 0, company: 0 };
+    map[k].total++;
+    map[k][role] = (map[k][role] || 0) + 1;
+  };
+  const bySource = {}, byCampaign = {}, daily = {}, referrerCount = {};
+  for (const u of inPeriod) {
+    bump(bySource, u.signup_source, u.role);
+    if (u.signup_campaign) bump(byCampaign, `${u.signup_source || ''}/${u.signup_campaign}`, u.role);
+    const day = toKstDate(u.created_at).toISOString().slice(0, 10);
+    daily[day] = (daily[day] || 0) + 1;
+    if (u.referred_by) referrerCount[u.referred_by] = (referrerCount[u.referred_by] || 0) + 1;
+  }
+
+  const topIds = Object.entries(referrerCount).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([id]) => Number(id));
+  let topReferrers = [];
+  if (topIds.length) {
+    const ph = topIds.map(() => '?').join(',');
+    const rows = await all(
+      `SELECT u.id, u.role, f.name AS freelancer_name, c.name AS company_name
+       FROM users u LEFT JOIN freelancer_profiles f ON f.user_id = u.id LEFT JOIN companies c ON c.user_id = u.id
+       WHERE u.id IN (${ph})`,
+      topIds
+    );
+    const byId = Object.fromEntries(rows.map((r) => [r.id, r]));
+    topReferrers = topIds.filter((id) => byId[id]).map((id) => ({
+      id, role: byId[id].role,
+      name: (byId[id].role === 'company' ? byId[id].company_name : byId[id].freelancer_name) || '이름 미입력',
+      count: referrerCount[id],
+    }));
+  }
+
+  const sortDesc = (m) => Object.values(m).sort((a, b) => b.total - a.total);
+  res.json({
+    days,
+    total: inPeriod.length,
+    freelancer: inPeriod.filter((u) => u.role === 'freelancer').length,
+    company: inPeriod.filter((u) => u.role === 'company').length,
+    referred: inPeriod.filter((u) => u.referred_by).length,
+    bySource: sortDesc(bySource),
+    byCampaign: sortDesc(byCampaign).slice(0, 20),
+    daily: Object.entries(daily).sort((a, b) => (a[0] < b[0] ? -1 : 1)).map(([date, count]) => ({ date, count })),
+    topReferrers,
+  });
+});
+
 module.exports = router;

@@ -112,6 +112,11 @@
   .tag.rm{cursor:pointer;}
   .tag.hit{background:var(--green-soft); color:var(--green-deep); border-color:var(--green);}
   .tag.hit::before{content:'✓ ';}
+  .stat-table{width:100%; border-collapse:collapse; font-size:13px; background:var(--card, #fff); border:1px solid var(--line); border-radius:12px; overflow:hidden;}
+  .stat-table th, .stat-table td{padding:9px 10px; border-bottom:1px solid var(--line); text-align:left;}
+  .stat-table th{font-size:11.5px; color:var(--slate); font-weight:700; background:var(--paper-dim);}
+  .stat-table .num{text-align:right; font-family:var(--mono);}
+  .stat-table tr:last-child td{border-bottom:none;}
   .reco-breakdown{margin-top:8px; font-size:11.5px; color:var(--slate); font-family:var(--mono);}
   .reco-breakdown b{color:var(--ink); font-weight:700;}
   .reco-breakdown > span{white-space:nowrap;}
@@ -669,7 +674,7 @@ function talentDetailBack(){ goBackFrom(talentDetailReturn, 'talent'); }
 // 화면 안의 뒤로가기 화살표가 항상 마이페이지로 돌아가는 화면들.
 // 이 화면들은 드로어 메뉴 등 여러 곳에서 열릴 수 있어서, 휴대폰의 '뒤로가기'
 // 제스처도 그 화살표와 똑같이 항상 마이페이지로 보내도록 popstate에서 함께 처리합니다.
-const MYPAGE_CHILD_SCREENS = ['proposalSettings','changePassword','deleteAccount','savedJobs','followedCompanies','adminReports','profileViews','companyProfileEdit','profileEdit','notices','events','faq','supportInquiry'];
+const MYPAGE_CHILD_SCREENS = ['proposalSettings','changePassword','deleteAccount','savedJobs','followedCompanies','adminReports','adminSignupStats','invite','profileViews','companyProfileEdit','profileEdit','notices','events','faq','supportInquiry'];
 
 // 회원 유형별로만 열 수 있는 화면. 다른 유형의 화면이 열리려 하면(뒤로가기 기록, 예전 알림 등) 홈으로 보냅니다.
 const FREELANCER_ONLY = ['receivedProposals','myApplications','portfolios','portfolioEdit','savedJobs','followedCompanies','profileViews','profileEdit','proposalSettings','reportJob'];
@@ -1327,7 +1332,7 @@ async function doSignup(){
     toast('이용약관 및 개인정보처리방침에 동의해주세요'); return;
   }
   try{
-    const body = { email, password, role: signupRole, phone };
+    const body = { email, password, role: signupRole, phone, attribution: signupAttribution('su-refcode') };
     if(signupRole==='freelancer'){
       body.name = document.getElementById('su-name').value.trim() || '이름 미입력';
       body.birthDate = document.getElementById('su-birthdate').value.trim();
@@ -1345,6 +1350,7 @@ async function doSignup(){
     }
     const data = await apiFetch('/auth/signup', {method:'POST', body});
     saveToken(data.token); state.role = data.user.role; state.userId = data.user.id; state.isAdmin = !!data.user.isAdmin;
+    clearAttribution();
     toast('가입이 완료됐어요');
     syncPushSubscription();
     go('home');
@@ -1391,8 +1397,46 @@ function screenOauthRole(){
       <div class="chip ${isCompany?'active':''}" onclick="setOauthRole('company', this)">기업</div>
     </div>
     <div class="form-field" style="margin-top:14px;"><label class="form-label">이름 / 회사명</label><input id="or-name" class="form-input" value="${esc(p.name||'')}"></div>
+    ${refCodeField('or-refcode')}
     <button class="btn btn-primary" onclick="finishOAuthSignup()">가입 완료하기</button>
   </div>`;
+}
+/* ---------------- 가입 경로 추적 + 친구 초대 코드 ---------------- */
+// 공유 링크(?utm_source=okky&utm_campaign=... 또는 ?ref=초대코드)로 처음 들어왔을 때의 정보를 30일간 보관했다가
+// 회원가입 시 함께 보냅니다. 채널은 "처음 들어온 곳"을 유지하고, 초대 코드는 가장 최근 것을 씁니다.
+const ATTR_KEY = 'itfree_attr';
+const ATTR_TTL = 30 * 24 * 3600 * 1000;
+function readAttribution(){
+  try{
+    const a = JSON.parse(localStorage.getItem(ATTR_KEY) || 'null');
+    return a && Date.now() - (a.ts||0) < ATTR_TTL ? a : null;
+  }catch(e){ return null; }
+}
+function clearAttribution(){ try{ localStorage.removeItem(ATTR_KEY); }catch(e){} }
+function captureAttribution(){
+  try{
+    const p = new URLSearchParams(location.search);
+    const ref = (p.get('ref')||'').trim();
+    const source = (p.get('utm_source')||'').trim();
+    if(!ref && !source) return;
+    const cur = readAttribution();
+    const next = cur && cur.source
+      ? { ...cur }
+      : { source, medium: (p.get('utm_medium')||'').trim(), campaign: (p.get('utm_campaign')||'').trim(), ts: Date.now() };
+    if(ref) next.ref = ref;
+    localStorage.setItem(ATTR_KEY, JSON.stringify(next));
+  }catch(e){}
+}
+captureAttribution(); // OAuth 처리 등으로 주소의 ?파라미터가 지워지기 전에 먼저 읽어둡니다.
+function signupAttribution(refInputId){
+  const a = readAttribution() || {};
+  const typed = (document.getElementById(refInputId)?.value || '').trim();
+  return { source: a.source||'', medium: a.medium||'', campaign: a.campaign||'', ref: typed || a.ref || '' };
+}
+function refCodeField(id){
+  const pre = (readAttribution()||{}).ref || '';
+  return `<div class="form-field"><label class="form-label">추천인 코드 <span style="font-weight:400; color:var(--slate-light);">(선택)</span></label>
+    <input id="${id}" class="form-input" maxlength="12" autocapitalize="characters" placeholder="친구에게 받은 초대 코드" value="${esc(pre)}" style="text-transform:uppercase;"></div>`;
 }
 async function finishOAuthSignup(){
   if(!oauthPending){ toast('인증 정보가 없어요. 다시 시도해주세요.'); go('onboarding'); return; }
@@ -1400,9 +1444,11 @@ async function finishOAuthSignup(){
   try{
     const data = await apiFetch('/auth/oauth/finish', {method:'POST', body:{
       pendingToken: oauthPending.token, role: oauthRoleChoice, name,
+      attribution: signupAttribution('or-refcode'),
     }});
     saveToken(data.token); state.role = data.user.role; state.userId = data.user.id; state.isAdmin = !!data.user.isAdmin;
     oauthPending = null;
+    clearAttribution();
     toast('가입이 완료됐어요');
     syncPushSubscription();
     go('home');
@@ -2352,6 +2398,7 @@ function screenSignup(){
       <label class="form-label" id="su-phonelabel">휴대폰 <span style="color:var(--danger); font-size:11px;">(필수)</span></label>
       <input id="su-phone" class="form-input" type="tel" inputmode="tel" autocomplete="tel" placeholder="010-1234-5678">
     </div>
+    ${refCodeField('su-refcode')}
 
     <div class="su-section-title">약관 동의</div>
     <div class="su-agree-item" style="border-bottom:none; margin-bottom:6px;">
@@ -3568,6 +3615,12 @@ async function screenMypage(){
     <div class="list-item" onclick="go('proposalSettings')"><div class="li-l"><div class="li-icon">${I.gear}</div>
       <div><div class="li-tt">제안 설정</div><div class="page-sub" style="margin-top:2px;">${Number(profile.accept_proposals ?? 1)===1 ? '제안 받는 중' : '제안 받지 않음'}</div></div></div>${I.back}</div>` : ''}
     ${me.user.hasPassword ? `<div class="list-item" onclick="go('changePassword')"><div class="li-l"><div class="li-icon">${I.gear}</div><div class="li-tt">비밀번호 변경</div></div>${I.back}</div>` : ''}
+    <div class="list-item" onclick="go('invite')"><div class="li-l"><div class="li-icon">${I.gift}</div>
+      <div><div class="li-tt">친구 초대</div><div class="page-sub" style="margin-top:2px;">내 초대 코드로 동료를 초대해보세요</div></div></div>${I.back}</div>
+    ${state.isAdmin ? `
+    <div class="section-label with-ic">${I.gear}관리자</div>
+    <div class="list-item" onclick="go('adminSignupStats')"><div class="li-l"><div class="li-icon">${I.talent}</div><div class="li-tt">가입 경로 통계</div></div>${I.back}</div>
+    <div class="list-item" onclick="go('adminReports')"><div class="li-l"><div class="li-icon">${I.alertCircle}</div><div class="li-tt">신고 관리</div></div>${I.back}</div>` : ''}
     <div class="section-label with-ic">${I.building}약관 및 정책</div>
     <div class="list-item" onclick="window.open('/terms.html','_blank')"><div class="li-l"><div class="li-icon">${I.building}</div><div class="li-tt">이용약관</div></div>${I.back}</div>
     <div class="list-item" onclick="window.open('/privacy.html','_blank')"><div class="li-l"><div class="li-icon">${I.eye}</div><div class="li-tt">개인정보처리방침</div></div>${I.back}</div>
@@ -3796,6 +3849,109 @@ async function screenFollowedCompanies(){
         <div class="page-sub" style="margin-top:6px;">${esc(c.description) || '회사 소개가 아직 없어요'}</div>
         <div class="icon-meta" style="margin-top:8px;"><span class="im">${I.jobs}<b>${c.open_jobs}</b>건 채용중</span></div>
       </div>`).join('') || emptyArt(ART.noJobs, '아직 관심 등록한 기업이 없어요', '공고 상세에서 기업명 옆 ★ 버튼으로 등록할 수 있어요.')}
+  </div>`;
+}
+
+// 마이페이지 > 친구 초대: 내 초대 코드·링크 공유와 초대로 가입한 친구 목록
+function inviteLink(code){
+  return `${location.origin}/?ref=${encodeURIComponent(code)}&utm_source=referral&utm_medium=invite`;
+}
+async function copyText(text, okMsg){
+  try{ await navigator.clipboard.writeText(text); toast(okMsg || '복사했어요'); }
+  catch(e){
+    const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select();
+    try{ document.execCommand('copy'); toast(okMsg || '복사했어요'); }catch(_){ toast('복사하지 못했어요. 길게 눌러 직접 복사해주세요.'); }
+    ta.remove();
+  }
+}
+async function shareInvite(code){
+  const url = inviteLink(code);
+  const text = `IT 프리랜서·기업 매칭 앱 IT Free에 초대합니다. 가입할 때 추천인 코드 ${code}를 입력해주세요.`;
+  if(navigator.share){
+    try{ await navigator.share({ title: 'IT Free 초대', text, url }); return; }catch(e){ if(e && e.name==='AbortError') return; }
+  }
+  copyText(`${text}\n${url}`, '초대 메시지를 복사했어요. 카톡·문자에 붙여넣어 보내주세요.');
+}
+async function screenInvite(){
+  const data = await apiFetch('/referral/me');
+  const invited = data.invited || [];
+  return `${statusbar()}
+  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('mypage')">${I.back}</div><div class="page-title" style="font-size:19.5px;">친구 초대</div></div></div>
+  <div class="content">
+    <div class="banner light" style="cursor:default;">
+      <div class="banner-eyebrow">My Invite Code</div>
+      <div style="font-family:var(--mono); font-size:30px; font-weight:800; letter-spacing:.14em; color:var(--ink); margin:6px 0 4px;">${esc(data.code)}</div>
+      <div class="banner-sub" style="color:var(--slate);">함께 일했던 동료 프리랜서나 기업 담당자에게 공유해보세요.<br>가입할 때 이 코드를 입력하거나, 아래 링크로 들어오면 자동으로 연결돼요.</div>
+    </div>
+    <div style="display:flex; gap:8px; margin:12px 0 4px;">
+      <button class="btn btn-primary" style="flex:1;" onclick="shareInvite('${jsAttrStr(data.code)}')">초대 링크 공유</button>
+      <button class="btn btn-outline" style="flex:1;" onclick="copyText('${jsAttrStr(data.code)}', '초대 코드를 복사했어요')">코드 복사</button>
+    </div>
+    <div class="page-sub" style="word-break:break-all; margin-bottom:6px;">${esc(inviteLink(data.code))}</div>
+    <div class="section-label with-ic">${I.talent}초대로 가입한 친구 <b style="color:var(--ink); margin-left:4px;">${invited.length}명</b></div>
+    ${invited.length ? invited.map(v=>`
+      <div class="list-item" style="cursor:default;"><div class="li-l"><div class="li-icon">${I.user}</div>
+        <div><div class="li-tt">${esc(v.name)}</div><div class="page-sub" style="margin-top:2px;">${v.role==='company'?'기업회원':'프리랜서'} · ${(parseServerTime(v.created_at)||new Date()).toLocaleDateString('ko-KR')} 가입</div></div></div></div>`).join('')
+      : `<div class="reco-empty">아직 초대로 가입한 친구가 없어요.<br>초대 링크를 공유해보세요.</div>`}
+    <div class="page-sub" style="margin-top:14px;">초대 혜택은 고객센터 &gt; 이벤트·혜택에서 안내해요.</div>
+  </div>`;
+}
+
+// 관리자 전용: 가입 경로 통계 + 채널별 공유 링크 만들기
+const SOURCE_LABELS = {
+  '': '직접 방문·알 수 없음', referral: '친구 초대', okky: 'OKKY', openchat: '카카오 오픈채팅', linkedin: '링크드인',
+  naver_cafe: '네이버 카페', blog: '블로그', instagram: '인스타그램', google_ads: '구글 광고', naver_ads: '네이버 광고',
+  meta_ads: '메타(페북·인스타) 광고', email: '이메일', offline: '오프라인·명함',
+};
+const sourceLabel = (s) => SOURCE_LABELS[s] || s;
+let adminStatsDays = 30;
+function setAdminStatsDays(d){ adminStatsDays = d; render(); }
+function buildChannelLink(){
+  const src = document.getElementById('lb-source').value;
+  const camp = (document.getElementById('lb-campaign').value || '').trim().toLowerCase().replace(/[^a-z0-9_.-]/g, '');
+  const qs = new URLSearchParams({ utm_source: src, utm_medium: ['google_ads','naver_ads','meta_ads'].includes(src) ? 'cpc' : 'social' });
+  if(camp) qs.set('utm_campaign', camp);
+  const url = `${location.origin}/?${qs.toString()}`;
+  document.getElementById('lb-result').textContent = url;
+  copyText(url, '링크를 복사했어요');
+}
+async function screenAdminSignupStats(){
+  if(!state.isAdmin){ go('mypage'); return ''; }
+  const s = await apiFetch('/admin/signup-stats?days=' + adminStatsDays);
+  const periods = [[7,'7일'],[30,'30일'],[90,'90일'],[3650,'전체']];
+  const row = (label, r) => `<tr><td>${esc(label)}</td><td class="num"><b>${r.total}</b></td><td class="num">${r.freelancer||0}</td><td class="num">${r.company||0}</td></tr>`;
+  const table = (rows, labelFn) => rows.length
+    ? `<table class="stat-table"><thead><tr><th>경로</th><th class="num">합계</th><th class="num">프리랜서</th><th class="num">기업</th></tr></thead><tbody>${rows.map(r=>row(labelFn(r.key), r)).join('')}</tbody></table>`
+    : `<div class="reco-empty">이 기간에 가입한 회원이 없어요.</div>`;
+  const daily = s.daily.slice(-14);
+  return `${statusbar()}
+  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('mypage')">${I.back}</div><div class="page-title" style="font-size:19.5px;">가입 경로 통계</div></div></div>
+  <div class="content">
+    <div class="chip-row">${periods.map(([d,l])=>`<div class="chip ${d===adminStatsDays?'active':''}" onclick="setAdminStatsDays(${d})">${l}</div>`).join('')}</div>
+    <div class="hero-stat" style="margin-top:10px;">
+      <div class="hs"><div class="hs-num">${s.total}</div><div class="hs-lbl">전체 가입</div></div>
+      <div class="hs"><div class="hs-num">${s.freelancer} / ${s.company}</div><div class="hs-lbl">프리랜서 / 기업</div></div>
+      <div class="hs"><div class="hs-num">${s.referred}</div><div class="hs-lbl">친구 초대 가입</div></div>
+    </div>
+    ${daily.length ? `<div class="card"><div class="card-title" style="font-size:13.5px;">일별 가입 (최근 ${daily.length}일)</div>${barChart(daily.map(d=>({label:d.date.slice(5).replace('-','/'), value:d.count})), true)}</div>` : ''}
+    <div class="section-label with-ic">${I.layers}채널별 가입</div>
+    ${table(s.bySource, sourceLabel)}
+    ${s.byCampaign.length ? `<div class="section-label with-ic">${I.megaphone}캠페인별 가입</div>${table(s.byCampaign, k=>{ const [src, camp] = k.split('/'); return `${sourceLabel(src)} · ${camp}`; })}` : ''}
+    <div class="section-label with-ic">${I.gift}초대왕 TOP 10</div>
+    ${s.topReferrers.length ? s.topReferrers.map((r,i)=>`
+      <div class="list-item" style="cursor:default;"><div class="li-l"><div class="li-icon" style="font-weight:800;">${i+1}</div>
+        <div><div class="li-tt">${esc(r.name)}</div><div class="page-sub" style="margin-top:2px;">${r.role==='company'?'기업회원':'프리랜서'}</div></div></div><b>${r.count}명</b></div>`).join('')
+      : `<div class="reco-empty">아직 친구 초대로 가입한 회원이 없어요.</div>`}
+    <div class="section-label with-ic">${I.megaphone}채널별 공유 링크 만들기</div>
+    <div class="card">
+      <div class="page-sub" style="margin-bottom:8px;">OKKY·오픈채팅 등에 글을 올릴 때 이 링크를 쓰면, 그 링크로 가입한 회원이 위 표에 채널별로 집계돼요.</div>
+      <div class="form-field"><label class="form-label">채널</label>
+        <select id="lb-source" class="form-input">${Object.entries(SOURCE_LABELS).filter(([k])=>k && k!=='referral').map(([k,l])=>`<option value="${k}">${esc(l)}</option>`).join('')}</select></div>
+      <div class="form-field"><label class="form-label">캠페인 이름 <span style="font-weight:400; color:var(--slate-light);">(선택, 영문·숫자)</span></label>
+        <input id="lb-campaign" class="form-input" placeholder="예: okbank_ta_1001"></div>
+      <button class="btn btn-primary" onclick="buildChannelLink()">링크 만들고 복사</button>
+      <div id="lb-result" class="page-sub" style="margin-top:8px; word-break:break-all; font-family:var(--mono);"></div>
+    </div>
   </div>`;
 }
 
@@ -4126,6 +4282,7 @@ async function render(){
       proposeForm: screenProposeForm, pickerScreen: screenPicker,
       reviewForm: screenReviewForm,
       adminReports: screenAdminReports, reportJob: screenReportJob,
+      invite: screenInvite, adminSignupStats: screenAdminSignupStats,
       notices: screenNotices, events: screenEvents, faq: screenFaq, supportInquiry: screenSupportInquiry,
       announcementForm: screenAnnouncementForm,
     };

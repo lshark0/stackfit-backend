@@ -109,8 +109,17 @@ if (USE_POSTGRES) {
     await ensureColumnPg('job_reports', 'attachment_data', 'BYTEA');
     // 잡코리아 스타일 "바로 지원하기" 확인 화면에 "MM/DD HH:mm 저장" 형태로 보여주기 위한 프로필 최종 수정 시각
     await ensureColumnPg('freelancer_profiles', 'updated_at', 'TEXT');
+    // 친구 초대 코드 + 가입 경로(어느 채널/캠페인으로 들어왔는지)
+    await ensureColumnPg('users', 'referral_code', 'TEXT');
+    await ensureColumnPg('users', 'referred_by', 'INTEGER');
+    await ensureColumnPg('users', 'signup_source', 'TEXT');
+    await ensureColumnPg('users', 'signup_medium', 'TEXT');
+    await ensureColumnPg('users', 'signup_campaign', 'TEXT');
     await pool.query(
       'CREATE UNIQUE INDEX IF NOT EXISTS idx_users_oauth ON users(oauth_provider, oauth_id) WHERE oauth_provider IS NOT NULL'
+    );
+    await pool.query(
+      'CREATE UNIQUE INDEX IF NOT EXISTS idx_users_refcode ON users(referral_code) WHERE referral_code IS NOT NULL'
     );
     await removeDemoAccounts();
     await fixRoleToCompany('454145@hanmail.net');
@@ -194,8 +203,17 @@ if (USE_POSTGRES) {
     addCol('job_reports', 'attachment_data', 'BLOB');
     // 잡코리아 스타일 "바로 지원하기" 확인 화면에 "MM/DD HH:mm 저장" 형태로 보여주기 위한 프로필 최종 수정 시각
     addCol('freelancer_profiles', 'updated_at', 'TEXT');
+    // 친구 초대 코드 + 가입 경로(어느 채널/캠페인으로 들어왔는지)
+    addCol('users', 'referral_code', 'TEXT');
+    addCol('users', 'referred_by', 'INTEGER');
+    addCol('users', 'signup_source', 'TEXT');
+    addCol('users', 'signup_medium', 'TEXT');
+    addCol('users', 'signup_campaign', 'TEXT');
     try {
       db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_oauth ON users(oauth_provider, oauth_id) WHERE oauth_provider IS NOT NULL');
+    } catch (e) {}
+    try {
+      db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_refcode ON users(referral_code) WHERE referral_code IS NOT NULL');
     } catch (e) {}
     await removeDemoAccounts();
     await fixRoleToCompany('454145@hanmail.net');

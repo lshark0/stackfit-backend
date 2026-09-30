@@ -5,6 +5,7 @@ const { requireAuth } = require('../middleware/requireAuth');
 const { wrapAllRoutes } = require('../middleware/asyncHandler');
 const { normalizeMobile, normalizePhone, normalizeBirthDate } = require('../contact');
 const { isAdminEmail } = require('../middleware/requireAdmin');
+const { recordSignupAttribution } = require('../attribution');
 
 const router = express.Router();
 wrapAllRoutes(router);
@@ -99,6 +100,9 @@ router.post('/signup', async (req, res) => {
       ]
     );
   }
+
+  await recordSignupAttribution(userId, req.body.attribution)
+    .catch((e) => console.warn('[IT Free] 가입 경로 기록 실패:', e.message));
 
   const token = signToken({ id: userId, role, email });
   res.status(201).json({ token, user: { id: userId, email, role, isAdmin: isAdminEmail(email) } });
