@@ -91,7 +91,7 @@ if (USE_POSTGRES) {
     await ensureColumnPg('companies', 'phone', "TEXT NOT NULL DEFAULT ''");
     await ensureColumnPg('companies', 'email', "TEXT NOT NULL DEFAULT ''");
     await ensureColumnPg('companies', 'address', "TEXT NOT NULL DEFAULT ''");
-    // 잡코리아 스타일 가입 양식: 생년월일/성별(개인), 기업형태/사업자등록번호/대표자명(기업)
+    // 잡코리아 스타일 가입 양식: 생년월일/성별(프리랜서), 기업형태/사업자등록번호/대표자명(기업)
     await ensureColumnPg('freelancer_profiles', 'birth_date', 'TEXT');
     await ensureColumnPg('freelancer_profiles', 'gender', 'TEXT');
     await ensureColumnPg('companies', 'company_type', "TEXT NOT NULL DEFAULT ''");
@@ -190,7 +190,7 @@ if (USE_POSTGRES) {
     addCol('companies', 'phone', "TEXT NOT NULL DEFAULT ''");
     addCol('companies', 'email', "TEXT NOT NULL DEFAULT ''");
     addCol('companies', 'address', "TEXT NOT NULL DEFAULT ''");
-    // 잡코리아 스타일 가입 양식: 생년월일/성별(개인), 기업형태/사업자등록번호/대표자명(기업)
+    // 잡코리아 스타일 가입 양식: 생년월일/성별(프리랜서), 기업형태/사업자등록번호/대표자명(기업)
     addCol('freelancer_profiles', 'birth_date', 'TEXT');
     addCol('freelancer_profiles', 'gender', 'TEXT');
     addCol('companies', 'company_type', "TEXT NOT NULL DEFAULT ''");

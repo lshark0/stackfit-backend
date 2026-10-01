@@ -86,7 +86,7 @@
   .chip-row{display:flex; gap:8px; margin:12px 0 4px; overflow-x:auto;}
   .chip{font-family:var(--mono); font-size:12.5px; font-weight:600; border-radius:999px; padding:7px 13px; background:var(--paper-dim); color:var(--ink); border:1px solid var(--line); cursor:pointer; white-space:nowrap; flex:0 0 auto;}
   .chip.active{background:linear-gradient(135deg, var(--purple) 0%, var(--blue) 100%); color:#fff; border-color:transparent;}
-  /* 잡코리아 스타일 회원가입 상단 탭(개인회원/기업회원) */
+  /* 잡코리아 스타일 회원가입 상단 탭(프리랜서회원/기업회원) */
   .tab-switch{display:flex; border-bottom:2px solid var(--line); margin:0 -20px 16px;}
   .tab-switch .tab{flex:1; text-align:center; padding:14px 0; font-size:15.5px; font-weight:700; color:var(--slate-light); cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-2px;}
   .tab-switch .tab.active{color:var(--ink); border-bottom-color:var(--amber);}
@@ -2454,7 +2454,7 @@ function screenSignup(){
   <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('onboarding')">${I.back}</div><div class="page-title">회원가입</div></div></div>
   <div class="content">
     <div class="tab-switch" id="signupRoleTabs">
-      <div class="tab active" onclick="setSignupRole('freelancer', this)">개인회원</div>
+      <div class="tab active" onclick="setSignupRole('freelancer', this)">프리랜서회원</div>
       <div class="tab" onclick="setSignupRole('company', this)">기업회원</div>
     </div>
     ${socialLoginButtons()}
