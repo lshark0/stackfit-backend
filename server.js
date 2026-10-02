@@ -24,6 +24,7 @@ const adminRoutes = require('./src/routes/admin');
 const supportRoutes = require('./src/routes/support');
 const announcementsRoutes = require('./src/routes/announcements');
 const referralRoutes = require('./src/routes/referral');
+const aiRoutes = require('./src/routes/ai');
 const { verifyToken } = require('./src/auth');
 
 const app = express();
@@ -192,6 +193,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/support', supportRoutes);
 app.use('/api/announcements', announcementsRoutes);
 app.use('/api/referral', referralRoutes);
+app.use('/api/ai', aiRoutes);
 
 app.use((req, res) => res.status(404).json({ error: 'Not found' }));
 // eslint-disable-next-line no-unused-vars

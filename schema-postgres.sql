@@ -286,3 +286,16 @@ CREATE TABLE IF NOT EXISTS announcements (
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_announcements_kind ON announcements(kind);
+
+-- AI 기능 사용 기록 (1인 1일 이용 한도 및 비용 집계용). day는 한국시간 기준 YYYY-MM-DD
+CREATE TABLE IF NOT EXISTS ai_usage (
+  id             SERIAL PRIMARY KEY,
+  user_id        INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  feature        TEXT NOT NULL DEFAULT '',
+  day            TEXT NOT NULL DEFAULT '',
+  model          TEXT NOT NULL DEFAULT '',
+  input_tokens   INTEGER NOT NULL DEFAULT 0,
+  output_tokens  INTEGER NOT NULL DEFAULT 0,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_ai_usage_user_day ON ai_usage(user_id, feature, day);

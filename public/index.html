@@ -253,6 +253,26 @@
   .switch input:checked + .slider{background:linear-gradient(135deg, var(--purple) 0%, var(--blue) 100%);}
   .switch input:checked + .slider::before{transform:translateX(19px);}
   .bubble-time{font-family:var(--mono); font-size:10.5px; color:var(--slate); margin-top:3px;}
+  .ai-fill-box{margin-top:12px; padding:14px; border-radius:14px; border:1px solid var(--line); background:linear-gradient(135deg, rgba(124,92,255,.07) 0%, rgba(66,133,244,.07) 100%);}
+  .ai-fill-tt{display:flex; align-items:center; gap:6px; font-weight:800; font-size:14px; color:var(--ink);}
+  .ai-fill-tt svg{width:17px; height:17px; color:var(--purple);}
+  .ai-fill-result{margin-top:12px; padding-top:10px; border-top:1px dashed var(--line);}
+  .ai-fill-row{display:flex; gap:10px; align-items:flex-start; padding:9px 0; border-bottom:1px solid var(--line); cursor:pointer;}
+  .ai-fill-row input{margin-top:3px; width:17px; height:17px; flex:0 0 auto; accent-color:var(--purple);}
+  .ai-fill-lbl{font-size:12.5px; font-weight:800; color:var(--slate);}
+  .ai-fill-val{font-size:13.5px; color:var(--ink); margin-top:3px; line-height:1.55; white-space:pre-wrap; word-break:break-word;}
+  .ai-fill-val .tag{margin:2px 2px 0 0;}
+  .ai-avatar{width:28px; height:28px; border-radius:50%; flex:0 0 auto; display:flex; align-items:center; justify-content:center; color:#fff; background:linear-gradient(135deg, var(--purple) 0%, var(--blue) 100%);}
+  .ai-avatar svg{width:16px; height:16px;}
+  .ai-suggest{display:flex; flex-wrap:wrap; gap:7px; padding-left:34px;}
+  .ai-suggest .chip{font-size:12.5px;}
+  .ai-note, .ai-fill-box .page-sub, .ai-suggest .chip, .ai-fill-lbl{font-family:var(--sans); letter-spacing:0;}
+  .ai-note{font-size:11.5px; text-align:center; margin:4px 8px 10px;}
+  .ai-note a{text-decoration:underline; cursor:pointer; color:var(--ink);}
+  .ai-typing{display:flex; gap:4px; align-items:center; padding:13px 14px;}
+  .ai-typing span{width:6px; height:6px; border-radius:50%; background:var(--slate-light); animation:aiDot 1s infinite ease-in-out;}
+  .ai-typing span:nth-child(2){animation-delay:.15s;} .ai-typing span:nth-child(3){animation-delay:.3s;}
+  @keyframes aiDot{0%,80%,100%{opacity:.3; transform:translateY(0);} 40%{opacity:1; transform:translateY(-3px);}}
   .chat-input-bar{display:flex; gap:8px; padding:10px 20px 16px; border-top:1px solid var(--line); background:var(--paper); flex:0 0 auto;}
   .chat-input{flex:1; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:11px 14px; font-size:14.5px; color:var(--ink); font-family:var(--sans); outline:none;}
   .send-btn{width:42px; height:42px; border-radius:12px; background:linear-gradient(135deg, var(--purple) 0%, var(--blue) 100%); color:#fff; display:flex; align-items:center; justify-content:center; flex:0 0 auto; cursor:pointer; border:none;}
@@ -636,6 +656,7 @@ const I = {
   megaphone:`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 10v4a1 1 0 0 0 1 1h2l7 4V5L6 9H4a1 1 0 0 0-1 1Z" stroke-linejoin="round"/><path d="M17 9.5a3.5 3.5 0 0 1 0 5M20 7a7 7 0 0 1 0 10" stroke-linecap="round"/></svg>`,
   gift:`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="9" width="16" height="11" rx="1.5"/><path d="M4 13h16M12 9v11" stroke-linecap="round"/><path d="M12 9c-1.5 0-4-1-4-3a2.2 2.2 0 0 1 4 0 2.2 2.2 0 0 1 4 0c0 2-2.5 3-4 3Z" stroke-linejoin="round"/></svg>`,
   alertCircle:`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8.5"/><path d="M12 8v5" stroke-linecap="round"/><circle cx="12" cy="16.2" r="1" fill="currentColor" stroke="none"/></svg>`,
+  sparkle:`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9Z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8Z"/></svg>`,
   headset:`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 13v-1a8 8 0 0 1 16 0v1" stroke-linecap="round"/><rect x="3" y="13" width="4" height="6" rx="1.5"/><rect x="17" y="13" width="4" height="6" rx="1.5"/><path d="M19 19v1a2 2 0 0 1-2 2h-3" stroke-linecap="round"/></svg>`,
 };
 
@@ -777,6 +798,7 @@ function drawerMenuContent(){
     <div class="drawer-sec"><div class="drawer-sec-label">내 활동</div>${activityItems}${item(I.bell,'알림','alerts')}${item(I.user,'마이페이지','mypage')}${item(I.gift,'친구 초대','invite')}</div>
     <div class="drawer-sec"><div class="drawer-sec-label">고객센터</div>
       <div class="cs-grid">
+        <div class="cs-item" onclick="closeDrawer(); go('aiChat');"><span class="ic">${I.sparkle}</span><span class="lbl">AI 상담</span></div>
         <div class="cs-item" onclick="closeDrawer(); go('notices');"><span class="ic">${I.megaphone}</span><span class="lbl">공지사항</span></div>
         <div class="cs-item" onclick="closeDrawer(); go('events');"><span class="ic">${I.gift}</span><span class="lbl">이벤트·혜택</span></div>
         <div class="cs-item" onclick="closeDrawer(); go('supportInquiry');"><span class="ic">${I.alertCircle}</span><span class="lbl">문의·신고</span></div>
@@ -3867,6 +3889,87 @@ async function screenFaq(){
   </div>`;
 }
 
+// 고객센터 > AI 상담 — 서비스 이용 방법을 Claude가 바로 답해줍니다.
+// 대화 내용은 이 탭(sessionStorage)에만 보관하고, 서버에는 질문할 때만 최근 대화를 함께 보냅니다.
+const AI_CHAT_KEY = 'itfree_ai_chat';
+let aiChatMsgs = [];
+let aiChatBusy = false;
+function loadAiChat(){
+  try{ const v = JSON.parse(sessionStorage.getItem(AI_CHAT_KEY) || '[]'); aiChatMsgs = Array.isArray(v) ? v : []; }
+  catch(e){ aiChatMsgs = []; }
+}
+function saveAiChat(){ try{ sessionStorage.setItem(AI_CHAT_KEY, JSON.stringify(aiChatMsgs.slice(-40))); }catch(e){} }
+function aiChatSuggestions(){
+  return state.role === 'company'
+    ? ['공고는 어떻게 등록하나요?', '계약은 어떻게 진행되나요?', '추천 인재 점수는 어떻게 계산되나요?', '푸시 알림이 안 와요']
+    : ['지원하려면 무엇을 채워야 하나요?', '추천 %는 어떻게 계산되나요?', '제안을 수락하면 연락처가 공개되나요?', '푸시 알림이 안 와요'];
+}
+function aiBubble(role, text){
+  const mine = role === 'user';
+  return `<div class="bubble-line ${mine?'me':'them'}">
+    ${mine ? '' : `<div class="ai-avatar">${I.sparkle}</div>`}
+    <div class="bubble ${mine?'me':'them'}">${esc(text)}</div>
+  </div>`;
+}
+function aiChatBodyHtml(enabled){
+  const greet = `안녕하세요! IT Free AI 상담이에요.\n가입, 프로필, 공고·지원, 제안, 계약 진행, 알림 등 이용 방법을 물어보세요.`;
+  return aiBubble('assistant', greet)
+    + aiChatMsgs.map(m => aiBubble(m.role, m.content)).join('')
+    + (enabled && !aiChatMsgs.length ? `<div class="ai-suggest">${aiChatSuggestions().map(q=>`<button class="chip" onclick="sendAiChat('${jsAttrStr(q)}')">${esc(q)}</button>`).join('')}</div>` : '');
+}
+function scrollAiChat(){ const el = document.getElementById('chatScroll'); if(el) el.scrollTop = el.scrollHeight; }
+async function screenAiChat(){
+  loadAiChat();
+  const st = await apiFetch('/ai/status').catch(()=>({enabled:false}));
+  return `${statusbar()}
+  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('home')">${I.back}</div>
+    <div class="page-title" style="font-size:16px;">AI 상담</div>
+    ${aiChatMsgs.length ? `<button class="btn btn-outline" style="width:auto; margin-left:auto; padding:6px 11px; font-size:12px;" onclick="resetAiChat()">새 대화</button>` : ''}
+  </div></div>
+  <div class="content" id="chatScroll">
+    <div class="bubble-wrap" id="aiChatWrap">${aiChatBodyHtml(st.enabled)}</div>
+    <div class="page-sub ai-note">AI 답변은 부정확할 수 있어요. 계정·신고 처리 등 확인이 필요한 일은 <a onclick="go('supportInquiry')">문의·신고</a>로 접수해주세요.${st.enabled && st.remaining ? ` · 오늘 ${st.remaining.support_chat}회 남음` : ''}</div>
+  </div>
+  ${st.enabled ? `
+  <div class="chat-input-bar">
+    <input id="aiChatInput" class="chat-input" maxlength="1000" placeholder="궁금한 점을 입력하세요" onkeydown="if(event.key==='Enter' && !event.isComposing){ event.preventDefault(); sendAiChat(); }">
+    <button class="send-btn" id="aiChatSend" onclick="sendAiChat()">${I.send}</button>
+  </div>` : `
+  <div class="chat-input-bar"><div class="reco-empty" style="flex:1; margin:0; text-align:left;">AI 상담을 준비하고 있어요. 그동안은 <a style="text-decoration:underline; cursor:pointer;" onclick="go('faq')">FAQ</a>나 <a style="text-decoration:underline; cursor:pointer;" onclick="go('supportInquiry')">문의·신고</a>를 이용해주세요.</div></div>`}`;
+}
+function resetAiChat(){ aiChatMsgs = []; saveAiChat(); go('aiChat'); }
+async function sendAiChat(preset){
+  if(aiChatBusy) return;
+  const input = document.getElementById('aiChatInput');
+  const text = (preset || (input ? input.value : '')).trim();
+  if(!text) return;
+  if(input) input.value = '';
+  aiChatMsgs.push({role:'user', content:text.slice(0,1000)});
+  saveAiChat();
+  const wrap = document.getElementById('aiChatWrap');
+  if(!wrap) return;
+  wrap.querySelector('.ai-suggest')?.remove();
+  wrap.insertAdjacentHTML('beforeend', aiBubble('user', text) + `<div class="bubble-line them" id="aiTyping"><div class="ai-avatar">${I.sparkle}</div><div class="bubble them ai-typing"><span></span><span></span><span></span></div></div>`);
+  scrollAiChat();
+  aiChatBusy = true;
+  try{
+    const data = await apiFetch('/ai/support-chat', {method:'POST', body:{messages: aiChatMsgs.slice(-20)}});
+    aiChatMsgs.push({role:'assistant', content:data.reply});
+    saveAiChat();
+    document.getElementById('aiTyping')?.remove();
+    if(state.screen === 'aiChat') wrap.insertAdjacentHTML('beforeend', aiBubble('assistant', data.reply));
+  }catch(e){
+    // 실패한 질문은 기록에서 빼서, 다시 보내도 같은 질문이 두 번 쌓이지 않게 합니다.
+    aiChatMsgs.pop(); saveAiChat();
+    document.getElementById('aiTyping')?.remove();
+    wrap.insertAdjacentHTML('beforeend', `<div class="page-sub" style="text-align:center; color:var(--danger);">${esc(e.message)}</div>`);
+    if(input && !input.value) input.value = text;
+  }finally{
+    aiChatBusy = false;
+    scrollAiChat();
+  }
+}
+
 // 눈 아이콘을 누르면 입력한 비밀번호를 보거나 다시 가릴 수 있는 입력칸
 function passwordField(id, label, placeholder, autocomplete){
   return `<div class="form-field">
@@ -4306,6 +4409,78 @@ function openPortfolioEdit(id){
   captureProfileDraft();
   go('portfolioEdit', id ?? null);
 }
+// 경력기술서 → 프로필 자동 채우기: AI가 제안한 값을 보여주고, 사용자가 고른 항목만 입력란에 반영합니다.
+// (프로필 저장은 사용자가 '저장하기'를 눌러야 이루어집니다)
+let aiFillSuggestion = null;
+function aiFillBoxHtml(){
+  return `<div class="ai-fill-box">
+    <div class="ai-fill-tt">${I.sparkle}AI 자동 채우기</div>
+    <div class="page-sub" style="margin-top:4px;">올린 경력기술서를 AI가 읽고 업무·등급·기술스택·자격증·자기소개·수행 프로젝트를 채워드려요.</div>
+    <button class="btn btn-primary" id="aiFillBtn" style="margin-top:10px;" onclick="aiFillProfile()">AI로 자동 채우기</button>
+    <div id="aiFillResult"></div>
+  </div>`;
+}
+async function aiFillProfile(){
+  const btn = document.getElementById('aiFillBtn');
+  if(btn){ btn.disabled = true; btn.textContent = 'AI가 경력기술서를 읽는 중… (최대 30초)'; }
+  try{
+    const data = await apiFetch('/ai/profile-from-resume', {method:'POST'});
+    aiFillSuggestion = data.suggestion;
+    const box = document.getElementById('aiFillResult');
+    if(box) box.innerHTML = aiFillResultHtml(aiFillSuggestion);
+  }catch(e){ toast(e.message); }
+  finally{ if(btn){ btn.disabled = false; btn.textContent = 'AI로 다시 분석하기'; } }
+}
+function aiFillResultHtml(s){
+  const row = (key, label, valueHtml, on) => `
+    <label class="ai-fill-row"><input type="checkbox" data-ai-key="${key}" ${on?'checked':''}>
+      <div style="min-width:0;"><div class="ai-fill-lbl">${label}</div><div class="ai-fill-val">${valueHtml}</div></div></label>`;
+  const newStack = s.stack.filter(x => !pendingStack.some(p => p.toLowerCase() === x.toLowerCase()));
+  const newCerts = s.certs.filter(x => !pendingCerts.includes(x));
+  const curSummary = (document.getElementById('pf-summary')?.value || '').trim();
+  const rows = [];
+  if(s.role_title) rows.push(row('role', '업무', esc(s.role_title), true));
+  if(s.grade) rows.push(row('grade', '등급', `${esc(s.grade)} <span class="page-sub">(경력 약 ${s.years}년 기준)</span>`, true));
+  if(newStack.length) rows.push(row('stack', `기술스택 ${newStack.length}개 추가`, newStack.map(x=>`<span class="tag">${esc(x)}</span>`).join(' '), true));
+  if(newCerts.length) rows.push(row('certs', `자격증 ${newCerts.length}개 추가`, newCerts.map(x=>`<span class="tag">${esc(x)}</span>`).join(' '), true));
+  if(s.summary) rows.push(row('summary', curSummary ? '자기소개 (지금 내용을 바꿔요)' : '자기소개', esc(s.summary), !curSummary));
+  if(s.projects.length) rows.push(row('projects', `수행 프로젝트 ${s.projects.length}건 추가`, s.projects.map(p=>`· ${esc(p.title)}${p.period?` <span class="page-sub">${esc(p.period)}</span>`:''}`).join('<br>'), false));
+  if(!rows.length) return `<div class="page-sub" style="margin-top:10px;">새로 채울 내용을 찾지 못했어요.</div>`;
+  return `<div class="ai-fill-result">
+    <div class="page-sub" style="margin-bottom:6px;">반영할 항목을 고르세요. AI 결과는 틀릴 수 있으니 꼭 확인해주세요.</div>
+    ${rows.join('')}
+    <button class="btn btn-outline" style="margin-top:8px;" onclick="applyAiFill()">선택한 항목 반영하기</button>
+  </div>`;
+}
+async function applyAiFill(){
+  const s = aiFillSuggestion;
+  if(!s) return;
+  const on = (k) => !!document.querySelector(`#aiFillResult input[data-ai-key="${k}"]`)?.checked;
+  const setVal = (id, v) => { const el = document.getElementById(id); if(el) el.value = v; };
+  if(on('role')) setVal('pf-role', s.role_title);
+  if(on('grade')) setVal('pf-grade', s.grade);
+  if(on('stack')) s.stack.forEach(x => { if(!pendingStack.some(p => p.toLowerCase() === x.toLowerCase())) pendingStack.push(x); });
+  if(on('certs')) s.certs.forEach(x => { if(!pendingCerts.includes(x)) pendingCerts.push(x); });
+  if(on('summary')) setVal('pf-summary', s.summary);
+  refreshTagsUI(); refreshCertsUI();
+  let added = 0;
+  if(on('projects')){
+    for(const p of s.projects){
+      try{ await apiFetch('/portfolios', {method:'POST', body:p}); added++; }catch(e){ toast(e.message); break; }
+    }
+  }
+  aiFillSuggestion = null;
+  if(added){
+    // 수행 프로젝트 목록을 다시 불러오되, 입력 중인 프로필 값은 그대로 유지합니다.
+    captureProfileDraft();
+    await go('profileEdit');
+  } else {
+    const box = document.getElementById('aiFillResult');
+    if(box) box.innerHTML = '';
+  }
+  toast(`반영했어요${added ? ` (수행 프로젝트 ${added}건 추가)` : ''}. 확인 후 저장하기를 눌러주세요`);
+}
+
 function resumeSectionHtml(resumeUrl, resumeName){
   return resumeUrl ? `
     <div class="card" style="margin-bottom:0; display:flex; align-items:center; justify-content:space-between; gap:10px;">
@@ -4317,9 +4492,11 @@ function resumeSectionHtml(resumeUrl, resumeName){
       </div>
     </div>
     <div class="add-tag-row" style="margin-top:8px;"><label class="btn btn-ghost" style="width:auto; padding:10px 14px; font-size:12.5px;">다른 파일로 교체<input type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.hwp" style="display:none;" onchange="uploadResume(this)"></label></div>
+    ${aiFillBoxHtml()}
   ` : `
     <label class="btn btn-outline" style="cursor:pointer;">파일 선택해서 업로드<input type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.hwp" style="display:none;" onchange="uploadResume(this)"></label>
     <div class="page-sub" style="margin-top:6px;">PDF, Word, PPT, 한글(HWP) · 최대 15MB</div>
+    <div class="page-sub" style="margin-top:4px; color:var(--purple);">✨ 올리면 AI가 프로필을 자동으로 채워드려요</div>
   `;
 }
 
@@ -4473,14 +4650,14 @@ async function render(){
       reviewForm: screenReviewForm,
       adminReports: screenAdminReports, reportJob: screenReportJob,
       invite: screenInvite, adminSignupStats: screenAdminSignupStats,
-      notices: screenNotices, events: screenEvents, faq: screenFaq, supportInquiry: screenSupportInquiry,
+      notices: screenNotices, events: screenEvents, faq: screenFaq, aiChat: screenAiChat, supportInquiry: screenSupportInquiry,
       announcementForm: screenAnnouncementForm,
     };
     const fn = map[state.screen] || screenOnboarding;
     const html = await fn();
     if(seq !== renderSeq) return;
     el.innerHTML = html;
-    if(state.screen==='chatRoom'){
+    if(state.screen==='chatRoom' || state.screen==='aiChat'){
       const box = document.getElementById('chatScroll');
       if(box) box.scrollTop = box.scrollHeight;
     }

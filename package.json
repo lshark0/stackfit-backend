@@ -13,6 +13,7 @@
     "seed:reset": "rm -f data/stackfit.db && node -e \"require('./src/db')\""
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.131.0",
     "express": "^4.19.2",
     "express-rate-limit": "^7.4.0",
     "helmet": "^7.1.0",
