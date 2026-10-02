@@ -74,6 +74,10 @@ function dDay(deadline) {
   return `D-${diffDays}`;
 }
 
+// 근무지 지역 목록 — 프론트엔드(공고 등록·공고 탐색)의 LOCATION_OPTIONS와 같은 값입니다.
+const LOCATION_REGIONS = ['서울', '경기', '인천', '부산', '대구', '광주', '대전', '울산', '세종',
+  '강원', '충북', '충남', '전북', '전남', '경북', '경남', '제주', '협의'];
+
 router.get('/', optionalAuth, async (req, res) => {
   const { q, category, duty, grade, location } = req.query;
   // 기업 회원은 "등록한 공고" 화면에서 자신의 공고만, 마감 여부와 관계없이 모두 봐야 합니다.
@@ -110,9 +114,18 @@ router.get('/', optionalAuth, async (req, res) => {
   if (grade && grade !== '전체') {
     jobs = jobs.filter(j => j.grade === grade);
   }
-  if (location) {
-    const needle = String(location).toLowerCase();
-    jobs = jobs.filter(j => (j.location || '').toLowerCase().includes(needle));
+  if (location && location !== '전체') {
+    const needle = String(location).trim().toLowerCase();
+    if (needle === '원격') {
+      // "서울 종로, 원격 가능"처럼 원격 근무를 함께 적은 공고도 포함합니다.
+      jobs = jobs.filter(j => /원격|재택/.test(j.location || ''));
+    } else if (LOCATION_REGIONS.includes(needle)) {
+      // 근무지는 "지역 + 상세 위치"(예: "경기 판교")로 저장되므로 지역은 앞부분으로 비교합니다.
+      // (포함 여부로 비교하면 "경기 광주"가 '광주' 필터에 걸립니다)
+      jobs = jobs.filter(j => (j.location || '').trim().startsWith(needle));
+    } else {
+      jobs = jobs.filter(j => (j.location || '').toLowerCase().includes(needle));
+    }
   }
 
   let profileStack = [];
