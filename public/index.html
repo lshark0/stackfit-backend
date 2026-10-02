@@ -1041,7 +1041,7 @@ function tabs(nc){
 function tabbar(active, chatUnread){
   const n = Number(chatUnread || 0);
   return `<div class="tabbar">${tabs().map(t=>{
-    const onclick = t.k==='jobs' ? "jobQuery=''; jobCat='전체'; jobGrade='전체'; jobDuty=''; go('jobs')" : `go('${t.k}')`;
+    const onclick = t.k==='jobs' ? "jobQuery=''; jobCat='전체'; jobGrade='전체'; jobDuty=''; jobLocation=''; go('jobs')" : `go('${t.k}')`;
     const badge = (t.k==='chatList' && n>0) ? `<span class="tab-badge">${n>99?'99+':n}</span>` : '';
     return `<button class="tab-btn ${t.k===active?'active':''}" data-tab="${t.k}" onclick="${onclick}">${t.i}${badge}<span class="tab-lbl">${t.l}</span></button>`;
   }).join('')}</div>`;
@@ -1078,6 +1078,22 @@ function dutySelect(id, current, emptyLabel){
     ${legacy}
     ${DUTY_OPTIONS.map(d=>`<option value="${d}" ${d===cur?'selected':''}>${d}</option>`).join('')}
   </select>`;
+}
+// 근무지 지역 목록 — 공고 등록과 공고 탐색 필터가 같은 값을 써야 지역으로 정확히 걸러집니다.
+// (서버 src/routes/jobs.js의 LOCATION_REGIONS와 같은 목록 + 원격)
+const LOCATION_OPTIONS = ['서울','경기','인천','부산','대구','광주','대전','울산','세종',
+  '강원','충북','충남','전북','전남','경북','경남','제주','원격','협의'];
+const locationLabel = (r) => r === '원격' ? '원격(재택)' : r;
+// 저장된 근무지("서울 종로")를 지역과 상세 위치로 나눕니다. 목록에 없는 예전 값은 상세 위치로 둡니다.
+function splitLocation(loc){
+  const s = String(loc || '').trim();
+  const region = LOCATION_OPTIONS.find(r => s.startsWith(r)) || '';
+  return { region, detail: (region ? s.slice(region.length).replace(/^(특별자치시|특별자치도|특별시|광역시|도|시)(?=[\s,·/]|$)/, '') : s).replace(/^[\s,·/]+/, '').trim() };
+}
+function jobLocationValue(){
+  const region = document.getElementById('pj-location').value;
+  const detail = document.getElementById('pj-location-detail').value.trim();
+  return [region, detail].filter(Boolean).join(' ');
 }
 // 업무(직무)별 아이콘 — 역할의 성격을 직관적으로 나타냅니다.
 const DUTY_ICON = {
@@ -2051,7 +2067,7 @@ async function settleProject(id){
 }
 
 /* ---- Job search / filter (partial refresh, keeps input focus) ---- */
-let jobQuery="", jobCat="전체", jobGrade="전체", jobDuty="";
+let jobQuery="", jobCat="전체", jobGrade="전체", jobDuty="", jobLocation="";
 async function refreshJobList(){
   const el = document.getElementById('jobList');
   if(!el) return;
@@ -2062,6 +2078,7 @@ async function refreshJobList(){
     if(jobCat && jobCat!=='전체') qs.set('category', jobCat);
     if(jobGrade && jobGrade!=='전체') qs.set('grade', jobGrade);
     if(jobDuty) qs.set('duty', jobDuty);
+    if(jobLocation) qs.set('location', jobLocation);
     const data = await apiFetch('/jobs?' + qs.toString());
     el.innerHTML = data.jobs.length ? data.jobs.map(jobCard).join('') : emptyHtml('조건에 맞는 공고가 없어요', I.jobs);
   }catch(e){ el.innerHTML = emptyHtml(e.message, I.jobs); }
@@ -2191,7 +2208,7 @@ function captureJobDraft(){
   const val = (id) => { const el = document.getElementById(id); return el ? el.value : null; };
   const d = {
     title: val('pj-title'), period: val('pj-period'), rate: val('pj-rate'),
-    work_type: val('pj-type'), location: val('pj-location'), duty: val('pj-duty'),
+    work_type: val('pj-type'), location: document.getElementById('pj-location') ? jobLocationValue() : null, duty: val('pj-duty'),
     grade: val('pj-grade'), deadline: val('pj-deadline'), description: val('pj-desc'),
   };
   if(Object.values(d).every(v => v === null)) return;
@@ -2396,14 +2413,14 @@ async function postJob(){
       period: document.getElementById('pj-period').value.trim(),
       rate: document.getElementById('pj-rate').value.trim(),
       work_type: document.getElementById('pj-type').value.trim(),
-      location: document.getElementById('pj-location').value.trim(),
+      location: jobLocationValue(),
       duty: document.getElementById('pj-duty').value,
       grade: document.getElementById('pj-grade').value,
       deadline: document.getElementById('pj-deadline').value.trim(),
       description: document.getElementById('pj-desc').value.trim(),
     }});
     toast('공고가 등록됐어요');
-    jobQuery=''; jobCat='전체'; jobGrade='전체'; jobDuty='';
+    jobQuery=''; jobCat='전체'; jobGrade='전체'; jobDuty=''; jobLocation='';
     go('jobs');
   }catch(e){ toast(e.message); }
 }
@@ -2420,7 +2437,7 @@ async function updateJob(id){
       period: document.getElementById('pj-period').value.trim(),
       rate: document.getElementById('pj-rate').value.trim(),
       work_type: document.getElementById('pj-type').value.trim(),
-      location: document.getElementById('pj-location').value.trim(),
+      location: jobLocationValue(),
       duty: document.getElementById('pj-duty').value,
       grade: document.getElementById('pj-grade').value,
       deadline: document.getElementById('pj-deadline').value.trim(),
@@ -2702,6 +2719,7 @@ async function screenJobs(){
   if(jobCat && jobCat!=='전체') qs.set('category', jobCat);
   if(jobGrade && jobGrade!=='전체') qs.set('grade', jobGrade);
   if(jobDuty) qs.set('duty', jobDuty);
+  if(jobLocation) qs.set('location', jobLocation);
   const [data, recentJobs] = await Promise.all([
     apiFetch('/jobs?' + qs.toString()),
     isCompany ? Promise.resolve([]) : apiFetch('/jobs/recent-views').then(r=>r.jobs).catch(()=>[]),
@@ -2719,6 +2737,10 @@ async function screenJobs(){
       </select>
       <select id="jobDutySel" class="form-input" style="flex:1; padding:9px 10px; font-size:12.5px;" onchange="jobDuty=this.value; refreshJobList();">
         ${duties.map(d=>`<option value="${d}" ${d===jobDuty?'selected':''}>${d===''?'업무 전체':d}</option>`).join('')}
+      </select>
+      <select id="jobLocationSel" class="form-input" style="flex:1; padding:9px 10px; font-size:12.5px;" onchange="jobLocation=this.value; refreshJobList();">
+        <option value="" ${jobLocation?'':'selected'}>근무지 전체</option>
+        ${LOCATION_OPTIONS.map(r=>`<option value="${r}" ${r===jobLocation?'selected':''}>${locationLabel(r)}</option>`).join('')}
       </select>
     </div>
     ${recentJobs.length ? `
@@ -2999,7 +3021,7 @@ async function screenProjects(){
         ? `${emptyArt(ART.noProjects, '아직 계약된 프로젝트가 없어요', myJobs.jobs.length
             ? `등록한 공고 <b>${myJobs.jobs.length}건</b>에서 지원자를 수락하면<br>프로젝트가 자동으로 생성돼요.`
             : '먼저 공고를 등록하고 지원자를 받아보세요.')}
-           <button class="btn btn-primary" onclick="jobQuery=''; jobCat='전체'; jobGrade='전체'; jobDuty=''; go('jobs')">${myJobs.jobs.length ? '공고 관리로 이동' : '공고 등록하러 가기'}</button>`
+           <button class="btn btn-primary" onclick="jobQuery=''; jobCat='전체'; jobGrade='전체'; jobDuty=''; jobLocation=''; go('jobs')">${myJobs.jobs.length ? '공고 관리로 이동' : '공고 등록하러 가기'}</button>`
         : emptyArt(ART.noProjects, '진행 중인 프로젝트가 없어요', '지원이 수락되면 프로젝트가 자동으로 생성돼요.'))}
   </div>${tabbar('projects')}`;
 }
@@ -4583,6 +4605,7 @@ async function screenJobPost(){
     pendingJobCerts = server ? [...(server.certs || [])] : [];
   }
   jobDraft = null;
+  const loc = splitLocation(job && job.location);
   return `${statusbar()}
   <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('${isEdit?'jobDetail':'jobs'}'${isEdit?`, ${state.param}`:''})">${I.back}</div><div class="page-title">${isEdit?'공고 수정':'새 공고 등록'}</div></div></div>
   <div class="content">
@@ -4601,7 +4624,12 @@ async function screenJobPost(){
     <div class="form-field"><label class="form-label">근무 기간</label><input id="pj-period" class="form-input" placeholder="예: 6개월" value="${job?esc(job.period):''}"></div>
     <div class="form-field"><label class="form-label">단가</label><input id="pj-rate" class="form-input" placeholder="예: 600만원/월" value="${job?esc(job.rate):''}"></div>
     <div class="form-field"><label class="form-label">근무 형태</label><input id="pj-type" class="form-input" placeholder="예: 상주 · 주5일" value="${job?esc(job.work_type):''}"></div>
-    <div class="form-field"><label class="form-label">근무지</label><input id="pj-location" class="form-input" placeholder="예: 서울 종로, 원격 가능" value="${job?esc(job.location):''}"></div>
+    <div class="form-field"><label class="form-label">근무지</label>
+      <select id="pj-location" class="form-input">
+        <option value="" ${loc.region?'':'selected'}>지역을 선택하세요</option>
+        ${LOCATION_OPTIONS.map(r=>`<option value="${r}" ${r===loc.region?'selected':''}>${locationLabel(r)}</option>`).join('')}
+      </select>
+      <input id="pj-location-detail" class="form-input" style="margin-top:8px;" maxlength="30" placeholder="상세 위치 (선택) 예: 종로구, 판교, 원격 병행" value="${esc(loc.detail)}"></div>
     <div class="form-field"><label class="form-label">업무</label>${dutySelect('pj-duty', job && job.duty, '선택 안 함')}</div>
     <div class="form-field"><label class="form-label">등급</label><select id="pj-grade" class="form-input">
       <option value="">선택 안 함</option>
