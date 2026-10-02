@@ -11,6 +11,17 @@ const GRADE_LEVEL = { 초급: 1, 중급: 2, 고급: 3, 특급: 4 };
 //   - 업무(직무) 일치 (최대 20점): DBA 공고엔 DBA를 우선
 //   - 등급 적합도 (최대 15점): 같은 등급이면 만점, 한 단계 차이면 부분 점수
 //   - 평판 (최대 5점): 좋은 평가를 받은 쪽에 소폭 가점
+// 업무 일치 판정. PM·SE 같은 짧은 영문 코드는 단어 단위로만 비교합니다
+// (예전에 직접 입력한 "Senior 개발자"가 SE로 잘못 일치하지 않도록).
+function containsTerm(text, term) {
+  if (!term) return false;
+  if (/^[a-z]{1,3}$/.test(term)) return new RegExp(`(^|[^a-z])${term}([^a-z]|$)`).test(text);
+  return text.includes(term);
+}
+function dutyMatches(role, duty) {
+  return role === duty || containsTerm(role, duty) || containsTerm(duty, role);
+}
+
 function scoreMatch(job, profile, rating) {
   const reasons = [];
 
@@ -23,7 +34,7 @@ function scoreMatch(job, profile, rating) {
   if (job.duty && profile.role_title) {
     const role = profile.role_title.toLowerCase();
     const duty = job.duty.toLowerCase();
-    if (role.includes(duty) || duty.includes(role)) {
+    if (dutyMatches(role, duty)) {
       dutyScore = 20;
       reasons.push(`업무(${job.duty}) 일치`);
     }

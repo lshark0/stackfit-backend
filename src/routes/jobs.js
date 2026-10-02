@@ -29,7 +29,7 @@ function fixFilenameEncoding(name) {
 }
 
 // SI/공공 프로젝트에서 흔히 쓰는 업무 구분과 기술등급
-const DUTY_OPTIONS = ['PM', 'PL', 'TA', 'SA', 'DBA', '개발자', 'QA', '보안', '감리', '기타'];
+const DUTY_OPTIONS = ['PM', 'PL', 'TA', 'SA', 'SE', 'DBA', '개발자', 'QA', '보안', '감리', '기타'];
 const GRADE_OPTIONS = ['초급', '중급', '고급', '특급'];
 const pickFrom = (value, options, fallback) => (options.includes(value) ? value : fallback);
 

@@ -15,7 +15,7 @@ const { sameProject } = require('../portfolioDedupe');
 const router = express.Router();
 wrapAllRoutes(router);
 
-const DUTY_OPTIONS = ['PM', 'PL', 'TA', 'SA', 'DBA', '개발자', 'QA', '보안', '감리', '기타'];
+const DUTY_OPTIONS = ['PM', 'PL', 'TA', 'SA', 'SE', 'DBA', '개발자', 'QA', '보안', '감리', '기타'];
 const MAX_TURNS = 20;
 const MAX_MESSAGE_CHARS = 1000;
 const MAX_PROJECTS = 50; // 경력기술서에서 가져올 수행 프로젝트 최대 개수 (portfolios.js의 등록 상한과 같게)

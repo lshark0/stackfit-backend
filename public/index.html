@@ -1067,7 +1067,7 @@ function ddayBadge(dday){
   return `<span style="font-family:var(--mono); font-size:10.5px; font-weight:700; color:${color};">${esc(dday)}</span>`;
 }
 // 업무(직무) 선택 목록 — 공고 등록·프로필·수행 프로젝트에서 같은 값을 써야 매칭(업무 일치)이 정확해집니다.
-const DUTY_OPTIONS = ['PM','PL','TA','SA','DBA','개발자','QA','보안','감리','기타'];
+const DUTY_OPTIONS = ['PM','PL','TA','SA','SE','DBA','개발자','QA','보안','감리','기타'];
 // 목록에 없는 예전 직접 입력 값(예: "백엔드 개발자")은 선택된 채로 보여줘, 저장해도 지워지지 않게 합니다.
 function dutySelect(id, current, emptyLabel){
   const cur = String(current || '').trim();
@@ -1101,6 +1101,7 @@ const DUTY_ICON = {
   PL:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 3l2.5 5.5L20 9l-4 4 1 6-5-3-5 3 1-6-4-4 5.5-.5z" stroke-linejoin="round"/></svg>`,
   TA:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><path d="M7 7h.01M7 17h.01" stroke-linecap="round"/></svg>`,
   SA:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 3l8 4v6c0 5-3.5 7.5-8 8-4.5-.5-8-3-8-8V7l8-4z" stroke-linejoin="round"/></svg>`,
+  SE:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.2L4 16.8V20h3.2l5.3-5.3a4 4 0 0 0 5.2-5.4l-2.4 2.4-2.4-.6-.6-2.4z" stroke-linejoin="round"/></svg>`,
   DBA:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg>`,
   개발자:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 7l-5 5 5 5M15 7l5 5-5 5" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   QA:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5L21 21M8.5 11l2 2 4-4.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
