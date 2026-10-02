@@ -5,6 +5,7 @@ const { requireAdmin } = require('../middleware/requireAdmin');
 const { wrapAllRoutes } = require('../middleware/asyncHandler');
 const { addNotification, pushTo } = require('../notify');
 const { signedFileUrl } = require('../fileAccess');
+const ai = require('../ai');
 
 const router = express.Router();
 wrapAllRoutes(router);
@@ -166,6 +167,80 @@ router.get('/signup-stats', requireAuth, requireAdmin, async (req, res) => {
     byCampaign: sortDesc(byCampaign).slice(0, 20),
     daily: Object.entries(daily).sort((a, b) => (a[0] < b[0] ? -1 : 1)).map(([date, count]) => ({ date, count })),
     topReferrers,
+  });
+});
+
+// AI 사용량 통계 — 기능별 호출 수·토큰·예상 비용(USD/원), 일별 추이, 많이 쓴 회원
+const AI_FEATURE_LABELS = { support_chat: 'AI 상담', profile_from_resume: '경력기술서 자동 채우기' };
+router.get('/ai-usage', requireAuth, requireAdmin, async (req, res) => {
+  const days = Math.min(3650, Math.max(1, Number.parseInt(req.query.days, 10) || 30));
+  const today = ai.kstDay();
+  const sinceDay = new Date(Date.parse(today) - (days - 1) * 24 * 3600 * 1000).toISOString().slice(0, 10);
+  const monthStart = today.slice(0, 8) + '01';
+  const fromDay = sinceDay < monthStart ? sinceDay : monthStart;
+  const rows = await all(
+    'SELECT user_id, feature, day, model, input_tokens, output_tokens FROM ai_usage WHERE day >= ?',
+    [fromDay]
+  );
+  const krwPerUsd = Number(process.env.AI_KRW_PER_USD) || 1400;
+
+  const empty = () => ({ calls: 0, input: 0, output: 0, costUsd: 0, users: new Set() });
+  const add = (acc, r, cost) => {
+    acc.calls++; acc.input += Number(r.input_tokens); acc.output += Number(r.output_tokens);
+    acc.costUsd += cost; acc.users.add(r.user_id);
+  };
+  const total = empty(), month = empty(), todayAcc = empty();
+  const byFeature = {}, daily = {}, byUser = {};
+  for (const r of rows) {
+    const cost = ai.estimateCostUsd(r.model, r.input_tokens, r.output_tokens);
+    if (r.day >= monthStart) add(month, r, cost);
+    if (r.day === today) add(todayAcc, r, cost);
+    if (r.day < sinceDay) continue;
+    add(total, r, cost);
+    add(byFeature[r.feature] || (byFeature[r.feature] = empty()), r, cost);
+    const d = daily[r.day] || (daily[r.day] = { date: r.day, calls: 0, costUsd: 0 });
+    d.calls++; d.costUsd += cost;
+    const u = byUser[r.user_id] || (byUser[r.user_id] = { id: r.user_id, calls: 0, costUsd: 0 });
+    u.calls++; u.costUsd += cost;
+  }
+  const out = (a) => ({
+    calls: a.calls, users: a.users.size, input: a.input, output: a.output,
+    costUsd: Math.round(a.costUsd * 10000) / 10000, costKrw: Math.round(a.costUsd * krwPerUsd),
+  });
+
+  const top = Object.values(byUser).sort((a, b) => b.calls - a.calls).slice(0, 10);
+  let topUsers = [];
+  if (top.length) {
+    const ph = top.map(() => '?').join(',');
+    const users = await all(
+      `SELECT u.id, u.role, f.name AS freelancer_name, c.name AS company_name
+       FROM users u LEFT JOIN freelancer_profiles f ON f.user_id = u.id LEFT JOIN companies c ON c.user_id = u.id
+       WHERE u.id IN (${ph})`,
+      top.map((t) => t.id)
+    );
+    const byId = Object.fromEntries(users.map((u) => [u.id, u]));
+    topUsers = top.map((t) => {
+      const u = byId[t.id];
+      return {
+        id: t.id, role: u ? u.role : null,
+        name: u ? ((u.role === 'company' ? u.company_name : u.freelancer_name) || '이름 미입력') : '(탈퇴한 회원)',
+        calls: t.calls, costKrw: Math.round(t.costUsd * krwPerUsd),
+      };
+    });
+  }
+
+  res.json({
+    days, krwPerUsd,
+    model: ai.SUPPORT_MODEL,
+    enabled: ai.aiEnabled(),
+    limits: ai.DAILY_LIMITS,
+    total: out(total), month: out(month), today: out(todayAcc),
+    byFeature: Object.entries(byFeature)
+      .map(([feature, a]) => ({ feature, label: AI_FEATURE_LABELS[feature] || feature, ...out(a) }))
+      .sort((a, b) => b.calls - a.calls),
+    daily: Object.values(daily).sort((a, b) => (a.date < b.date ? -1 : 1))
+      .map((d) => ({ date: d.date, calls: d.calls, costKrw: Math.round(d.costUsd * krwPerUsd) })),
+    topUsers,
   });
 });
 

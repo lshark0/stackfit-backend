@@ -696,7 +696,7 @@ function talentDetailBack(){ goBackFrom(talentDetailReturn, 'talent'); }
 // 화면 안의 뒤로가기 화살표가 항상 마이페이지로 돌아가는 화면들.
 // 이 화면들은 드로어 메뉴 등 여러 곳에서 열릴 수 있어서, 휴대폰의 '뒤로가기'
 // 제스처도 그 화살표와 똑같이 항상 마이페이지로 보내도록 popstate에서 함께 처리합니다.
-const MYPAGE_CHILD_SCREENS = ['proposalSettings','changePassword','deleteAccount','savedJobs','followedCompanies','adminReports','adminSignupStats','profileViews','companyProfileEdit','profileEdit','notices','events','faq','supportInquiry'];
+const MYPAGE_CHILD_SCREENS = ['proposalSettings','changePassword','deleteAccount','savedJobs','followedCompanies','adminReports','adminSignupStats','adminAiUsage','profileViews','companyProfileEdit','profileEdit','notices','events','faq','supportInquiry'];
 
 // 회원 유형별로만 열 수 있는 화면. 다른 유형의 화면이 열리려 하면(뒤로가기 기록, 예전 알림 등) 홈으로 보냅니다.
 const FREELANCER_ONLY = ['receivedProposals','myApplications','portfolios','portfolioEdit','savedJobs','followedCompanies','profileViews','profileEdit','proposalSettings','reportJob'];
@@ -3783,6 +3783,7 @@ async function screenMypage(){
     ${state.isAdmin ? `
     <div class="section-label with-ic">${I.gear}관리자</div>
     <div class="list-item" onclick="go('adminSignupStats')"><div class="li-l"><div class="li-icon">${I.talent}</div><div class="li-tt">가입 경로 통계</div></div>${I.back}</div>
+    <div class="list-item" onclick="go('adminAiUsage')"><div class="li-l"><div class="li-icon">${I.sparkle}</div><div class="li-tt">AI 사용량 통계</div></div>${I.back}</div>
     <div class="list-item" onclick="go('adminReports')"><div class="li-l"><div class="li-icon">${I.alertCircle}</div><div class="li-tt">신고 관리</div></div>${I.back}</div>` : ''}
     <div class="section-label with-ic">${I.building}약관 및 정책</div>
     <div class="list-item" onclick="window.open('/terms.html','_blank')"><div class="li-l"><div class="li-icon">${I.building}</div><div class="li-tt">이용약관</div></div>${I.back}</div>
@@ -4273,6 +4274,54 @@ async function screenAdminSignupStats(){
   </div>`;
 }
 
+// 관리자 전용: AI 사용량 통계 (호출 수·토큰·예상 비용)
+let adminAiDays = 30;
+function setAdminAiDays(d){ adminAiDays = d; render(); }
+const fmtNum = (n) => Number(n||0).toLocaleString('ko-KR');
+const fmtWon = (n) => `${fmtNum(n)}원`;
+async function screenAdminAiUsage(){
+  if(!state.isAdmin){ go('mypage'); return ''; }
+  const s = await apiFetch('/admin/ai-usage?days=' + adminAiDays);
+  const periods = [[7,'7일'],[30,'30일'],[90,'90일'],[3650,'전체']];
+  const daily = s.daily.slice(-14);
+  const limitLabel = { support_chat: 'AI 상담', profile_from_resume: '경력기술서 자동 채우기' };
+  return `${statusbar()}
+  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('mypage')">${I.back}</div><div class="page-title" style="font-size:19.5px;">AI 사용량 통계</div></div></div>
+  <div class="content">
+    ${!s.enabled ? `<div class="reco-empty" style="text-align:left; border-color:var(--amber); background:#FDF6E9;">AI 키가 설정되지 않아 AI 기능이 꺼져 있어요.</div>` : ''}
+    <div class="hero-stat">
+      <div class="hs"><div class="hs-num">${fmtWon(s.today.costKrw)}</div><div class="hs-lbl">오늘 · ${fmtNum(s.today.calls)}회</div></div>
+      <div class="hs"><div class="hs-num">${fmtWon(s.month.costKrw)}</div><div class="hs-lbl">이번 달 · ${fmtNum(s.month.calls)}회</div></div>
+      <div class="hs"><div class="hs-num">$${s.month.costUsd.toFixed(2)}</div><div class="hs-lbl">이번 달 (달러)</div></div>
+    </div>
+    <div class="chip-row" style="margin-top:14px;">${periods.map(([d,l])=>`<div class="chip ${d===adminAiDays?'active':''}" onclick="setAdminAiDays(${d})">${l}</div>`).join('')}</div>
+    <div class="card" style="margin-top:10px;">
+      <div class="card-title" style="font-size:13.5px;">선택 기간 합계</div>
+      <div class="kv-grid" style="margin-top:10px;">
+        <div class="kv-box"><div class="kv-lbl">호출</div><div class="kv-val">${fmtNum(s.total.calls)}회</div></div>
+        <div class="kv-box"><div class="kv-lbl">이용 회원</div><div class="kv-val">${fmtNum(s.total.users)}명</div></div>
+        <div class="kv-box"><div class="kv-lbl">예상 비용</div><div class="kv-val">${fmtWon(s.total.costKrw)}</div></div>
+        <div class="kv-box"><div class="kv-lbl">1회 평균</div><div class="kv-val">${s.total.calls ? fmtWon(Math.round(s.total.costKrw / s.total.calls)) : '-'}</div></div>
+      </div>
+      <div class="page-sub" style="margin-top:8px;">토큰: 입력 ${fmtNum(s.total.input)} · 출력 ${fmtNum(s.total.output)}</div>
+    </div>
+    ${daily.length ? `<div class="card"><div class="card-title" style="font-size:13.5px;">일별 호출 수 (최근 ${daily.length}일)</div>${barChart(daily.map(d=>({label:d.date.slice(5).replace('-','/'), value:d.calls})), true)}</div>` : ''}
+    <div class="section-label with-ic">${I.sparkle}기능별</div>
+    ${s.byFeature.length ? `<table class="stat-table"><thead><tr><th>기능</th><th class="num">호출</th><th class="num">회원</th><th class="num">비용</th></tr></thead><tbody>
+      ${s.byFeature.map(f=>`<tr><td>${esc(f.label)}</td><td class="num"><b>${fmtNum(f.calls)}</b></td><td class="num">${fmtNum(f.users)}</td><td class="num">${fmtWon(f.costKrw)}</td></tr>`).join('')}
+    </tbody></table>` : `<div class="reco-empty">이 기간에 AI 이용 기록이 없어요.</div>`}
+    <div class="section-label with-ic">${I.talent}많이 쓴 회원 TOP 10</div>
+    ${s.topUsers.length ? s.topUsers.map((u,i)=>`
+      <div class="list-item" style="cursor:default;"><div class="li-l"><div class="li-icon" style="font-weight:800;">${i+1}</div>
+        <div><div class="li-tt">${esc(u.name)}</div><div class="page-sub" style="margin-top:2px;">${u.role==='company'?'기업회원':u.role==='freelancer'?'프리랜서':'-'} · ${fmtWon(u.costKrw)}</div></div></div><b>${fmtNum(u.calls)}회</b></div>`).join('')
+      : `<div class="reco-empty">아직 이용한 회원이 없어요.</div>`}
+    <div class="page-sub" style="margin-top:14px; line-height:1.6;">
+      · 모델: ${esc(s.model)} · 비용은 토큰 수로 계산한 <b>예상치</b>예요(1달러 = ${fmtNum(s.krwPerUsd)}원). 실제 청구액은 Claude Console › 사용량에서 확인하세요.<br>
+      · 1인 1일 한도: ${Object.entries(s.limits).map(([k,v])=>`${limitLabel[k]||k} ${v}회`).join(', ')}
+    </div>
+  </div>`;
+}
+
 // 관리자 전용: 프리랜서가 신고한 공고를 검토해 반려/마감처리/삭제 중 하나로 처리합니다.
 async function screenAdminReports(){
   const data = await apiFetch('/admin/job-reports');
@@ -4677,7 +4726,7 @@ async function render(){
       proposeForm: screenProposeForm, pickerScreen: screenPicker,
       reviewForm: screenReviewForm,
       adminReports: screenAdminReports, reportJob: screenReportJob,
-      invite: screenInvite, adminSignupStats: screenAdminSignupStats,
+      invite: screenInvite, adminSignupStats: screenAdminSignupStats, adminAiUsage: screenAdminAiUsage,
       notices: screenNotices, events: screenEvents, faq: screenFaq, aiChat: screenAiChat, supportInquiry: screenSupportInquiry,
       announcementForm: screenAnnouncementForm,
     };

@@ -49,10 +49,25 @@ async function remainingToday(userId, feature) {
 }
 
 async function recordUsage(userId, feature, model, usage) {
+  // 프롬프트 캐시를 쓴 경우 캐시 토큰도 입력 토큰에 합산합니다(비용을 넉넉히 잡는 쪽).
+  const input = (Number(usage?.input_tokens) || 0)
+    + (Number(usage?.cache_creation_input_tokens) || 0)
+    + (Number(usage?.cache_read_input_tokens) || 0);
   await run(
     'INSERT INTO ai_usage (user_id, feature, day, model, input_tokens, output_tokens) VALUES (?,?,?,?,?,?)',
-    [userId, feature, kstDay(), model, Number(usage?.input_tokens) || 0, Number(usage?.output_tokens) || 0]
+    [userId, feature, kstDay(), model, input, Number(usage?.output_tokens) || 0]
   );
+}
+
+// 모델별 가격 (USD / 100만 토큰). 관리자 통계의 예상 비용 계산에만 씁니다.
+const MODEL_PRICES = {
+  'claude-haiku-4-5': { input: 1, output: 5 },
+  'claude-opus-5-5': { input: 4, output: 20 },
+};
+function estimateCostUsd(model, inputTokens, outputTokens) {
+  const key = Object.keys(MODEL_PRICES).find((k) => String(model || '').startsWith(k));
+  const price = MODEL_PRICES[key] || MODEL_PRICES['claude-haiku-4-5'];
+  return (Number(inputTokens) * price.input + Number(outputTokens) * price.output) / 1e6;
 }
 
 // SDK 오류를 사용자에게 보여줄 한국어 메시지로 바꿉니다. (원인은 서버 로그에만 남김)
@@ -70,6 +85,8 @@ module.exports = {
   setClientForTest,
   remainingToday,
   recordUsage,
+  estimateCostUsd,
+  kstDay,
   friendlyError,
   SUPPORT_MODEL,
   PROFILE_MODEL,
