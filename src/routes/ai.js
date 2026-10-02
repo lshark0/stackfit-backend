@@ -3,7 +3,7 @@
 // - POST /api/ai/support-chat           고객센터 AI 상담 (Claude Haiku 4.5)
 // - POST /api/ai/profile-from-resume    올려둔 경력기술서를 읽어 프로필 입력값을 제안 (저장은 하지 않음)
 const express = require('express');
-const { get } = require('../db');
+const { get, all } = require('../db');
 const { requireAuth, requireRole } = require('../middleware/requireAuth');
 const { wrapAllRoutes } = require('../middleware/asyncHandler');
 const ai = require('../ai');
@@ -179,6 +179,28 @@ function cleanSuggestion(raw) {
   };
 }
 
+// ---------- 수행 프로젝트 중복 판별 ----------
+// 같은 경력기술서를 다시 분석하거나 파일을 교체해도 이미 등록한 프로젝트가 또 추가되지 않도록,
+// 프로젝트명(공백·괄호·기호 무시)이나 '발주처 + 시작 연월'이 같으면 같은 프로젝트로 봅니다.
+const normTitle = (t) => String(t || '').toLowerCase().replace(/[\s()\[\]{}·.,\-_/'"]/g, '');
+function periodStart(period) {
+  const m = /(\d{4})\s*[.\-/년]?\s*(\d{1,2})?/.exec(String(period || ''));
+  return m ? `${m[1]}.${String(m[2] || '1').padStart(2, '0')}` : '';
+}
+function sameProject(a, b) {
+  const ta = normTitle(a.title), tb = normTitle(b.title);
+  if (ta && tb && (ta === tb || (Math.min(ta.length, tb.length) >= 6 && (ta.includes(tb) || tb.includes(ta))))) return true;
+  const ca = normTitle(a.client), cb = normTitle(b.client);
+  const sa = periodStart(a.period), sb = periodStart(b.period);
+  return !!(ca && ca === cb && sa && sa === sb);
+}
+// AI 결과 안의 중복을 없애고, 이미 등록된 프로젝트에는 exists: true를 표시합니다.
+function markExistingProjects(projects, existing) {
+  const unique = [];
+  for (const p of projects) if (!unique.some((u) => sameProject(u, p))) unique.push(p);
+  return unique.map((p) => ({ ...p, exists: existing.some((e) => sameProject(e, p)) }));
+}
+
 router.post('/profile-from-resume', requireAuth, requireRole('freelancer'), async (req, res) => {
   const client = ai.getClient();
   if (!client) return res.status(503).json({ error: NOT_READY, code: 'AI_DISABLED' });
@@ -234,8 +256,11 @@ router.post('/profile-from-resume', requireAuth, requireRole('freelancer'), asyn
     console.error('[AI] 프로필 추출 실패:', resp.stop_reason);
     return res.status(502).json({ error: '경력기술서를 분석하지 못했어요. 잠시 후 다시 시도해주세요.' });
   }
-  res.json({ suggestion: cleanSuggestion(parsed), remaining: remaining - 1 });
+  const suggestion = cleanSuggestion(parsed);
+  const existing = await all('SELECT title, client, period FROM portfolios WHERE freelancer_id = ?', [req.user.id]);
+  suggestion.projects = markExistingProjects(suggestion.projects, existing);
+  res.json({ suggestion, remaining: remaining - 1 });
 });
 
 module.exports = router;
-module.exports._test = { sanitizeHistory, cleanSuggestion, gradeFromYears };
+module.exports._test = { sanitizeHistory, cleanSuggestion, gradeFromYears, markExistingProjects };

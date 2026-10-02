@@ -4550,13 +4550,17 @@ function aiFillResultHtml(s){
   const newCerts = s.certs.filter(x => !pendingCerts.includes(x));
   const curSummary = (document.getElementById('pf-summary')?.value || '').trim();
   const rows = [];
-  if(s.role_title) rows.push(row('role', '업무', esc(s.role_title), true));
-  if(s.grade) rows.push(row('grade', '등급', `${esc(s.grade)} <span class="page-sub">(경력 약 ${s.years}년 기준)</span>`, true));
+  const curVal = (id) => document.getElementById(id)?.value || '';
+  if(s.role_title && s.role_title !== curVal('pf-role')) rows.push(row('role', '업무', esc(s.role_title), true));
+  if(s.grade && s.grade !== curVal('pf-grade')) rows.push(row('grade', '등급', `${esc(s.grade)} <span class="page-sub">(경력 약 ${s.years}년 기준)</span>`, true));
   if(newStack.length) rows.push(row('stack', `기술스택 ${newStack.length}개 추가`, newStack.map(x=>`<span class="tag">${esc(x)}</span>`).join(' '), true));
   if(newCerts.length) rows.push(row('certs', `자격증 ${newCerts.length}개 추가`, newCerts.map(x=>`<span class="tag">${esc(x)}</span>`).join(' '), true));
-  if(s.summary) rows.push(row('summary', curSummary ? '자기소개 (지금 내용을 바꿔요)' : '자기소개', esc(s.summary), !curSummary));
-  if(s.projects.length) rows.push(row('projects', `수행 프로젝트 ${s.projects.length}건 추가`, s.projects.map(p=>`· ${esc(p.title)}${p.period?` <span class="page-sub">${esc(p.period)}</span>`:''}`).join('<br>'), false));
-  if(!rows.length) return `<div class="page-sub" style="margin-top:10px;">새로 채울 내용을 찾지 못했어요.</div>`;
+  if(s.summary && s.summary !== curSummary) rows.push(row('summary', curSummary ? '자기소개 (지금 내용을 바꿔요)' : '자기소개', esc(s.summary), !curSummary));
+  const newProjects = s.projects.filter(p => !p.exists);
+  const dupCount = s.projects.length - newProjects.length;
+  if(newProjects.length) rows.push(row('projects', `수행 프로젝트 ${newProjects.length}건 추가${dupCount ? ` <span class="page-sub">(이미 등록된 ${dupCount}건 제외)</span>` : ''}`, newProjects.map(p=>`· ${esc(p.title)}${p.period?` <span class="page-sub">${esc(p.period)}</span>`:''}`).join('<br>'), false));
+  else if(dupCount) rows.push(`<div class="page-sub" style="padding:9px 0;">수행 프로젝트 ${dupCount}건은 이미 등록돼 있어서 제외했어요.</div>`);
+  if(!rows.some(r => r.includes('data-ai-key'))) return `<div class="page-sub" style="margin-top:10px;">새로 채울 내용이 없어요. 이미 프로필에 모두 반영돼 있어요.</div>`;
   return `<div class="ai-fill-result">
     <div class="page-sub" style="margin-bottom:6px;">반영할 항목을 고르세요. AI 결과는 틀릴 수 있으니 꼭 확인해주세요.</div>
     ${rows.join('')}
@@ -4576,7 +4580,9 @@ async function applyAiFill(){
   refreshTagsUI(); refreshCertsUI();
   let added = 0;
   if(on('projects')){
-    for(const p of s.projects){
+    const applyBtn = document.querySelector('#aiFillResult .btn');
+    if(applyBtn) applyBtn.disabled = true; // 두 번 눌러 같은 프로젝트가 중복 등록되지 않도록
+    for(const p of s.projects.filter(p => !p.exists)){
       try{ await apiFetch('/portfolios', {method:'POST', body:p}); added++; }catch(e){ toast(e.message); break; }
     }
   }
