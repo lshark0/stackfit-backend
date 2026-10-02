@@ -26,6 +26,7 @@ const announcementsRoutes = require('./src/routes/announcements');
 const referralRoutes = require('./src/routes/referral');
 const aiRoutes = require('./src/routes/ai');
 const { verifyToken } = require('./src/auth');
+const { dedupeAllPortfolios } = require('./src/portfolioDedupe');
 
 const app = express();
 app.set('trust proxy', 1); // Render는 프록시 뒤에 있으므로 rate-limit이 실제 클라이언트 IP를 보게 함
@@ -207,6 +208,7 @@ const PORT = process.env.PORT || 4000;
 async function main() {
   await initDb(); // 스키마 준비 + (필요 시) 데모 데이터 시드까지 끝난 뒤에 요청을 받기 시작
   await initPush(); // 푸시 인증키 준비 (실패해도 서버는 정상 동작)
+  await dedupeAllPortfolios(); // 예전에 AI 자동 채우기로 중복 등록된 수행 프로젝트를 한 번 정리
   app.listen(PORT, () => {
     console.log(`[IT Free] API 서버 실행 중 → http://localhost:${PORT} (DB: ${USE_POSTGRES ? 'PostgreSQL' : 'SQLite'})`);
   });

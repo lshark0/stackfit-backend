@@ -10,6 +10,7 @@ const ai = require('../ai');
 const { buildSupportSystemPrompt } = require('../aiSupportPrompt');
 const { extractOfficeText } = require('../docText');
 const { STACK_CATALOG } = require('../stackCatalog');
+const { sameProject } = require('../portfolioDedupe');
 
 const router = express.Router();
 wrapAllRoutes(router);
@@ -179,21 +180,6 @@ function cleanSuggestion(raw) {
   };
 }
 
-// ---------- 수행 프로젝트 중복 판별 ----------
-// 같은 경력기술서를 다시 분석하거나 파일을 교체해도 이미 등록한 프로젝트가 또 추가되지 않도록,
-// 프로젝트명(공백·괄호·기호 무시)이나 '발주처 + 시작 연월'이 같으면 같은 프로젝트로 봅니다.
-const normTitle = (t) => String(t || '').toLowerCase().replace(/[\s()\[\]{}·.,\-_/'"]/g, '');
-function periodStart(period) {
-  const m = /(\d{4})\s*[.\-/년]?\s*(\d{1,2})?/.exec(String(period || ''));
-  return m ? `${m[1]}.${String(m[2] || '1').padStart(2, '0')}` : '';
-}
-function sameProject(a, b) {
-  const ta = normTitle(a.title), tb = normTitle(b.title);
-  if (ta && tb && (ta === tb || (Math.min(ta.length, tb.length) >= 6 && (ta.includes(tb) || tb.includes(ta))))) return true;
-  const ca = normTitle(a.client), cb = normTitle(b.client);
-  const sa = periodStart(a.period), sb = periodStart(b.period);
-  return !!(ca && ca === cb && sa && sa === sb);
-}
 // AI 결과 안의 중복을 없애고, 이미 등록된 프로젝트에는 exists: true를 표시합니다.
 function markExistingProjects(projects, existing) {
   const unique = [];
