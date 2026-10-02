@@ -96,6 +96,28 @@ router.put('/:id', requireAuth, requireRole('freelancer'), async (req, res) => {
   res.json(withStack(await get('SELECT * FROM portfolios WHERE id = ?', [id])));
 });
 
+// 포트폴리오 일괄 삭제 (본인 것만) — body: { ids: [1, 2, ...] }
+router.post('/bulk-delete', requireAuth, requireRole('freelancer'), async (req, res) => {
+  const raw = req.body && req.body.ids;
+  const ids = [...new Set((Array.isArray(raw) ? raw : []).map(Number).filter(Number.isInteger))];
+  if (!ids.length) return res.status(400).json({ error: '삭제할 항목을 선택해주세요.' });
+  if (ids.length > MAX_ITEMS) return res.status(400).json({ error: '한 번에 삭제할 수 있는 개수를 넘었어요.' });
+
+  const placeholders = ids.map(() => '?').join(',');
+  const owned = await all(
+    `SELECT id FROM portfolios WHERE freelancer_id = ? AND id IN (${placeholders})`,
+    [req.user.id, ...ids]
+  );
+  if (owned.length) {
+    const ownedIds = owned.map((r) => r.id);
+    await run(
+      `DELETE FROM portfolios WHERE freelancer_id = ? AND id IN (${ownedIds.map(() => '?').join(',')})`,
+      [req.user.id, ...ownedIds]
+    );
+  }
+  res.json({ deleted: owned.length });
+});
+
 // 포트폴리오 삭제 (본인 것만)
 router.delete('/:id', requireAuth, requireRole('freelancer'), async (req, res) => {
   const id = Number(req.params.id);

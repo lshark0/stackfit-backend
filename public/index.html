@@ -3562,6 +3562,36 @@ async function deletePortfolio(id){
   });
 }
 
+// 수행 프로젝트 일괄 삭제 — 체크한 항목만 한 번에 지웁니다. (선택 상태는 화면 다시 그리기 없이 DOM으로만 관리)
+function selectedPortfolioIds(){
+  return [...document.querySelectorAll('.pf-sel:checked')].map(el=>Number(el.value));
+}
+function updatePortfolioSelect(){
+  const all = document.querySelectorAll('.pf-sel');
+  const n = selectedPortfolioIds().length;
+  const btn = document.getElementById('pf-bulk-del');
+  if(btn){ btn.disabled = !n; btn.style.opacity = n ? '1' : '.45'; btn.textContent = n ? `선택 삭제 (${n})` : '선택 삭제'; }
+  const allBox = document.getElementById('pf-sel-all');
+  if(allBox) allBox.checked = all.length > 0 && n === all.length;
+}
+function toggleAllPortfolioSelect(on){
+  document.querySelectorAll('.pf-sel').forEach(el=>{ el.checked = on; });
+  updatePortfolioSelect();
+}
+function deleteSelectedPortfolios(){
+  const ids = selectedPortfolioIds();
+  if(!ids.length) return toast('삭제할 수행 프로젝트를 선택해주세요');
+  showConfirm(`선택한 수행 프로젝트 ${ids.length}건을 삭제할까요?`, async () => {
+    try{
+      const r = await apiFetch('/portfolios/bulk-delete', {method:'POST', body:{ids}});
+      toast(`${r.deleted}건 삭제됐어요`);
+      captureProfileDraft(); // 작성 중이던 프로필 값은 그대로 유지
+      go('profileEdit');
+    }
+    catch(e){ toast(e.message); }
+  });
+}
+
 // 합격한 지원 건의 실제 계약 진행 단계에 맞는 안내 문구를 만듭니다.
 function acceptedProjectHint(projectState){
   if(!projectState) return '👉 눌러서 프로젝트 관리로 이동하세요.';
@@ -4453,9 +4483,19 @@ async function screenProfileEdit(){
     </div>
     <div class="form-field">
       <label class="form-label">수행 프로젝트 ${portfolios.length ? `<span style="color:var(--slate); font-weight:400;">(${portfolios.length}건)</span>` : ''}</label>
+      ${portfolios.length > 1 ? `
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px;">
+          <label style="display:flex; align-items:center; gap:6px; font-size:12.5px; color:var(--slate); cursor:pointer;">
+            <input type="checkbox" id="pf-sel-all" onclick="toggleAllPortfolioSelect(this.checked)">전체 선택
+          </label>
+          <button id="pf-bulk-del" class="btn btn-outline" style="width:auto; padding:7px 12px; font-size:12px; border-color:var(--danger); color:var(--danger); opacity:.45;" disabled onclick="deleteSelectedPortfolios()">선택 삭제</button>
+        </div>` : ''}
       ${portfolios.map(pf=>`
         <div class="card" style="margin-bottom:8px; padding:12px 14px;">
+          <div style="display:flex; align-items:flex-start; gap:8px;">
+          ${portfolios.length > 1 ? `<input type="checkbox" class="pf-sel" value="${pf.id}" style="margin-top:3px; flex-shrink:0; cursor:pointer;" onclick="updatePortfolioSelect()" aria-label="선택">` : ''}
           <div class="card-title" style="font-size:13.5px;">${esc(pf.title)}</div>
+          </div>
           ${(pf.client||pf.role_title) ? `<div class="card-org">${esc(pf.client||'')}${pf.client&&pf.role_title?' · ':''}${esc(pf.role_title||'')}</div>` : ''}
           ${pf.period?`<div class="meta-row" style="margin-top:6px;"><span>${I.clock}${esc(pf.period)}</span></div>`:''}
           ${pf.stack.length?`<div class="tag-row">${pf.stack.map(x=>`<span class="tag">${esc(x)}</span>`).join('')}</div>`:''}
