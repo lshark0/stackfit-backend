@@ -4533,7 +4533,7 @@ function aiFillBoxHtml(){
 }
 async function aiFillProfile(){
   const btn = document.getElementById('aiFillBtn');
-  if(btn){ btn.disabled = true; btn.textContent = 'AI가 경력기술서를 읽는 중… (최대 30초)'; }
+  if(btn){ btn.disabled = true; btn.textContent = 'AI가 경력기술서를 읽는 중… (프로젝트가 많으면 1분 이상 걸려요)'; }
   try{
     const data = await apiFetch('/ai/profile-from-resume', {method:'POST'});
     aiFillSuggestion = data.suggestion;

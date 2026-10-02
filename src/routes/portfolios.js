@@ -7,7 +7,7 @@ const { sortPortfoliosByPeriod } = require('../periodSort');
 const router = express.Router();
 wrapAllRoutes(router);
 
-const MAX_ITEMS = 30; // 한 사람이 등록할 수 있는 포트폴리오 개수 상한
+const MAX_ITEMS = 50; // 한 사람이 등록할 수 있는 포트폴리오 개수 상한 (경력 20년 이상도 담을 수 있게)
 
 const clean = (v, max, fallback = '') =>
   (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : fallback);

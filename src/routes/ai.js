@@ -18,6 +18,7 @@ wrapAllRoutes(router);
 const DUTY_OPTIONS = ['PM', 'PL', 'TA', 'SA', 'DBA', '개발자', 'QA', '보안', '감리', '기타'];
 const MAX_TURNS = 20;
 const MAX_MESSAGE_CHARS = 1000;
+const MAX_PROJECTS = 50; // 경력기술서에서 가져올 수행 프로젝트 최대 개수 (portfolios.js의 등록 상한과 같게)
 
 const NOT_READY = 'AI 기능을 준비하고 있어요. 조금만 기다려주세요.';
 
@@ -128,7 +129,7 @@ const PROFILE_INSTRUCTIONS = `위 문서는 IT 프리랜서의 경력기술서�
 - stack: 실제로 사용한 기술스택. 가능하면 다음 표준 표기를 그대로 쓰세요: ${CATALOG_NAMES.join(', ')}. 목록에 없는 기술은 일반적인 영문 표기로. 중요한 것부터 최대 20개.
 - certs: 보유 자격증 정식 명칭(예: 정보처리기사). 없으면 빈 배열.
 - summary: 프로필 자기소개. 경력 연수, 주요 업무·도메인, 사용 기술을 1인칭 합니다체 3~4문장(350자 이내)으로. 문서에 없는 성과·역할·수식어(예: 주도, 최적화, 능숙)는 덧붙이지 마세요. 개인 연락처·주민번호 등 개인정보는 넣지 마세요.
-- projects: 수행 프로젝트를 최근 것부터 최대 10개. title(프로젝트명), client(발주처/고객사, 없으면 빈 문자열), role_title(위 업무 목록 중 하나 또는 빈 문자열), period("2024.03 ~ 2024.09" 형식, 진행 중이면 "2025.06 ~ 진행중", 모르면 빈 문자열), stack(그 프로젝트 설명에 적힌 기술만, 최대 10개), description(문서에 적힌 담당 업무를 1~2문장, 200자 이내로 요약하되 없는 내용은 덧붙이지 말 것).`;
+- projects: 문서에 나온 수행 프로젝트를 하나도 빠짐없이 모두(최대 50개), 최근 것부터. 표·목록으로 나열된 프로젝트도 각각 하나씩 넣으세요. title(프로젝트명), client(발주처/고객사, 없으면 빈 문자열), role_title(위 업무 목록 중 하나 또는 빈 문자열), period("2024.03 ~ 2024.09" 형식, 진행 중이면 "2025.06 ~ 진행중", 모르면 빈 문자열), stack(그 프로젝트 설명에 적힌 기술만, 최대 10개), description(문서에 적힌 담당 업무를 1~2문장, 150자 이내로 요약하되 없는 내용은 덧붙이지 말 것. 문서에 프로젝트명·기간만 있으면 빈 문자열).`;
 
 // IT 업계에서 흔히 쓰는 학사 기준 기술자 등급(초급 → 3년 후 중급 → 6년 후 고급)을 단순 적용합니다.
 // 사용자가 저장 전에 직접 확인·수정합니다.
@@ -168,7 +169,7 @@ function cleanSuggestion(raw) {
     summary: str(raw.summary, 600),
     projects: (Array.isArray(raw.projects) ? raw.projects : [])
       .filter((p) => p && str(p.title, 120))
-      .slice(0, 10)
+      .slice(0, MAX_PROJECTS)
       .map((p) => ({
         title: str(p.title, 120),
         client: str(p.client, 60),
@@ -224,12 +225,13 @@ router.post('/profile-from-resume', requireAuth, requireRole('freelancer'), asyn
 
   let resp;
   try {
+    // 프로젝트가 많은 경력기술서는 응답이 길어 1분 이상 걸릴 수 있어 넉넉히 기다립니다.
     resp = await client.messages.create({
       model: ai.PROFILE_MODEL,
-      max_tokens: 4000,
+      max_tokens: 16000,
       messages: [{ role: 'user', content: [docBlock, { type: 'text', text: PROFILE_INSTRUCTIONS }] }],
       output_config: { format: { type: 'json_schema', schema: PROFILE_SCHEMA } },
-    });
+    }, { timeout: 180 * 1000, maxRetries: 1 });
   } catch (err) {
     return res.status(502).json({ error: ai.friendlyError(err) });
   }
