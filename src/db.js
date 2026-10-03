@@ -140,6 +140,11 @@ if (USE_POSTGRES) {
     await ensureColumnPg('users', 'totp_backup_codes', 'TEXT');
     await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_ci ON users(ci) WHERE ci IS NOT NULL');
     await removeDemoAccounts();
+    // DB가 어느 업체·지역에 있는지 확인용(개인정보처리방침의 국외 이전 고지). 접속 계정·비밀번호는 출력하지 않습니다.
+    try {
+      const host = new URL(process.env.DATABASE_URL).hostname;
+      console.log(`[IT Free] DB 호스트 지역: ${host.split('.').slice(1).join('.') || host}`);
+    } catch (e) { /* 무시 */ }
     console.log('[IT Free] PostgreSQL 연결 및 스키마 준비 완료 (영구 저장)');
   };
 
