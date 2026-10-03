@@ -3,6 +3,10 @@ const crypto = require('crypto');
 const DEFAULT_SECRET = 'stackfit-dev-secret-change-me';
 const SECRET = process.env.JWT_SECRET || DEFAULT_SECRET;
 
+// 운영 서버(Render)에서 비밀키가 없으면 누구나 토큰을 위조할 수 있으므로 아예 시작하지 않습니다.
+if (SECRET === DEFAULT_SECRET && (process.env.RENDER || process.env.NODE_ENV === 'production')) {
+  throw new Error('[IT Free] JWT_SECRET 환경변수가 없어 서버를 시작하지 않습니다.');
+}
 if (SECRET === DEFAULT_SECRET) {
   console.warn(
     '[IT Free] 경고: JWT_SECRET 환경변수가 설정되지 않아 기본값을 사용 중입니다. ' +

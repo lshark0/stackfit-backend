@@ -27,7 +27,8 @@ const referralRoutes = require('./src/routes/referral');
 const aiRoutes = require('./src/routes/ai');
 const { verifyToken } = require('./src/auth');
 const { dedupeAllPortfolios } = require('./src/portfolioDedupe');
-const { purgeOldSecurityEvents } = require('./src/securityLog');
+const securityLog = require('./src/securityLog');
+const { purgeOldSecurityEvents } = securityLog;
 
 const app = express();
 app.set('trust proxy', 1); // Render는 프록시 뒤에 있으므로 rate-limit이 실제 클라이언트 IP를 보게 함
@@ -85,6 +86,38 @@ const apiLimiter = rateLimit({
   legacyHeaders: false,
 });
 app.use('/api', apiLimiter);
+
+// 인재 정보 대량 수집(스크래핑) 방어: 로그인한 계정 단위로 인재 목록·상세 조회를 시간당 300회로 제한합니다.
+// IP를 바꿔가며 한 계정으로 전체 프리랜서 정보를 긁어가는 것을 막고, 한도를 넘으면 보안 로그에 남깁니다.
+const userKey = (req) => {
+  const h = req.headers.authorization || '';
+  const payload = h.startsWith('Bearer ') ? verifyToken(h.slice(7)) : null;
+  return payload ? `user:${payload.id}` : `ip:${req.ip}`;
+};
+const TALENT_HOURLY_LIMIT = Number(process.env.TALENT_HOURLY_LIMIT) || 300;
+const scrapeLogged = new Map(); // 같은 계정의 한도 초과는 창(1시간)마다 한 번만 기록
+const talentLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: TALENT_HOURLY_LIMIT,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: userKey,
+  skip: (req) => req.method !== 'GET',
+  handler: (req, res) => {
+    const key = userKey(req);
+    if ((scrapeLogged.get(key) || 0) < Date.now() - 60 * 60 * 1000) {
+      scrapeLogged.set(key, Date.now());
+      const h = req.headers.authorization || '';
+      const payload = h.startsWith('Bearer ') ? verifyToken(h.slice(7)) : null;
+      securityLog.logEvent('scrape_suspected', {
+        email: payload && payload.email, userId: payload && payload.id, ip: securityLog.clientIp(req),
+        detail: `인재 조회 시간당 ${TALENT_HOURLY_LIMIT}회 초과 (${req.originalUrl.split('?')[0]})`,
+      });
+    }
+    res.status(429).json({ error: '조회가 너무 많아요. 잠시 후 다시 시도해주세요.' });
+  },
+});
+app.use('/api/talents', talentLimiter);
 
 // 이력서 등 업로드 파일: 아무나 접근 가능한 고정 URL 대신, 짧은 시간(5분)만 유효한
 // 서명된 링크로만 접근할 수 있게 합니다. URL이 캡처화면/로그 등으로 유출되어도
@@ -171,7 +204,7 @@ app.use(express.static(path.join(__dirname, 'public'), {
 app.get('/api/health', async (_req, res) => {
   try {
     await get('SELECT 1 AS ok');
-    res.json({ ok: true, service: 'stackfit-backend', db: USE_POSTGRES ? 'postgres' : 'sqlite' });
+    res.json({ ok: true }); // 내부 구성(서비스명·DB 종류)은 응답에 담지 않습니다
   } catch (err) {
     res.status(503).json({ ok: false, error: 'DB에 연결할 수 없어요.' });
   }

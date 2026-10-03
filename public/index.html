@@ -4310,6 +4310,7 @@ async function screenAdminSignupStats(){
 const SECURITY_EVENT_LABELS = {
   login_success: ['로그인', 'pass'], login_failed: ['로그인 실패', 'pending'], login_locked: ['계정 잠금', 'fail'],
   login_blocked: ['잠금 중 시도', 'fail'], admin_action: ['관리자 작업', 'pass'], admin_denied: ['관리자 접근 거부', 'fail'],
+  scrape_suspected: ['대량 조회 의심', 'fail'],
 };
 let adminSecurityFilter = 'alert';
 function setAdminSecurityFilter(f){ adminSecurityFilter = f; render(); }
@@ -4317,7 +4318,7 @@ async function screenAdminSecurity(){
   if(!state.isAdmin){ go('mypage'); return ''; }
   const s = await apiFetch('/admin/security-events?limit=300');
   const filters = [['alert','이상 징후'],['admin','관리자'],['all','전체']];
-  const alertEvents = ['login_failed','login_locked','login_blocked','admin_denied'];
+  const alertEvents = ['login_failed','login_locked','login_blocked','admin_denied','scrape_suspected'];
   const events = s.events.filter(e => adminSecurityFilter === 'all' ? true
     : adminSecurityFilter === 'admin' ? (e.event === 'admin_action' || (e.event === 'login_success' && /관리자/.test(e.detail)))
     : alertEvents.includes(e.event));
@@ -4340,7 +4341,7 @@ async function screenAdminSecurity(){
         <span class="sbadge ${cls}" style="flex:0 0 auto;">${esc(label)}</span>
       </div>`;
     }).join('') : `<div class="reco-empty">표시할 기록이 없어요.</div>`}
-    <div class="page-sub" style="margin-top:14px; line-height:1.6;">· 같은 이메일로 15분 안에 5번 틀리면 15분 동안 로그인이 잠겨요.<br>· 보안 로그는 6개월 보관 후 자동 삭제돼요. 최근 300건까지 보여요.</div>
+    <div class="page-sub" style="margin-top:14px; line-height:1.6;">· 같은 이메일로 15분 안에 5번 틀리면 15분 동안 로그인이 잠겨요.<br>· 한 계정이 인재 목록·상세를 시간당 300회 넘게 조회하면 차단하고 '대량 조회 의심'으로 남겨요.<br>· 보안 로그는 6개월 보관 후 자동 삭제돼요. 최근 300건까지 보여요.</div>
   </div>`;
 }
 
