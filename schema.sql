@@ -300,3 +300,16 @@ CREATE TABLE IF NOT EXISTS ai_usage (
   created_at     TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_ai_usage_user_day ON ai_usage(user_id, feature, day);
+
+-- 보안 로그: 로그인 성공·실패·잠금, 관리자 작업 기록 (6개월 보관 후 자동 삭제). ts는 밀리초 타임스탬프
+CREATE TABLE IF NOT EXISTS security_events (
+  id       INTEGER PRIMARY KEY AUTOINCREMENT,
+  event    TEXT NOT NULL,
+  email    TEXT NOT NULL DEFAULT '',
+  user_id  INTEGER,
+  ip       TEXT NOT NULL DEFAULT '',
+  detail   TEXT NOT NULL DEFAULT '',
+  ts       INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_security_events_email ON security_events(email, event, ts);
+CREATE INDEX IF NOT EXISTS idx_security_events_ts ON security_events(ts);

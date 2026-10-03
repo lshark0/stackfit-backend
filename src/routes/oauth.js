@@ -6,6 +6,7 @@ const { wrapAllRoutes } = require('../middleware/asyncHandler');
 const { PROVIDERS, isConfigured, buildAuthorizeUrl, exchangeCode } = require('../oauth');
 const { isAdminEmail } = require('../middleware/requireAdmin');
 const { recordSignupAttribution } = require('../attribution');
+const securityLog = require('../securityLog');
 
 const router = express.Router();
 wrapAllRoutes(router);
@@ -58,6 +59,10 @@ router.get('/:provider/callback', async (req, res) => {
   }
 
   if (user) {
+    await securityLog.logEvent('login_success', {
+      email: user.email, ip: securityLog.clientIp(req), userId: user.id,
+      detail: `${provider} 로그인${isAdminEmail(user.email) ? ' · 관리자' : ''}`,
+    });
     const token = signToken({ id: user.id, role: user.role, email: user.email });
     return res.redirect(`/?token=${encodeURIComponent(token)}`);
   }

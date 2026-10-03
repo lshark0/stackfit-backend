@@ -27,6 +27,7 @@ const referralRoutes = require('./src/routes/referral');
 const aiRoutes = require('./src/routes/ai');
 const { verifyToken } = require('./src/auth');
 const { dedupeAllPortfolios } = require('./src/portfolioDedupe');
+const { purgeOldSecurityEvents } = require('./src/securityLog');
 
 const app = express();
 app.set('trust proxy', 1); // Render는 프록시 뒤에 있으므로 rate-limit이 실제 클라이언트 IP를 보게 함
@@ -216,6 +217,7 @@ async function main() {
   // 마감일이 지난 공고 자동 마감 처리 + 저장한 공고 마감임박 알림: 기동 직후 한 번, 이후 6시간마다 확인합니다.
   const runScheduledChecks = () => {
     closeExpiredJobs().catch((e) => console.warn('[IT Free] 공고 자동 마감 처리 실패:', e.message));
+    purgeOldSecurityEvents().catch((e) => console.warn('[IT Free] 오래된 보안 로그 삭제 실패:', e.message));
     checkDeadlineAlerts().catch((e) => console.warn('[IT Free] 마감임박 알림 확인 실패:', e.message));
   };
   runScheduledChecks();

@@ -696,7 +696,7 @@ function talentDetailBack(){ goBackFrom(talentDetailReturn, 'talent'); }
 // 화면 안의 뒤로가기 화살표가 항상 마이페이지로 돌아가는 화면들.
 // 이 화면들은 드로어 메뉴 등 여러 곳에서 열릴 수 있어서, 휴대폰의 '뒤로가기'
 // 제스처도 그 화살표와 똑같이 항상 마이페이지로 보내도록 popstate에서 함께 처리합니다.
-const MYPAGE_CHILD_SCREENS = ['proposalSettings','changePassword','deleteAccount','savedJobs','followedCompanies','adminReports','adminSignupStats','adminAiUsage','profileViews','companyProfileEdit','profileEdit','notices','events','faq','supportInquiry'];
+const MYPAGE_CHILD_SCREENS = ['proposalSettings','changePassword','deleteAccount','savedJobs','followedCompanies','adminReports','adminSignupStats','adminAiUsage','adminSecurity','profileViews','companyProfileEdit','profileEdit','notices','events','faq','supportInquiry'];
 
 // 회원 유형별로만 열 수 있는 화면. 다른 유형의 화면이 열리려 하면(뒤로가기 기록, 예전 알림 등) 홈으로 보냅니다.
 const FREELANCER_ONLY = ['receivedProposals','myApplications','portfolios','portfolioEdit','savedJobs','followedCompanies','profileViews','profileEdit','proposalSettings','reportJob'];
@@ -3815,6 +3815,7 @@ async function screenMypage(){
     <div class="section-label with-ic">${I.gear}관리자</div>
     <div class="list-item" onclick="go('adminSignupStats')"><div class="li-l"><div class="li-icon">${I.talent}</div><div class="li-tt">가입 경로 통계</div></div>${I.back}</div>
     <div class="list-item" onclick="go('adminAiUsage')"><div class="li-l"><div class="li-icon">${I.sparkle}</div><div class="li-tt">AI 사용량 통계</div></div>${I.back}</div>
+    <div class="list-item" onclick="go('adminSecurity')"><div class="li-l"><div class="li-icon">${I.verified}</div><div class="li-tt">보안 로그</div></div>${I.back}</div>
     <div class="list-item" onclick="go('adminReports')"><div class="li-l"><div class="li-icon">${I.alertCircle}</div><div class="li-tt">신고 관리</div></div>${I.back}</div>` : ''}
     <div class="section-label with-ic">${I.building}약관 및 정책</div>
     <div class="list-item" onclick="window.open('/terms.html','_blank')"><div class="li-l"><div class="li-icon">${I.building}</div><div class="li-tt">이용약관</div></div>${I.back}</div>
@@ -4305,6 +4306,44 @@ async function screenAdminSignupStats(){
   </div>`;
 }
 
+// 관리자 전용: 보안 로그 (로그인 실패·잠금, 관리자 작업, 권한 없는 관리자 접근 시도)
+const SECURITY_EVENT_LABELS = {
+  login_success: ['로그인', 'pass'], login_failed: ['로그인 실패', 'pending'], login_locked: ['계정 잠금', 'fail'],
+  login_blocked: ['잠금 중 시도', 'fail'], admin_action: ['관리자 작업', 'pass'], admin_denied: ['관리자 접근 거부', 'fail'],
+};
+let adminSecurityFilter = 'alert';
+function setAdminSecurityFilter(f){ adminSecurityFilter = f; render(); }
+async function screenAdminSecurity(){
+  if(!state.isAdmin){ go('mypage'); return ''; }
+  const s = await apiFetch('/admin/security-events?limit=300');
+  const filters = [['alert','이상 징후'],['admin','관리자'],['all','전체']];
+  const alertEvents = ['login_failed','login_locked','login_blocked','admin_denied'];
+  const events = s.events.filter(e => adminSecurityFilter === 'all' ? true
+    : adminSecurityFilter === 'admin' ? (e.event === 'admin_action' || (e.event === 'login_success' && /관리자/.test(e.detail)))
+    : alertEvents.includes(e.event));
+  return `${statusbar()}
+  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('mypage')">${I.back}</div><div class="page-title" style="font-size:19.5px;">보안 로그</div></div></div>
+  <div class="content">
+    <div class="hero-stat">
+      <div class="hs"><div class="hs-num">${s.summary.failed24h}</div><div class="hs-lbl">로그인 실패 (24h)</div></div>
+      <div class="hs"><div class="hs-num">${s.summary.locked24h}</div><div class="hs-lbl">계정 잠금 (24h)</div></div>
+      <div class="hs"><div class="hs-num">${s.summary.denied24h}</div><div class="hs-lbl">관리자 접근 거부</div></div>
+    </div>
+    <div class="chip-row" style="margin-top:14px;">${filters.map(([k,l])=>`<div class="chip ${k===adminSecurityFilter?'active':''}" onclick="setAdminSecurityFilter('${k}')">${l}</div>`).join('')}</div>
+    ${events.length ? events.map(e => {
+      const [label, cls] = SECURITY_EVENT_LABELS[e.event] || [e.event, 'pending'];
+      return `<div class="list-item" style="cursor:default; align-items:flex-start;">
+        <div style="min-width:0;">
+          <div class="li-tt" style="word-break:break-all;">${esc(e.email || '-')}</div>
+          <div class="page-sub" style="margin-top:3px;">${new Date(e.ts).toLocaleString('ko-KR')} · IP ${esc(e.ip || '-')}${e.detail ? ` · ${esc(e.detail)}` : ''}</div>
+        </div>
+        <span class="sbadge ${cls}" style="flex:0 0 auto;">${esc(label)}</span>
+      </div>`;
+    }).join('') : `<div class="reco-empty">표시할 기록이 없어요.</div>`}
+    <div class="page-sub" style="margin-top:14px; line-height:1.6;">· 같은 이메일로 15분 안에 5번 틀리면 15분 동안 로그인이 잠겨요.<br>· 보안 로그는 6개월 보관 후 자동 삭제돼요. 최근 300건까지 보여요.</div>
+  </div>`;
+}
+
 // 관리자 전용: AI 사용량 통계 (호출 수·토큰·예상 비용)
 let adminAiDays = 30;
 function setAdminAiDays(d){ adminAiDays = d; render(); }
@@ -4773,7 +4812,7 @@ async function render(){
       proposeForm: screenProposeForm, pickerScreen: screenPicker,
       reviewForm: screenReviewForm,
       adminReports: screenAdminReports, reportJob: screenReportJob,
-      invite: screenInvite, adminSignupStats: screenAdminSignupStats, adminAiUsage: screenAdminAiUsage,
+      invite: screenInvite, adminSignupStats: screenAdminSignupStats, adminAiUsage: screenAdminAiUsage, adminSecurity: screenAdminSecurity,
       notices: screenNotices, events: screenEvents, faq: screenFaq, aiChat: screenAiChat, supportInquiry: screenSupportInquiry,
       announcementForm: screenAnnouncementForm,
     };

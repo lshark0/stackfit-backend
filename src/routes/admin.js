@@ -6,6 +6,7 @@ const { wrapAllRoutes } = require('../middleware/asyncHandler');
 const { addNotification, pushTo } = require('../notify');
 const { signedFileUrl } = require('../fileAccess');
 const ai = require('../ai');
+const { listSecurityEvents } = require('../securityLog');
 
 const router = express.Router();
 wrapAllRoutes(router);
@@ -241,6 +242,22 @@ router.get('/ai-usage', requireAuth, requireAdmin, async (req, res) => {
     daily: Object.values(daily).sort((a, b) => (a.date < b.date ? -1 : 1))
       .map((d) => ({ date: d.date, calls: d.calls, costKrw: Math.round(d.costUsd * krwPerUsd) })),
     topUsers,
+  });
+});
+
+// 보안 로그 조회 — 최근 로그인 실패·잠금·관리자 작업 등 (6개월 보관)
+router.get('/security-events', requireAuth, requireAdmin, async (req, res) => {
+  const events = await listSecurityEvents(Number.parseInt(req.query.limit, 10) || 200);
+  const dayAgo = Date.now() - 24 * 3600 * 1000;
+  const recent = events.filter((e) => e.ts >= dayAgo);
+  res.json({
+    summary: {
+      failed24h: recent.filter((e) => e.event === 'login_failed').length,
+      locked24h: recent.filter((e) => e.event === 'login_locked').length,
+      denied24h: recent.filter((e) => e.event === 'admin_denied').length,
+      adminLogins24h: recent.filter((e) => e.event === 'login_success' && /관리자/.test(e.detail)).length,
+    },
+    events,
   });
 });
 

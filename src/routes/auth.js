@@ -7,6 +7,7 @@ const { normalizeMobile, normalizePhone, normalizeBirthDate } = require('../cont
 const { isAdminEmail } = require('../middleware/requireAdmin');
 const { recordSignupAttribution } = require('../attribution');
 const identity = require('../identity');
+const securityLog = require('../securityLog');
 
 const router = express.Router();
 wrapAllRoutes(router);
@@ -176,16 +177,27 @@ router.post('/login', async (req, res) => {
 
   if (!email || !password) return genericError();
 
+  const ip = securityLog.clientIp(req);
+  // 같은 이메일로 연속 실패하면 잠시 잠급니다 (여러 IP로 나눠 시도하는 대입 공격 방어).
+  if (await securityLog.isLoginLocked(email)) {
+    hashPassword(password);
+    await securityLog.logEvent('login_blocked', { email, ip });
+    return res.status(429).json({ error: '로그인 시도가 너무 많아 잠시 잠겼어요. 15분 후 다시 시도해주세요.', code: 'LOGIN_LOCKED' });
+  }
+
   const user = await get('SELECT * FROM users WHERE email = ?', [email]);
   if (!user) {
     // 존재하지 않는 계정이어도 동일한 지연을 주어 계정 존재 여부를 타이밍으로 추측하기 어렵게 함
     hashPassword(password);
+    await securityLog.recordLoginFailure(email, ip);
     return genericError();
   }
   if (!verifyPassword(password, user.password_hash, user.password_salt)) {
+    await securityLog.recordLoginFailure(email, ip, user.id);
     return genericError();
   }
 
+  await securityLog.logEvent('login_success', { email, ip, userId: user.id, detail: isAdminEmail(user.email) ? '관리자' : '' });
   const token = signToken({ id: user.id, role: user.role, email: user.email });
   res.json({ token, user: { id: user.id, email: user.email, role: user.role, isAdmin: isAdminEmail(user.email) } });
 });
