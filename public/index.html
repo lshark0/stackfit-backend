@@ -262,6 +262,16 @@
   .ai-fill-lbl{font-size:12.5px; font-weight:800; color:var(--slate);}
   .ai-fill-val{font-size:13.5px; color:var(--ink); margin-top:3px; line-height:1.55; white-space:pre-wrap; word-break:break-word;}
   .ai-fill-val .tag{margin:2px 2px 0 0;}
+  .mfa-hero{width:56px; height:56px; margin:10px auto 14px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:#fff; background:linear-gradient(135deg, var(--purple) 0%, var(--blue) 100%);}
+  .mfa-hero svg{width:28px; height:28px;}
+  .mfa-code-input{text-align:center; font-size:24px; letter-spacing:.35em; font-family:var(--mono);}
+  .mfa-step{display:flex; gap:10px; align-items:flex-start; margin-top:14px; font-size:14px; line-height:1.55;}
+  .mfa-step span{flex:0 0 auto; width:22px; height:22px; border-radius:50%; background:var(--ink); color:#fff; font-size:12px; font-weight:800; display:flex; align-items:center; justify-content:center;}
+  .mfa-qr{display:flex; justify-content:center; margin:14px 0 8px;}
+  .mfa-qr img{background:#fff; padding:8px; border-radius:12px; border:1px solid var(--line);}
+  .mfa-secret{font-family:var(--mono); text-align:center; font-size:13px; padding:10px; margin:6px 0 4px; border:1px dashed var(--line); border-radius:10px; word-break:break-all; cursor:pointer;}
+  .mfa-backup{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:14px;}
+  .mfa-backup code{font-family:var(--mono); font-size:15px; text-align:center; padding:9px; background:var(--card); border:1px solid var(--line); border-radius:10px;}
   .ai-avatar{width:28px; height:28px; border-radius:50%; flex:0 0 auto; display:flex; align-items:center; justify-content:center; color:#fff; background:linear-gradient(135deg, var(--purple) 0%, var(--blue) 100%);}
   .ai-avatar svg{width:16px; height:16px;}
   .ai-suggest{display:flex; flex-wrap:wrap; gap:7px; padding-left:34px;}
@@ -532,6 +542,8 @@ async function apiFetch(path, opts={}){
     const err = new Error((data && data.error) || `요청 실패 (${res.status})`);
     // 서버가 알려준 코드/부가정보를 화면에서 활용할 수 있게 함께 담아 보냅니다.
     if(data && data.code) err.code = data.code;
+    // 관리자 기능인데 2단계 인증을 안 거친 세션이면 설정/안내 화면으로 보냅니다.
+    if(err.code === 'MFA_REQUIRED' && state.screen !== 'mfaSetup') setTimeout(() => go('mfaSetup'), 0);
     if(data && data.missing) err.missing = data.missing;
     err.status = res.status;
     throw err;
@@ -696,7 +708,7 @@ function talentDetailBack(){ goBackFrom(talentDetailReturn, 'talent'); }
 // 화면 안의 뒤로가기 화살표가 항상 마이페이지로 돌아가는 화면들.
 // 이 화면들은 드로어 메뉴 등 여러 곳에서 열릴 수 있어서, 휴대폰의 '뒤로가기'
 // 제스처도 그 화살표와 똑같이 항상 마이페이지로 보내도록 popstate에서 함께 처리합니다.
-const MYPAGE_CHILD_SCREENS = ['proposalSettings','changePassword','deleteAccount','savedJobs','followedCompanies','adminReports','adminSignupStats','adminAiUsage','adminSecurity','profileViews','companyProfileEdit','profileEdit','notices','events','faq','supportInquiry'];
+const MYPAGE_CHILD_SCREENS = ['proposalSettings','changePassword','deleteAccount','savedJobs','followedCompanies','adminReports','adminSignupStats','adminAiUsage','adminSecurity','mfaSetup','profileViews','companyProfileEdit','profileEdit','notices','events','faq','supportInquiry'];
 
 // 회원 유형별로만 열 수 있는 화면. 다른 유형의 화면이 열리려 하면(뒤로가기 기록, 예전 알림 등) 홈으로 보냅니다.
 const FREELANCER_ONLY = ['receivedProposals','myApplications','portfolios','portfolioEdit','savedJobs','followedCompanies','profileViews','profileEdit','proposalSettings','reportJob'];
@@ -1519,6 +1531,7 @@ async function doLogin(){
   if(!email || !password){ toast('이메일과 비밀번호를 입력해주세요'); return; }
   try{
     const data = await apiFetch('/auth/login', {method:'POST', body:{email, password}});
+    if(data.mfaRequired){ startMfaVerify(data.mfaToken); return; } // 2단계 인증을 켠 관리자
     saveToken(data.token); state.role = data.user.role; state.userId = data.user.id; state.isAdmin = !!data.user.isAdmin;
     toast('로그인 성공');
     syncPushSubscription(); // 이 기기의 알림을 방금 로그인한 계정으로 연결
@@ -1635,7 +1648,7 @@ async function consumeOAuthHash(){
     history.replaceState(null, '', window.location.pathname);
 
     // 로그인과 무관한 파라미터(예: 홈화면 앱 실행 시 붙는 ?src=pwa)는 그냥 무시합니다.
-    const isOAuthCallback = ['oauth_error','token','oauth_pending'].some(k => params.has(k));
+    const isOAuthCallback = ['oauth_error','token','oauth_pending','mfa'].some(k => params.has(k));
     if(!isOAuthCallback) return false;
 
     if(params.get('oauth_error')){
@@ -1653,6 +1666,7 @@ async function consumeOAuthHash(){
       }catch(e){ lastAuthError = '로그인 확인 실패: ' + e.message; go('onboarding'); }
       return true;
     }
+    if(params.get('mfa')){ startMfaVerify(params.get('mfa')); return true; } // 소셜 로그인한 관리자의 2단계 인증
     if(params.get('oauth_pending')){
       oauthPending = { token: params.get('oauth_pending'), email: params.get('email')||'', name: params.get('name')||'', roleHint: params.get('role_hint')||'' };
       go('oauthRole');
@@ -2576,6 +2590,104 @@ function screenSignup(){
     <button class="btn btn-primary" style="margin-top:18px;" onclick="doSignup()">가입하기</button>
     <div class="server-line" style="margin-top:16px;">이미 계정이 있으신가요? <b onclick="go('login')">로그인</b></div>
   </div>`;
+}
+
+// ---- 관리자 2단계 인증 (OTP 앱 6자리 코드) ----
+let mfaPendingToken = null;   // 비밀번호(또는 소셜 로그인) 확인 후 코드 입력을 기다리는 임시 토큰
+let mfaSetupData = null;      // QR 발급 결과
+let mfaBackupCodes = null;    // 사용 시작 직후 한 번만 보여주는 백업 코드
+const MFA_LOCK_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8.5 10.5V7.5a3.5 3.5 0 0 1 7 0v3M12 14.5v2.5"/></svg>`;
+const MFA_CHECK_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>`;
+function startMfaVerify(token){ mfaPendingToken = token; go('mfaVerify'); }
+function screenMfaVerify(){
+  if(!mfaPendingToken){ go('login'); return ''; }
+  return `${statusbar()}
+  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="mfaPendingToken=null; go('login')">${I.back}</div><div class="page-title">2단계 인증</div></div></div>
+  <div class="content">
+    <div class="mfa-hero">${MFA_LOCK_ICON}</div>
+    <div class="para" style="text-align:center;">관리자 계정이에요.<br>OTP 앱(Google Authenticator 등)에 표시된<br><b>6자리 숫자</b>를 입력해주세요.</div>
+    <div class="form-field" style="margin-top:16px;">
+      <input id="mfa-code" class="form-input mfa-code-input" inputmode="numeric" autocomplete="one-time-code" maxlength="9" placeholder="000000"
+        onkeydown="if(event.key==='Enter' && !event.isComposing){ event.preventDefault(); submitMfaVerify(); }">
+    </div>
+    <button class="btn btn-primary" id="mfa-submit" onclick="submitMfaVerify()">확인</button>
+    <div class="page-sub" style="margin-top:12px; text-align:center;">휴대폰을 잃어버렸다면 설정할 때 받은 <b>8자리 백업 코드</b>를 같은 칸에 입력하세요.</div>
+  </div>`;
+}
+async function submitMfaVerify(){
+  const code = (document.getElementById('mfa-code')?.value || '').trim();
+  if(!code){ toast('인증 코드를 입력해주세요'); return; }
+  const btn = document.getElementById('mfa-submit'); if(btn) btn.disabled = true;
+  try{
+    const data = await apiFetch('/auth/mfa/verify', {method:'POST', body:{mfaToken: mfaPendingToken, code}});
+    mfaPendingToken = null;
+    saveToken(data.token); state.role = data.user.role; state.userId = data.user.id; state.isAdmin = !!data.user.isAdmin;
+    toast(data.backupCodesLeft != null ? `로그인 성공 · 남은 백업 코드 ${data.backupCodesLeft}개` : '로그인 성공');
+    syncPushSubscription();
+    go('home');
+    openPendingDeepLink();
+  }catch(e){
+    toast(e.message);
+    if(e.code === 'MFA_EXPIRED'){ mfaPendingToken = null; go('login'); }
+    if(btn) btn.disabled = false;
+  }
+}
+async function screenMfaSetup(){
+  if(!state.isAdmin){ go('mypage'); return ''; }
+  const st = await apiFetch('/auth/mfa/status');
+  const head = `${statusbar()}
+  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="mfaSetupData=null; mfaBackupCodes=null; go('mypage')">${I.back}</div><div class="page-title">2단계 인증</div></div></div>`;
+  if(mfaBackupCodes){
+    return `${head}<div class="content">
+      <div class="mfa-hero">${MFA_CHECK_ICON}</div>
+      <div class="card-title" style="text-align:center;">2단계 인증을 켰어요</div>
+      <div class="para" style="margin-top:10px;">휴대폰을 잃어버렸을 때 쓸 <b>백업 코드</b>예요. 각 코드는 한 번만 쓸 수 있고, <b>지금만 보여드려요.</b> 안전한 곳에 저장해두세요.</div>
+      <div class="mfa-backup">${mfaBackupCodes.map(c=>`<code>${esc(c.slice(0,4))}-${esc(c.slice(4))}</code>`).join('')}</div>
+      <button class="btn btn-outline" style="margin-top:12px;" onclick="copyText('${jsAttrStr(mfaBackupCodes.join(' '))}', '백업 코드를 복사했어요')">백업 코드 복사</button>
+      <button class="btn btn-primary" style="margin-top:8px;" onclick="mfaBackupCodes=null; mfaSetupData=null; go('mypage')">저장했어요</button>
+    </div>`;
+  }
+  if(st.enabled && st.verified){
+    return `${head}<div class="content">
+      <div class="mfa-hero">${MFA_LOCK_ICON}</div>
+      <div class="card-title" style="text-align:center;">2단계 인증 사용 중</div>
+      <div class="para" style="text-align:center; margin-top:8px;">로그인할 때마다 OTP 앱 코드를 확인해요.<br>남은 백업 코드: <b>${st.backupCodesLeft}개</b></div>
+      <div class="page-sub" style="margin-top:14px;">휴대폰과 백업 코드를 모두 잃어버렸다면 Render 환경변수 MFA_RESET_EMAILS에 관리자 이메일을 넣고 재배포하면 초기화돼요(초기화 후 환경변수는 지워주세요).</div>
+    </div>`;
+  }
+  if(st.enabled && !st.verified){
+    return `${head}<div class="content">
+      <div class="para">이 기기의 로그인은 2단계 인증을 거치지 않았어요. 로그아웃한 뒤 다시 로그인해서 OTP 코드를 입력해주세요.</div>
+      <button class="btn btn-primary" style="margin-top:12px;" onclick="logout()">로그아웃</button>
+    </div>`;
+  }
+  return `${head}<div class="content">
+    <div class="reco-empty" style="text-align:left; border-color:var(--amber); background:#FDF6E9;"><b style="color:var(--ink);">관리자 기능을 쓰려면 2단계 인증이 필요해요.</b><br>비밀번호가 유출돼도 휴대폰 없이는 관리자 화면에 들어올 수 없게 됩니다.</div>
+    <div class="mfa-step"><span>1</span><div>휴대폰에 <b>Google Authenticator</b> 또는 <b>Microsoft Authenticator</b> 앱을 설치하세요.</div></div>
+    <div class="mfa-step"><span>2</span><div>앱에서 <b>QR 코드 스캔</b>으로 아래 코드를 등록하세요.</div></div>
+    ${mfaSetupData ? `
+      <div class="mfa-qr"><img src="${mfaSetupData.qr}" alt="2단계 인증 QR 코드" width="200" height="200"></div>
+      <div class="page-sub" style="text-align:center;">QR을 찍을 수 없으면 앱에 이 키를 직접 입력하세요</div>
+      <div class="mfa-secret" onclick="copyText('${jsAttrStr(mfaSetupData.secret)}', '키를 복사했어요')">${esc(mfaSetupData.secret.replace(/(.{4})/g,'$1 ').trim())}</div>
+      <div class="mfa-step"><span>3</span><div>앱에 표시된 <b>6자리 숫자</b>를 입력하세요.</div></div>
+      <input id="mfa-enable-code" class="form-input mfa-code-input" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000"
+        onkeydown="if(event.key==='Enter' && !event.isComposing){ event.preventDefault(); enableMfa(); }">
+      <button class="btn btn-primary" style="margin-top:10px;" onclick="enableMfa()">2단계 인증 켜기</button>`
+    : `<button class="btn btn-primary" style="margin-top:12px;" onclick="requestMfaSetup()">QR 코드 받기</button>`}
+  </div>`;
+}
+async function requestMfaSetup(){
+  try{ mfaSetupData = await apiFetch('/auth/mfa/setup', {method:'POST'}); render(); }catch(e){ toast(e.message); }
+}
+async function enableMfa(){
+  const code = (document.getElementById('mfa-enable-code')?.value || '').trim();
+  if(!/^\d{6}$/.test(code)){ toast('6자리 숫자를 입력해주세요'); return; }
+  try{
+    const data = await apiFetch('/auth/mfa/enable', {method:'POST', body:{code}});
+    saveToken(data.token);
+    mfaBackupCodes = data.backupCodes; mfaSetupData = null;
+    render();
+  }catch(e){ toast(e.message); }
 }
 
 function screenLogin(){
@@ -3811,8 +3923,13 @@ async function screenMypage(){
     <div class="list-item" onclick="go('proposalSettings')"><div class="li-l"><div class="li-icon">${I.gear}</div>
       <div><div class="li-tt">제안 설정</div><div class="page-sub" style="margin-top:2px;">${Number(profile.accept_proposals ?? 1)===1 ? '제안 받는 중' : '제안 받지 않음'}</div></div></div>${I.back}</div>` : ''}
     ${me.user.hasPassword ? `<div class="list-item" onclick="go('changePassword')"><div class="li-l"><div class="li-icon">${I.gear}</div><div class="li-tt">비밀번호 변경</div></div>${I.back}</div>` : ''}
-    ${state.isAdmin ? `
+    ${state.isAdmin && !me.user.mfaVerified ? `
     <div class="section-label with-ic">${I.gear}관리자</div>
+    <div class="list-item" onclick="go('mfaSetup')"><div class="li-l"><div class="li-icon" style="color:var(--danger);">${I.verified}</div>
+      <div><div class="li-tt">2단계 인증 ${me.user.mfaEnabled ? '필요' : '설정하기'}</div><div class="page-sub" style="margin-top:2px;">관리자 기능은 2단계 인증 후 이용할 수 있어요</div></div></div>${I.back}</div>` : ''}
+    ${state.isAdmin && me.user.mfaVerified ? `
+    <div class="section-label with-ic">${I.gear}관리자</div>
+    <div class="list-item" onclick="go('mfaSetup')"><div class="li-l"><div class="li-icon">${I.verified}</div><div class="li-tt">2단계 인증 <span class="page-sub">사용 중</span></div></div>${I.back}</div>
     <div class="list-item" onclick="go('adminSignupStats')"><div class="li-l"><div class="li-icon">${I.talent}</div><div class="li-tt">가입 경로 통계</div></div>${I.back}</div>
     <div class="list-item" onclick="go('adminAiUsage')"><div class="li-l"><div class="li-icon">${I.sparkle}</div><div class="li-tt">AI 사용량 통계</div></div>${I.back}</div>
     <div class="list-item" onclick="go('adminSecurity')"><div class="li-l"><div class="li-icon">${I.verified}</div><div class="li-tt">보안 로그</div></div>${I.back}</div>
@@ -4311,6 +4428,7 @@ const SECURITY_EVENT_LABELS = {
   login_success: ['로그인', 'pass'], login_failed: ['로그인 실패', 'pending'], login_locked: ['계정 잠금', 'fail'],
   login_blocked: ['잠금 중 시도', 'fail'], admin_action: ['관리자 작업', 'pass'], admin_denied: ['관리자 접근 거부', 'fail'],
   scrape_suspected: ['대량 조회 의심', 'fail'],
+  mfa_enabled: ['2단계 인증 켬', 'pass'], mfa_reset: ['2단계 인증 초기화', 'fail'],
 };
 let adminSecurityFilter = 'alert';
 function setAdminSecurityFilter(f){ adminSecurityFilter = f; render(); }
@@ -4318,9 +4436,9 @@ async function screenAdminSecurity(){
   if(!state.isAdmin){ go('mypage'); return ''; }
   const s = await apiFetch('/admin/security-events?limit=300');
   const filters = [['alert','이상 징후'],['admin','관리자'],['all','전체']];
-  const alertEvents = ['login_failed','login_locked','login_blocked','admin_denied','scrape_suspected'];
+  const alertEvents = ['login_failed','login_locked','login_blocked','admin_denied','scrape_suspected','mfa_reset'];
   const events = s.events.filter(e => adminSecurityFilter === 'all' ? true
-    : adminSecurityFilter === 'admin' ? (e.event === 'admin_action' || (e.event === 'login_success' && /관리자/.test(e.detail)))
+    : adminSecurityFilter === 'admin' ? (['admin_action','mfa_enabled','mfa_reset'].includes(e.event) || (e.event === 'login_success' && /관리자/.test(e.detail)))
     : alertEvents.includes(e.event));
   return `${statusbar()}
   <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('mypage')">${I.back}</div><div class="page-title" style="font-size:19.5px;">보안 로그</div></div></div>
@@ -4782,7 +4900,7 @@ async function screenJobPost(){
 let renderSeq = 0;
 async function render(){
   const el = document.getElementById('screen');
-  const needsAuth = !["onboarding","serverSetup","signup","login","oauthRole"].includes(state.screen);
+  const needsAuth = !["onboarding","serverSetup","signup","login","oauthRole","mfaVerify"].includes(state.screen);
   if(needsAuth && !state.token){ state.screen = "onboarding"; }
   // 다른 회원 유형 전용 화면이 열리려 하면 홈으로 돌려보냅니다.
   if(state.token && state.role && !screenAllowed(state.screen)){
@@ -4813,7 +4931,7 @@ async function render(){
       proposeForm: screenProposeForm, pickerScreen: screenPicker,
       reviewForm: screenReviewForm,
       adminReports: screenAdminReports, reportJob: screenReportJob,
-      invite: screenInvite, adminSignupStats: screenAdminSignupStats, adminAiUsage: screenAdminAiUsage, adminSecurity: screenAdminSecurity,
+      invite: screenInvite, adminSignupStats: screenAdminSignupStats, adminAiUsage: screenAdminAiUsage, adminSecurity: screenAdminSecurity, mfaVerify: screenMfaVerify, mfaSetup: screenMfaSetup,
       notices: screenNotices, events: screenEvents, faq: screenFaq, aiChat: screenAiChat, supportInquiry: screenSupportInquiry,
       announcementForm: screenAnnouncementForm,
     };

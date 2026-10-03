@@ -133,6 +133,11 @@ if (USE_POSTGRES) {
     await ensureColumnPg('users', 'ci', 'TEXT');
     await ensureColumnPg('users', 'di', 'TEXT');
     await ensureColumnPg('users', 'identity_verified_at', 'TEXT');
+    // 관리자 2단계 인증(TOTP): 비밀값은 암호화 저장, 마지막 사용 구간(재사용 방지), 백업 코드 해시
+    await ensureColumnPg('users', 'totp_secret', 'TEXT');
+    await ensureColumnPg('users', 'totp_enabled_at', 'TEXT');
+    await ensureColumnPg('users', 'totp_last_counter', 'BIGINT NOT NULL DEFAULT 0');
+    await ensureColumnPg('users', 'totp_backup_codes', 'TEXT');
     await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_ci ON users(ci) WHERE ci IS NOT NULL');
     await removeDemoAccounts();
     console.log('[IT Free] PostgreSQL 연결 및 스키마 준비 완료 (영구 저장)');
@@ -230,6 +235,10 @@ if (USE_POSTGRES) {
     addCol('users', 'ci', 'TEXT');
     addCol('users', 'di', 'TEXT');
     addCol('users', 'identity_verified_at', 'TEXT');
+    addCol('users', 'totp_secret', 'TEXT');
+    addCol('users', 'totp_enabled_at', 'TEXT');
+    addCol('users', 'totp_last_counter', 'INTEGER NOT NULL DEFAULT 0');
+    addCol('users', 'totp_backup_codes', 'TEXT');
     try { db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_ci ON users(ci) WHERE ci IS NOT NULL'); } catch (e) {}
     await removeDemoAccounts();
     console.log('[IT Free] SQLite 로컬 DB 준비 완료 (data/stackfit.db, 로컬 개발 전용)');

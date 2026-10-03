@@ -76,4 +76,18 @@ function verifyToken(token) {
   return payload;
 }
 
-module.exports = { hashPassword, verifyPassword, signToken, verifyToken };
+// 로그인 세션 토큰만 통과시킵니다. 파일 열람·소셜 가입 대기·본인인증·2단계 인증 대기 같은
+// 다른 용도로 발급한 토큰은 같은 비밀키로 서명돼 있어도 로그인 세션으로 쓸 수 없습니다.
+function verifySessionToken(token) {
+  const p = verifyToken(token);
+  if (!p || p.purpose || p.typ || p.pending) return null;
+  if (!Number.isInteger(p.id) || !['freelancer', 'company'].includes(p.role)) return null;
+  return p;
+}
+
+// 용도별 암호화 키 (예: 2단계 인증 비밀값 암호화). 서명 비밀키에서 파생하므로 별도 환경변수가 필요 없습니다.
+function deriveKey(label) {
+  return crypto.createHash('sha256').update(`${label}:${SECRET}`).digest();
+}
+
+module.exports = { hashPassword, verifyPassword, signToken, verifyToken, verifySessionToken, deriveKey };

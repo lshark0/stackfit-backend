@@ -8,6 +8,7 @@ const { isAdminEmail } = require('../middleware/requireAdmin');
 const { recordSignupAttribution } = require('../attribution');
 const identity = require('../identity');
 const securityLog = require('../securityLog');
+const mfa = require('../mfa');
 
 const router = express.Router();
 wrapAllRoutes(router);
@@ -197,15 +198,23 @@ router.post('/login', async (req, res) => {
     return genericError();
   }
 
-  await securityLog.logEvent('login_success', { email, ip, userId: user.id, detail: isAdminEmail(user.email) ? '관리자' : '' });
+  // 2단계 인증을 켠 관리자는 비밀번호만으로 세션을 주지 않고, OTP 코드 입력 단계로 보냅니다.
+  if (isAdminEmail(user.email) && mfa.isMfaEnabled(user)) {
+    return res.json({ mfaRequired: true, mfaToken: mfa.mfaLoginToken(user) });
+  }
+  await securityLog.logEvent('login_success', { email, ip, userId: user.id, detail: isAdminEmail(user.email) ? '관리자 (2단계 인증 미설정)' : '' });
   const token = signToken({ id: user.id, role: user.role, email: user.email });
   res.json({ token, user: { id: user.id, email: user.email, role: user.role, isAdmin: isAdminEmail(user.email) } });
 });
 
 router.get('/me', requireAuth, async (req, res) => {
-  const user = await get('SELECT id, email, role, oauth_provider FROM users WHERE id = ?', [req.user.id]);
+  const user = await get('SELECT id, email, role, oauth_provider, totp_secret, totp_enabled_at FROM users WHERE id = ?', [req.user.id]);
   if (!user) return res.status(404).json({ error: '계정을 찾을 수 없습니다.' });
-  res.json({ user: { id: user.id, email: user.email, role: user.role, hasPassword: !user.oauth_provider, isAdmin: isAdminEmail(user.email) } });
+  const isAdmin = isAdminEmail(user.email);
+  res.json({ user: {
+    id: user.id, email: user.email, role: user.role, hasPassword: !user.oauth_provider, isAdmin,
+    ...(isAdmin ? { mfaEnabled: mfa.isMfaEnabled(user), mfaVerified: !!req.user.mfa } : {}),
+  } });
 });
 
 // 비밀번호 변경 (이메일/비밀번호로 가입한 계정만 — 소셜 전용 계정은 대상 아님)

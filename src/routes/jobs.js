@@ -4,7 +4,7 @@ const multer = require('multer');
 const { run, get, all } = require('../db');
 const { requireAuth, requireRole } = require('../middleware/requireAuth');
 const { wrapAllRoutes } = require('../middleware/asyncHandler');
-const { verifyToken } = require('../auth');
+const { verifySessionToken } = require('../auth');
 const { computeMatch } = require('../match');
 const { matchesCategory } = require('../stackCatalog');
 const { getRatingSummary, getRatingSummaries } = require('../ratings');
@@ -40,7 +40,7 @@ wrapAllRoutes(router);
 function optionalAuth(req, _res, next) {
   const header = req.headers.authorization || '';
   const token = header.startsWith('Bearer ') ? header.slice(7) : null;
-  req.user = token ? verifyToken(token) : null;
+  req.user = token ? verifySessionToken(token) : null;
   next();
 }
 

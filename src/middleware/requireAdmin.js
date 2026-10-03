@@ -19,6 +19,11 @@ function requireAdmin(req, res, next) {
     securityLog.logEvent('admin_denied', { email, userId: req.user && req.user.id, ip: securityLog.clientIp(req), detail: target });
     return res.status(403).json({ error: '관리자만 이용할 수 있어요.' });
   }
+  // 관리자 기능은 2단계 인증을 통과한 세션에서만 쓸 수 있습니다.
+  // (비상시 ADMIN_MFA_REQUIRED=false 환경변수로 잠시 끌 수 있음)
+  if (process.env.ADMIN_MFA_REQUIRED !== 'false' && !req.user.mfa) {
+    return res.status(403).json({ error: '관리자 기능은 2단계 인증 후 이용할 수 있어요.', code: 'MFA_REQUIRED' });
+  }
   if (req.method !== 'GET') {
     res.on('finish', () => {
       if (res.statusCode < 400) {

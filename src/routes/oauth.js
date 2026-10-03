@@ -7,6 +7,7 @@ const { PROVIDERS, isConfigured, buildAuthorizeUrl, exchangeCode } = require('..
 const { isAdminEmail } = require('../middleware/requireAdmin');
 const { recordSignupAttribution } = require('../attribution');
 const securityLog = require('../securityLog');
+const mfa = require('../mfa');
 
 const router = express.Router();
 wrapAllRoutes(router);
@@ -59,6 +60,10 @@ router.get('/:provider/callback', async (req, res) => {
   }
 
   if (user) {
+    // 2단계 인증을 켠 관리자는 소셜 로그인 뒤에도 OTP 코드 입력 단계를 거칩니다.
+    if (isAdminEmail(user.email) && mfa.isMfaEnabled(user)) {
+      return res.redirect(`/?mfa=${encodeURIComponent(mfa.mfaLoginToken(user))}`);
+    }
     await securityLog.logEvent('login_success', {
       email: user.email, ip: securityLog.clientIp(req), userId: user.id,
       detail: `${provider} 로그인${isAdminEmail(user.email) ? ' · 관리자' : ''}`,

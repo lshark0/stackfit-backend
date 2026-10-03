@@ -25,7 +25,9 @@ const supportRoutes = require('./src/routes/support');
 const announcementsRoutes = require('./src/routes/announcements');
 const referralRoutes = require('./src/routes/referral');
 const aiRoutes = require('./src/routes/ai');
-const { verifyToken } = require('./src/auth');
+const mfaRoutes = require('./src/routes/mfa');
+const { resetMfaFromEnv } = require('./src/mfa');
+const { verifyToken, verifySessionToken } = require('./src/auth');
 const { dedupeAllPortfolios } = require('./src/portfolioDedupe');
 const securityLog = require('./src/securityLog');
 const { purgeOldSecurityEvents } = securityLog;
@@ -75,6 +77,8 @@ app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/signup', authLimiter);
 app.use('/api/auth/identity/verify', authLimiter);
 app.use('/api/auth/change-password', authLimiter);
+app.use('/api/auth/mfa/verify', authLimiter);
+app.use('/api/auth/mfa/enable', authLimiter);
 // DELETE /api/auth/me(회원탈퇴)의 비밀번호 확인 무차별 대입만 제한 — GET(세션 확인)은 자주 호출되므로 제외
 app.use('/api/auth/me', (req, res, next) => (req.method === 'DELETE' ? authLimiter(req, res, next) : next()));
 
@@ -91,7 +95,7 @@ app.use('/api', apiLimiter);
 // IP를 바꿔가며 한 계정으로 전체 프리랜서 정보를 긁어가는 것을 막고, 한도를 넘으면 보안 로그에 남깁니다.
 const userKey = (req) => {
   const h = req.headers.authorization || '';
-  const payload = h.startsWith('Bearer ') ? verifyToken(h.slice(7)) : null;
+  const payload = h.startsWith('Bearer ') ? verifySessionToken(h.slice(7)) : null;
   return payload ? `user:${payload.id}` : `ip:${req.ip}`;
 };
 const TALENT_HOURLY_LIMIT = Number(process.env.TALENT_HOURLY_LIMIT) || 300;
@@ -108,7 +112,7 @@ const talentLimiter = rateLimit({
     if ((scrapeLogged.get(key) || 0) < Date.now() - 60 * 60 * 1000) {
       scrapeLogged.set(key, Date.now());
       const h = req.headers.authorization || '';
-      const payload = h.startsWith('Bearer ') ? verifyToken(h.slice(7)) : null;
+      const payload = h.startsWith('Bearer ') ? verifySessionToken(h.slice(7)) : null;
       securityLog.logEvent('scrape_suspected', {
         email: payload && payload.email, userId: payload && payload.id, ip: securityLog.clientIp(req),
         detail: `인재 조회 시간당 ${TALENT_HOURLY_LIMIT}회 초과 (${req.originalUrl.split('?')[0]})`,
@@ -210,6 +214,7 @@ app.get('/api/health', async (_req, res) => {
   }
 });
 
+app.use('/api/auth/mfa', mfaRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/auth/oauth', oauthRoutes);
 app.use('/api/profile', profileRoutes);
@@ -242,6 +247,7 @@ const PORT = process.env.PORT || 4000;
 async function main() {
   await initDb(); // 스키마 준비 + (필요 시) 데모 데이터 시드까지 끝난 뒤에 요청을 받기 시작
   await initPush(); // 푸시 인증키 준비 (실패해도 서버는 정상 동작)
+  await resetMfaFromEnv(securityLog.logEvent); // 비상시 관리자 2단계 인증 초기화 (MFA_RESET_EMAILS)
   await dedupeAllPortfolios(); // 예전에 AI 자동 채우기로 중복 등록된 수행 프로젝트를 한 번 정리
   app.listen(PORT, () => {
     console.log(`[IT Free] API 서버 실행 중 → http://localhost:${PORT} (DB: ${USE_POSTGRES ? 'PostgreSQL' : 'SQLite'})`);

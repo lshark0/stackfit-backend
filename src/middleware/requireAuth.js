@@ -1,9 +1,9 @@
-const { verifyToken } = require('../auth');
+const { verifySessionToken } = require('../auth');
 
 function requireAuth(req, res, next) {
   const header = req.headers.authorization || '';
   const token = header.startsWith('Bearer ') ? header.slice(7) : null;
-  const payload = token ? verifyToken(token) : null;
+  const payload = token ? verifySessionToken(token) : null;
   if (!payload) return res.status(401).json({ error: '로그인이 필요합니다.' });
   req.user = payload; // { id, role, email }
   next();
