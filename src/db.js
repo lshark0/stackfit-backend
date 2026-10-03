@@ -8,9 +8,17 @@ let run, get, all, initDb;
 if (USE_POSTGRES) {
   // ---------- PostgreSQL (영구 저장, 운영/배포용) ----------
   const { Pool } = require('pg');
+  // DB 연결은 항상 TLS 인증서를 검증합니다(중간자 공격 방지). 접속 주소의 sslmode 값은 pg 버전에 따라
+  // 의미가 달라지므로(다음 메이저 버전부터 'require'가 검증 없는 연결로 바뀜) 주소에서 빼고 여기서 명시합니다.
+  let connectionString = process.env.DATABASE_URL;
+  try {
+    const u = new URL(connectionString);
+    u.searchParams.delete('sslmode');
+    connectionString = u.toString();
+  } catch (e) { /* 주소 형식이 특이하면 그대로 사용 */ }
   const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false },
+    connectionString,
+    ssl: { rejectUnauthorized: true },
   });
 
   function toPgQuery(sql) {
