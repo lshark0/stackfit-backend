@@ -1334,21 +1334,24 @@ function logout(){
   showConfirm('로그아웃 하시겠어요?', signOutNow);
 }
 
-// 로그인(또는 앱 실행) 때마다, 프로필을 다 채우지 않은 프리랜서에게는 프로필 작성을,
+// 로그인(또는 앱 실행) 때, 프로필을 다 채우지 않은 프리랜서에게는 프로필 작성을,
 // 공고를 한 번도 등록하지 않은 기업에게는 프로젝트 등록을 팝업으로 안내합니다.
-// 완료할 때까지 매번 보여주되, 팝업을 한 번 닫은 뒤에는 같은 앱 실행 중 새로고침해도 다시 띄우지 않습니다.
-// (닫기 전에 새 버전 적용으로 화면이 새로고침되면 다시 보여줍니다)
-const NUDGE_SESSION_KEY = 'onboardingNudgeShown';
+// 완료할 때까지 계속 안내하되 하루(기기 날짜 기준)에 한 번만 띄웁니다. 계정마다 따로 셉니다.
+// 팝업을 닫거나 버튼을 눌러야 '오늘 봄'으로 기록하므로, 닫기 전에 새 버전 적용으로
+// 화면이 새로고침되면 다시 보여줍니다.
+const NUDGE_DAY_KEY = 'onboardingNudgeDay';
 let profileNudgeActive = false; // 팝업에서 프로필 수정으로 이동한 경우 안내 문구를 보여줌
-function resetOnboardingNudge(){
-  try{ sessionStorage.removeItem(NUDGE_SESSION_KEY); }catch(e){}
+function nudgeToday(){
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
 }
+function nudgeDayKey(){ return NUDGE_DAY_KEY + ':' + (state.userId || ''); }
 function markNudgeSeen(){
-  try{ sessionStorage.setItem(NUDGE_SESSION_KEY, '1'); }catch(e){}
+  try{ localStorage.setItem(nudgeDayKey(), nudgeToday()); }catch(e){}
 }
 async function maybeShowOnboardingNudge(){
   if(!state.token || state.isAdmin) return;
-  try{ if(sessionStorage.getItem(NUDGE_SESSION_KEY)) return; }catch(e){}
+  try{ if(localStorage.getItem(nudgeDayKey()) === nudgeToday()) return; }catch(e){}
   let info;
   try{ info = await apiFetch('/profile/completion'); }catch(e){ return; }
   if(!info || info.complete) return;
@@ -1590,7 +1593,6 @@ async function doSignup(){
     clearAttribution();
     toast('가입이 완료됐어요');
     syncPushSubscription();
-    resetOnboardingNudge();
     go('home');
     maybeShowOnboardingNudge();
   }catch(e){ toast(e.message); }
@@ -1605,7 +1607,6 @@ async function doLogin(){
     saveToken(data.token); state.role = data.user.role; state.userId = data.user.id; state.isAdmin = !!data.user.isAdmin;
     toast('로그인 성공');
     syncPushSubscription(); // 이 기기의 알림을 방금 로그인한 계정으로 연결
-    resetOnboardingNudge();
     go('home');
     openPendingDeepLink();
     maybeShowOnboardingNudge();
@@ -1693,7 +1694,6 @@ async function finishOAuthSignup(){
     clearAttribution();
     toast('가입이 완료됐어요');
     syncPushSubscription();
-    resetOnboardingNudge();
     go('home');
     maybeShowOnboardingNudge();
   }catch(e){ toast(e.message); }
@@ -1737,7 +1737,6 @@ async function consumeOAuthHash(){
         state.role = me.user.role; state.userId = me.user.id; state.isAdmin = !!me.user.isAdmin;
         toast('로그인 성공');
         syncPushSubscription();
-        resetOnboardingNudge();
         go('home');
         maybeShowOnboardingNudge();
       }catch(e){ lastAuthError = '로그인 확인 실패: ' + e.message; go('onboarding'); }
@@ -2702,7 +2701,6 @@ async function submitMfaVerify(){
     saveToken(data.token); state.role = data.user.role; state.userId = data.user.id; state.isAdmin = !!data.user.isAdmin;
     toast(data.backupCodesLeft != null ? `로그인 성공 · 남은 백업 코드 ${data.backupCodesLeft}개` : '로그인 성공');
     syncPushSubscription();
-    resetOnboardingNudge();
     go('home');
     openPendingDeepLink();
     maybeShowOnboardingNudge();
