@@ -1322,6 +1322,7 @@ function signOutNow(){
   clearToken(); state.role=null; state.userId=null; state.isAdmin=false;
   // 이전 계정의 화면 이동 기록이 다음 로그인 계정에 섞이지 않도록 비웁니다.
   jobDetailReturn = null; talentDetailReturn = null; pendingDeepLink = null;
+  profileNudgeActive = false;
   // 화면 밖에 있는 전체메뉴는 자동으로 지워지지 않으므로 직접 비웁니다.
   // (안 비우면 다른 계정으로 로그인해도 이전 역할의 메뉴가 남아 보입니다)
   const dw = document.getElementById('drawer');
@@ -1331,6 +1332,73 @@ function signOutNow(){
 }
 function logout(){
   showConfirm('로그아웃 하시겠어요?', signOutNow);
+}
+
+// 로그인(또는 앱 실행) 때마다, 프로필을 다 채우지 않은 프리랜서에게는 프로필 작성을,
+// 공고를 한 번도 등록하지 않은 기업에게는 프로젝트 등록을 팝업으로 안내합니다.
+// 완료할 때까지 매번 보여주되, 팝업을 한 번 닫은 뒤에는 같은 앱 실행 중 새로고침해도 다시 띄우지 않습니다.
+// (닫기 전에 새 버전 적용으로 화면이 새로고침되면 다시 보여줍니다)
+const NUDGE_SESSION_KEY = 'onboardingNudgeShown';
+let profileNudgeActive = false; // 팝업에서 프로필 수정으로 이동한 경우 안내 문구를 보여줌
+function resetOnboardingNudge(){
+  try{ sessionStorage.removeItem(NUDGE_SESSION_KEY); }catch(e){}
+}
+function markNudgeSeen(){
+  try{ sessionStorage.setItem(NUDGE_SESSION_KEY, '1'); }catch(e){}
+}
+async function maybeShowOnboardingNudge(){
+  if(!state.token || state.isAdmin) return;
+  try{ if(sessionStorage.getItem(NUDGE_SESSION_KEY)) return; }catch(e){}
+  let info;
+  try{ info = await apiFetch('/profile/completion'); }catch(e){ return; }
+  if(!info || info.complete) return;
+  // 홈 화면이 아닌 곳(공유 링크로 연 공고 등)으로 바로 이동했다면 방해하지 않습니다.
+  if(state.screen !== 'home') return;
+  if(document.getElementById('confirmOverlay').classList.contains('open')) return;
+  if(info.role === 'freelancer') showProfileNudge(info);
+  else if(info.role === 'company') showJobPostNudge();
+}
+function nudgeShell(title, body, laterLabel, okLabel, okAction){
+  document.getElementById('confirmMsg').innerHTML = `
+    <div style="text-align:left;">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+        <div style="font-size:17px; font-weight:800; color:var(--ink);">${title}</div>
+        <span onclick="markNudgeSeen(); closeConfirm()" style="cursor:pointer; color:var(--slate); padding:2px;">${I.x}</span>
+      </div>
+      ${body}
+      <div style="display:flex; gap:8px; margin-top:16px;">
+        <button class="confirm-cancel" style="flex:1; padding:12px 0; border-radius:12px; border:none; font-size:14.5px; font-weight:700; cursor:pointer;" onclick="markNudgeSeen(); closeConfirm()">${laterLabel}</button>
+        <button class="confirm-ok" style="flex:1.4; padding:12px 0; border-radius:12px; border:none; font-size:14.5px; font-weight:700; cursor:pointer;" onclick="markNudgeSeen(); closeConfirm(); ${okAction}">${okLabel}</button>
+      </div>
+    </div>`;
+  const actions = document.querySelector('#confirmOverlay .confirm-actions');
+  if(actions) actions.style.display = 'none';
+  document.getElementById('confirmOverlay').classList.add('open');
+}
+function showProfileNudge(info){
+  const missing = info.missing || [];
+  const total = info.total || 7;
+  const done = Math.max(0, total - missing.length);
+  const pct = Math.round(done / total * 100);
+  profileMissingFields = missing;
+  nudgeShell('프로필을 완성해 주세요', `
+      <div style="font-size:13.5px; color:var(--ink); line-height:1.55;">프로필을 채우면 내 기술에 맞는 공고를 추천받고, 기업의 제안도 받을 수 있어요. 공고에 지원할 때도 꼭 필요해요.</div>
+      <div style="margin-top:14px; display:flex; justify-content:space-between; font-size:12.5px; font-weight:700; color:var(--slate);"><span>프로필 완성도</span><span style="color:var(--ink);">${done} / ${total}</span></div>
+      <div style="margin-top:6px; height:8px; border-radius:99px; background:var(--paper-dim); overflow:hidden;"><div style="width:${pct}%; height:100%; background:var(--amber);"></div></div>
+      <div style="margin-top:12px; font-size:12px; font-weight:700; color:var(--ink);">아직 비어 있는 항목</div>
+      <div style="margin-top:6px; display:flex; flex-wrap:wrap; gap:5px;">${missing.map(f=>`<span class="reco-reason" style="border-color:var(--amber); color:var(--amber-deep);">${esc(f)}</span>`).join('')}</div>
+      <div style="margin-top:12px; font-size:12px; color:var(--slate); line-height:1.5;">경력기술서를 올리고 <b style="color:var(--ink);">AI로 자동 채우기</b>를 누르면 업무·등급·기술스택·자기소개를 한 번에 채울 수 있어요.</div>`,
+    '나중에', '프로필 작성하기', "profileNudgeActive=true; go('profileEdit');");
+}
+function showJobPostNudge(){
+  nudgeShell('첫 프로젝트를 등록해 보세요', `
+      <div style="font-size:13.5px; color:var(--ink); line-height:1.55;">프로젝트(공고)를 등록하면 필요한 기술·등급에 맞는 인재를 추천 %와 함께 바로 보여드려요.</div>
+      <div style="margin-top:12px; background:#EEF4FF; border-radius:12px; padding:11px 13px; font-size:12.5px; color:var(--ink); line-height:1.6;">
+        <div>① 프로젝트 정보·필요 기술스택 입력</div>
+        <div>② 맞춤 인재 추천 확인</div>
+        <div>③ 지원자 확인 또는 인재에게 직접 제안</div>
+      </div>`,
+    '나중에', '프로젝트 등록하기', "go('jobPost');");
 }
 
 let signupRole = 'freelancer';
@@ -1522,7 +1590,9 @@ async function doSignup(){
     clearAttribution();
     toast('가입이 완료됐어요');
     syncPushSubscription();
+    resetOnboardingNudge();
     go('home');
+    maybeShowOnboardingNudge();
   }catch(e){ toast(e.message); }
 }
 async function doLogin(){
@@ -1535,8 +1605,10 @@ async function doLogin(){
     saveToken(data.token); state.role = data.user.role; state.userId = data.user.id; state.isAdmin = !!data.user.isAdmin;
     toast('로그인 성공');
     syncPushSubscription(); // 이 기기의 알림을 방금 로그인한 계정으로 연결
+    resetOnboardingNudge();
     go('home');
     openPendingDeepLink();
+    maybeShowOnboardingNudge();
   }catch(e){ toast(e.message); }
 }
 
@@ -1621,7 +1693,9 @@ async function finishOAuthSignup(){
     clearAttribution();
     toast('가입이 완료됐어요');
     syncPushSubscription();
+    resetOnboardingNudge();
     go('home');
+    maybeShowOnboardingNudge();
   }catch(e){ toast(e.message); }
 }
 async function restoreSession(){
@@ -1634,6 +1708,7 @@ async function restoreSession(){
     state.role = me.user.role; state.userId = me.user.id; state.isAdmin = !!me.user.isAdmin;
     go('home');
     syncPushSubscription(); // 알림을 켜둔 기기라면 서버 구독을 최신 상태로 유지
+    maybeShowOnboardingNudge();
     return true;
   }catch(e){
     clearToken();
@@ -1662,7 +1737,9 @@ async function consumeOAuthHash(){
         state.role = me.user.role; state.userId = me.user.id; state.isAdmin = !!me.user.isAdmin;
         toast('로그인 성공');
         syncPushSubscription();
+        resetOnboardingNudge();
         go('home');
+        maybeShowOnboardingNudge();
       }catch(e){ lastAuthError = '로그인 확인 실패: ' + e.message; go('onboarding'); }
       return true;
     }
@@ -2396,6 +2473,7 @@ async function saveProfile(){
       certs: pendingCerts,
     }});
     toast('프로필이 저장됐어요');
+    profileNudgeActive = false;
     // 지원하려다 프로필 때문에 막혔던 경우, 저장 후 바로 지원까지 이어서 완료합니다.
     if(pendingApplyJobId){
       const jobId = pendingApplyJobId;
@@ -2624,8 +2702,10 @@ async function submitMfaVerify(){
     saveToken(data.token); state.role = data.user.role; state.userId = data.user.id; state.isAdmin = !!data.user.isAdmin;
     toast(data.backupCodesLeft != null ? `로그인 성공 · 남은 백업 코드 ${data.backupCodesLeft}개` : '로그인 성공');
     syncPushSubscription();
+    resetOnboardingNudge();
     go('home');
     openPendingDeepLink();
+    maybeShowOnboardingNudge();
   }catch(e){
     toast(e.message);
     if(e.code === 'MFA_EXPIRED'){ mfaPendingToken = null; go('login'); }
@@ -4591,13 +4671,18 @@ async function screenProfileEdit(){
   }
   profileDraft = null;
   return `${statusbar()}
-  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="applyConfirmReturnJobId=null; go('mypage')">${I.back}</div><div class="page-title">프로필 수정</div></div></div>
+  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="applyConfirmReturnJobId=null; profileNudgeActive=false; go('mypage')">${I.back}</div><div class="page-title">프로필 수정</div></div></div>
   <div class="content">
     ${pendingApplyJobId ? `
     <div class="reco-empty" style="text-align:left; border-color:var(--amber); background:#FDF6E9;">
       <b style="color:var(--ink);">지원하려면 아래 항목을 채워주세요</b>
       ${profileMissingFields.length ? `<div style="margin-top:6px; display:flex; flex-wrap:wrap; gap:5px;">${profileMissingFields.map(f=>`<span class="reco-reason" style="border-color:var(--amber); color:var(--amber-deep);">${esc(f)}</span>`).join('')}</div>` : ''}
       <div style="margin-top:6px; font-size:11.5px;">저장하면 보던 공고로 다시 돌아가요.</div>
+    </div>` : (profileNudgeActive && profileMissingFields.length) ? `
+    <div class="reco-empty" style="text-align:left; border-color:var(--amber); background:#FDF6E9;">
+      <b style="color:var(--ink);">아래 항목을 채우면 프로필이 완성돼요</b>
+      <div style="margin-top:6px; display:flex; flex-wrap:wrap; gap:5px;">${profileMissingFields.map(f=>`<span class="reco-reason" style="border-color:var(--amber); color:var(--amber-deep);">${esc(f)}</span>`).join('')}</div>
+      <div style="margin-top:6px; font-size:11.5px;">경력기술서를 올리고 AI로 자동 채우기를 쓰면 더 빨라요.</div>
     </div>` : ''}
     <div class="form-field"><label class="form-label">이름</label><input id="pf-name" class="form-input" value="${esc(p.name)}"></div>
     <div class="form-field">

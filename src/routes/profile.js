@@ -6,6 +6,7 @@ const { signedFileUrl } = require('../fileAccess');
 const { requireAuth, requireRole } = require('../middleware/requireAuth');
 const { wrapAllRoutes } = require('../middleware/asyncHandler');
 const { normalizeMobile, normalizePhone, normalizeEmail, normalizeBirthDate } = require('../contact');
+const { freelancerMissingFields, FREELANCER_REQUIRED_COUNT } = require('../profileCheck');
 
 const router = express.Router();
 wrapAllRoutes(router);
@@ -83,6 +84,24 @@ router.get('/views', requireAuth, requireRole('freelancer'), async (req, res) =>
     [req.user.id]
   );
   res.json({ views: rows });
+});
+
+// 로그인 후 안내 팝업용: 프리랜서는 비어 있는 필수 항목, 기업은 등록한 공고 수를 알려줍니다.
+router.get('/completion', requireAuth, async (req, res) => {
+  if (req.user.role === 'freelancer') {
+    const p = await get(
+      'SELECT role_title, grade, rate, stack_json, summary, resume_filename, phone FROM freelancer_profiles WHERE user_id = ?',
+      [req.user.id]
+    );
+    const missing = freelancerMissingFields(p);
+    return res.json({ role: 'freelancer', complete: missing.length === 0, missing, total: FREELANCER_REQUIRED_COUNT });
+  }
+  if (req.user.role === 'company') {
+    const row = await get('SELECT COUNT(*) AS n FROM jobs WHERE company_id = ?', [req.user.id]);
+    const jobCount = Number(row && row.n) || 0;
+    return res.json({ role: 'company', complete: jobCount > 0, jobCount });
+  }
+  res.json({ role: req.user.role, complete: true });
 });
 
 router.get('/', requireAuth, async (req, res) => {

@@ -6,6 +6,7 @@ const { requireAuth, requireRole } = require('../middleware/requireAuth');
 const { wrapAllRoutes } = require('../middleware/asyncHandler');
 const { addNotification, pushTo } = require('../notify');
 const { publicTalent } = require('../contact');
+const { freelancerMissingFields } = require('../profileCheck');
 
 const router = express.Router();
 wrapAllRoutes(router);
@@ -31,14 +32,7 @@ router.post('/jobs/:id/apply', requireAuth, requireRole('freelancer'), async (re
 
   // 기업이 지원자를 제대로 판단할 수 있도록, 프로필이 모두 채워져 있어야 지원할 수 있습니다.
   const myProfile = await get('SELECT * FROM freelancer_profiles WHERE user_id = ?', [req.user.id]);
-  const missing = [];
-  if (!myProfile || !String(myProfile.role_title || '').trim()) missing.push('업무');
-  if (!myProfile || !String(myProfile.grade || '').trim()) missing.push('등급');
-  if (!myProfile || !String(myProfile.rate || '').trim()) missing.push('희망 단가');
-  if (!myProfile || JSON.parse(myProfile.stack_json || '[]').length === 0) missing.push('기술스택');
-  if (!myProfile || !String(myProfile.summary || '').trim()) missing.push('자기 소개');
-  if (!myProfile || !myProfile.resume_filename) missing.push('경력기술서');
-  if (!myProfile || !String(myProfile.phone || '').trim()) missing.push('휴대폰');
+  const missing = freelancerMissingFields(myProfile);
   if (missing.length) {
     return res.status(400).json({
       error: `지원하려면 프로필을 먼저 완성해주세요. (${missing.join(', ')})`,
