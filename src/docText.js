@@ -5,6 +5,9 @@ const zlib = require('zlib');
 
 const MAX_ENTRY_BYTES = 20 * 1024 * 1024; // 압축 폭탄 방지: 항목 하나당 풀린 크기 상한
 const MAX_TEXT_CHARS = 60000;
+const MAX_TOTAL_BYTES = 40 * 1024 * 1024; // 압축 폭탄 방지: 파일 전체에서 풀어내는 크기 합계 상한
+const MAX_SLIDES = 300; // 슬라이드 수천 장짜리 파일로 서버 메모리를 고갈시키는 것 방지
+const MAX_ENTRIES = 5000;
 
 function readZipEntries(buf) {
   // End of Central Directory 레코드를 파일 끝에서부터 찾습니다.
@@ -14,6 +17,7 @@ function readZipEntries(buf) {
   }
   if (eocd < 0) throw new Error('zip: EOCD not found');
   const count = buf.readUInt16LE(eocd + 10);
+  if (count > MAX_ENTRIES) throw new Error('zip: too many entries');
   let p = buf.readUInt32LE(eocd + 16);
   const entries = new Map();
   for (let n = 0; n < count; n++) {
@@ -74,7 +78,15 @@ function extractOfficeText(buf, ext) {
     const slides = [...entries.keys()]
       .filter((k) => /^ppt\/slides\/slide\d+\.xml$/.test(k))
       .sort((a, b) => Number(a.match(/(\d+)\.xml$/)[1]) - Number(b.match(/(\d+)\.xml$/)[1]));
-    text = slides.map((k) => xmlToText(readEntry(buf, entries.get(k)).toString('utf8'), 'a')).join('\n\n');
+    let total = 0;
+    const parts = [];
+    for (const k of slides.slice(0, MAX_SLIDES)) {
+      const raw = readEntry(buf, entries.get(k));
+      total += raw.length;
+      if (total > MAX_TOTAL_BYTES) break;
+      parts.push(xmlToText(raw.toString('utf8'), 'a'));
+    }
+    text = parts.join('\n\n');
   } else {
     return null;
   }

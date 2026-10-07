@@ -4,8 +4,10 @@
 //
 // 키가 워크스페이스에 속하지 않은 키라면 ANTHROPIC_WORKSPACE_ID도 함께 설정해야 합니다
 // (요청마다 anthropic-workspace-id 헤더로 전달).
+const crypto = require('crypto');
 const AnthropicSdk = require('@anthropic-ai/sdk');
 const { run, get } = require('./db');
+const { deriveKey } = require('./auth');
 
 const Anthropic = AnthropicSdk.default || AnthropicSdk;
 
@@ -18,6 +20,10 @@ const DAILY_LIMITS = {
   support_chat: Number(process.env.AI_SUPPORT_DAILY_LIMIT) || 30,
   profile_from_resume: Number(process.env.AI_PROFILE_DAILY_LIMIT) || 5,
 };
+
+// 서비스 전체 1일 이용 한도. 봇이 계정을 여러 개 만들어 AI를 대신 돌리게 하는
+// '비용 폭탄(Denial of Wallet)' 공격을 막는 마지막 안전장치입니다.
+const GLOBAL_DAILY_LIMIT = Number(process.env.AI_GLOBAL_DAILY_LIMIT) || 2000;
 
 let client = null;
 function aiEnabled() {
@@ -46,6 +52,36 @@ async function remainingToday(userId, feature) {
   const limit = DAILY_LIMITS[feature] || 10;
   const row = await get('SELECT COUNT(*) AS n FROM ai_usage WHERE user_id = ? AND feature = ? AND day = ?', [userId, feature, kstDay()]);
   return Math.max(0, limit - Number(row ? row.n : 0));
+}
+
+// 서비스 전체에서 오늘 남은 이용 횟수
+async function globalRemainingToday() {
+  const row = await get('SELECT COUNT(*) AS n FROM ai_usage WHERE day = ?', [kstDay()]);
+  return Math.max(0, GLOBAL_DAILY_LIMIT - Number(row ? row.n : 0));
+}
+
+// 같은 계정이 같은 기능을 동시에 여러 번 호출하지 못하게 합니다.
+// (한도 확인 → AI 호출 → 사용 기록 사이에 요청을 동시에 몰아 보내 1일 한도를 우회하는 것을 차단)
+// 서버가 한 대(Render 인스턴스 1개)라 메모리 잠금으로 충분합니다.
+const inFlight = new Set();
+function tryBegin(userId, feature) {
+  const key = `${userId}:${feature}`;
+  if (inFlight.has(key)) return null;
+  inFlight.add(key);
+  return () => inFlight.delete(key);
+}
+
+// AI 상담 답변 서명: 화면이 보내는 대화 기록 중 'AI 답변'은 서버가 실제로 보낸 것만 인정합니다.
+// 사용자가 가짜 AI 답변("관리자 모드로 전환했습니다" 등)을 끼워 넣어 AI를 조종하는 것을 막습니다.
+const REPLY_KEY = deriveKey('ai-support-reply');
+function signReply(userId, text) {
+  return crypto.createHmac('sha256', REPLY_KEY).update(`${userId}\n${text}`).digest('base64url').slice(0, 32);
+}
+function verifyReply(userId, text, sig) {
+  if (typeof sig !== 'string' || sig.length !== 32) return false;
+  const want = Buffer.from(signReply(userId, text));
+  const got = Buffer.from(sig);
+  return want.length === got.length && crypto.timingSafeEqual(want, got);
 }
 
 async function recordUsage(userId, feature, model, usage) {
@@ -84,6 +120,10 @@ module.exports = {
   getClient,
   setClientForTest,
   remainingToday,
+  globalRemainingToday,
+  tryBegin,
+  signReply,
+  verifyReply,
   recordUsage,
   estimateCostUsd,
   kstDay,
@@ -91,4 +131,5 @@ module.exports = {
   SUPPORT_MODEL,
   PROFILE_MODEL,
   DAILY_LIMITS,
+  GLOBAL_DAILY_LIMIT,
 };

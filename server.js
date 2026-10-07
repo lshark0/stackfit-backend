@@ -123,6 +123,52 @@ const talentLimiter = rateLimit({
 });
 app.use('/api/talents', talentLimiter);
 
+// AI 봇 자동 도배 방어: 사람이 하기 어려운 속도로 제안·메시지·공고·신고를 쏟아내는 계정을 막습니다.
+// (AI로 만든 피싱 제안·가짜 공고를 대량으로 뿌리는 공격) 계정 단위로 시간당 횟수를 제한하고,
+// 한도를 넘으면 보안 로그에 '자동 도배 의심'으로 남깁니다.
+const WRITE_RULES = [
+  { name: '제안 보내기', re: /^\/api\/talents\/\d+\/propose$/, limit: Number(process.env.PROPOSE_HOURLY_LIMIT) || 30 },
+  { name: '채팅 메시지', re: /^\/api\/conversations\/\d+\/messages$/, limit: 200 },
+  { name: '대화 시작', re: /^\/api\/conversations\/?$/, limit: 60 },
+  { name: '공고 등록', re: /^\/api\/jobs\/?$|^\/api\/jobs\/\d+\/duplicate$/, limit: 20 },
+  { name: '공고 지원', re: /^\/api\/jobs\/\d+\/apply$/, limit: 60 },
+  { name: '신고·문의', re: /^\/api\/jobs\/\d+\/report$|^\/api\/support\/inquiries$/, limit: 10 },
+];
+const spamLogged = new Map();
+for (const rule of WRITE_RULES) {
+  app.use('/api', rateLimit({
+    windowMs: 60 * 60 * 1000,
+    limit: rule.limit,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req) => `${userKey(req)}:${rule.name}`,
+    skip: (req) => req.method !== 'POST' || !rule.re.test(req.originalUrl.split('?')[0]),
+    handler: (req, res) => {
+      const key = `${userKey(req)}:${rule.name}`;
+      if ((spamLogged.get(key) || 0) < Date.now() - 60 * 60 * 1000) {
+        spamLogged.set(key, Date.now());
+        const h = req.headers.authorization || '';
+        const payload = h.startsWith('Bearer ') ? verifySessionToken(h.slice(7)) : null;
+        securityLog.logEvent('spam_suspected', {
+          email: payload && payload.email, userId: payload && payload.id, ip: securityLog.clientIp(req),
+          detail: `${rule.name} 시간당 ${rule.limit}회 초과`,
+        });
+      }
+      res.status(429).json({ error: '요청이 너무 많아요. 잠시 후 다시 시도해주세요.' });
+    },
+  }));
+}
+
+// AI 기능 IP 단위 제한: 한 곳에서 계정을 여러 개 만들어 AI를 돌리는 것을 막습니다(계정별 1일 한도와 별도).
+app.use('/api/ai', rateLimit({
+  windowMs: 10 * 60 * 1000,
+  limit: Number(process.env.AI_IP_LIMIT_10MIN) || 40,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => req.method !== 'POST',
+  message: { error: 'AI 요청이 너무 많아요. 잠시 후 다시 시도해주세요.', code: 'AI_RATE_LIMIT' },
+}));
+
 // 이력서 등 업로드 파일: 아무나 접근 가능한 고정 URL 대신, 짧은 시간(5분)만 유효한
 // 서명된 링크로만 접근할 수 있게 합니다. URL이 캡처화면/로그 등으로 유출되어도
 // 시간이 지나면 무효화되어 개인정보(이력서) 노출 위험을 줄입니다.

@@ -4204,7 +4204,7 @@ async function sendAiChat(preset){
   aiChatBusy = true;
   try{
     const data = await apiFetch('/ai/support-chat', {method:'POST', body:{messages: aiChatMsgs.slice(-20)}});
-    aiChatMsgs.push({role:'assistant', content:data.reply});
+    aiChatMsgs.push({role:'assistant', content:data.reply, sig:data.sig}); // 서버 서명(sig)이 있어야 다음 질문 때 대화 맥락으로 인정됩니다
     saveAiChat();
     document.getElementById('aiTyping')?.remove();
     if(state.screen === 'aiChat') wrap.insertAdjacentHTML('beforeend', aiBubble('assistant', data.reply));
@@ -4506,6 +4506,7 @@ const SECURITY_EVENT_LABELS = {
   login_success: ['로그인', 'pass'], login_failed: ['로그인 실패', 'pending'], login_locked: ['계정 잠금', 'fail'],
   login_blocked: ['잠금 중 시도', 'fail'], admin_action: ['관리자 작업', 'pass'], admin_denied: ['관리자 접근 거부', 'fail'],
   scrape_suspected: ['대량 조회 의심', 'fail'],
+  spam_suspected: ['자동 도배 의심', 'fail'],
   mfa_enabled: ['2단계 인증 켬', 'pass'], mfa_reset: ['2단계 인증 초기화', 'fail'],
 };
 let adminSecurityFilter = 'alert';
@@ -4514,7 +4515,7 @@ async function screenAdminSecurity(){
   if(!state.isAdmin){ go('mypage'); return ''; }
   const s = await apiFetch('/admin/security-events?limit=300');
   const filters = [['alert','이상 징후'],['admin','관리자'],['all','전체']];
-  const alertEvents = ['login_failed','login_locked','login_blocked','admin_denied','scrape_suspected','mfa_reset'];
+  const alertEvents = ['login_failed','login_locked','login_blocked','admin_denied','scrape_suspected','spam_suspected','mfa_reset'];
   const events = s.events.filter(e => adminSecurityFilter === 'all' ? true
     : adminSecurityFilter === 'admin' ? (['admin_action','mfa_enabled','mfa_reset'].includes(e.event) || (e.event === 'login_success' && /관리자/.test(e.detail)))
     : alertEvents.includes(e.event));
