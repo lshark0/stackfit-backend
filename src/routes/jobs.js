@@ -10,6 +10,7 @@ const { matchesCategory } = require('../stackCatalog');
 const { getRatingSummary, getRatingSummaries } = require('../ratings');
 const { signedFileUrl } = require('../fileAccess');
 const { normalizeEmail } = require('../contact');
+const { grantReferralRewardLater } = require('../referralReward');
 
 // 잡코리아 문의·신고 양식과 동일한 첨부 가능 파일 종류(용량 10MB)
 const REPORT_ATTACH_EXT = ['.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.hwp', '.jpg', '.jpeg', '.gif', '.png', '.pdf', '.zip'];
@@ -306,6 +307,7 @@ router.post('/', requireAuth, requireRole('company'), async (req, res) => {
     ]
   );
   const job = await get('SELECT * FROM jobs WHERE id = ?', [r.lastInsertRowid]);
+  grantReferralRewardLater(req.user.id); // 초대받아 가입한 기업이 첫 공고를 올리면 초대한 회원에게 이용권 적립
   res.status(201).json(await withCompanyAndStack(job));
 });
 
@@ -354,6 +356,7 @@ router.put('/:id', requireAuth, requireRole('company'), async (req, res) => {
     ]
   );
   const updated = await get('SELECT * FROM jobs WHERE id = ?', [jobId]);
+  grantReferralRewardLater(req.user.id); // 수정으로 기술스택을 채운 경우도 적립 조건이 됩니다
   res.json(await withCompanyAndStack(updated));
 });
 

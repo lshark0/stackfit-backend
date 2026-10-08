@@ -313,3 +313,13 @@ CREATE TABLE IF NOT EXISTS security_events (
 );
 CREATE INDEX IF NOT EXISTS idx_security_events_email ON security_events(email, event, ts);
 CREATE INDEX IF NOT EXISTS idx_security_events_ts ON security_events(ts);
+
+-- 친구 초대 보상: 초대받은 회원이 활동을 시작하면(프로필 완성·첫 공고) 초대한 회원에게 이용권 1장 적립. 친구 1명당 한 번만
+CREATE TABLE IF NOT EXISTS referral_rewards (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  referrer_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  invitee_id   INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+  reason       TEXT NOT NULL DEFAULT '',
+  created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_referral_rewards_referrer ON referral_rewards(referrer_id);

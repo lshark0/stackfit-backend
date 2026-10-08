@@ -25,6 +25,7 @@ const supportRoutes = require('./src/routes/support');
 const announcementsRoutes = require('./src/routes/announcements');
 const referralRoutes = require('./src/routes/referral');
 const aiRoutes = require('./src/routes/ai');
+const publicPagesRoutes = require('./src/routes/publicPages');
 const mfaRoutes = require('./src/routes/mfa');
 const { resetMfaFromEnv } = require('./src/mfa');
 const { verifyToken, verifySessionToken } = require('./src/auth');
@@ -90,6 +91,14 @@ const apiLimiter = rateLimit({
   legacyHeaders: false,
 });
 app.use('/api', apiLimiter);
+
+// 공개 공고 페이지·sitemap은 로그인 없이 열리므로 IP당 분당 60회로 제한해 대량 수집을 막습니다.
+app.use(['/jobs', '/sitemap.xml'], rateLimit({
+  windowMs: 60 * 1000,
+  limit: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+}));
 
 // 인재 정보 대량 수집(스크래핑) 방어: 로그인한 계정 단위로 인재 목록·상세 조회를 시간당 300회로 제한합니다.
 // IP를 바꿔가며 한 계정으로 전체 프리랜서 정보를 긁어가는 것을 막고, 한도를 넘으면 보안 로그에 남깁니다.
@@ -280,6 +289,7 @@ app.use('/api/support', supportRoutes);
 app.use('/api/announcements', announcementsRoutes);
 app.use('/api/referral', referralRoutes);
 app.use('/api/ai', aiRoutes);
+app.use(publicPagesRoutes); // /jobs, /jobs/:id, /sitemap.xml, /robots.txt (로그인 없이 보는 공개 페이지)
 
 app.use((req, res) => res.status(404).json({ error: 'Not found' }));
 // eslint-disable-next-line no-unused-vars

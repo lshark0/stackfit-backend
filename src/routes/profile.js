@@ -7,6 +7,7 @@ const { requireAuth, requireRole } = require('../middleware/requireAuth');
 const { wrapAllRoutes } = require('../middleware/asyncHandler');
 const { normalizeMobile, normalizePhone, normalizeEmail, normalizeBirthDate } = require('../contact');
 const { freelancerMissingFields, FREELANCER_REQUIRED_COUNT } = require('../profileCheck');
+const { grantReferralRewardLater } = require('../referralReward');
 
 const router = express.Router();
 wrapAllRoutes(router);
@@ -221,6 +222,7 @@ router.put('/', requireAuth, async (req, res) => {
     );
     // 연락처를 지웠다면 공개 설정도 함께 꺼서, 빈 연락처가 공개로 남지 않게 합니다.
     if (!nextEmail) await run('UPDATE freelancer_profiles SET share_email=0 WHERE user_id=?', [req.user.id]);
+    grantReferralRewardLater(req.user.id); // 초대받아 가입한 회원이 프로필을 완성하면 초대한 회원에게 이용권 적립
     const updated = await get('SELECT * FROM freelancer_profiles WHERE user_id = ?', [req.user.id]);
     // eslint-disable-next-line no-unused-vars
     const { resume_data, ...rest } = updated;
@@ -291,6 +293,7 @@ router.post('/resume', requireAuth, requireRole('freelancer'), (req, res) => {
       'UPDATE freelancer_profiles SET resume_filename=?, resume_original_name=?, resume_data=?, completion=?, updated_at=? WHERE user_id=?',
       [filename, clamp(originalName, 200, 'resume.pdf'), req.file.buffer, completion, nowStr(), req.user.id]
     );
+    grantReferralRewardLater(req.user.id);
     res.status(201).json({
       resume_url: signedFileUrl(filename),
       resume_original_name: originalName,

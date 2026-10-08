@@ -721,7 +721,7 @@ function screenAllowed(screen){
 
 // 알림/푸시에 담긴 링크('screen' 또는 'screen:param')로 해당 화면을 엽니다.
 const LINKABLE_SCREENS = ['home','jobs','jobDetail','myApplications','receivedProposals','sentProposals','savedTalents',
-  'applicants','projects','chatList','chatRoom','profileViews','alerts','mypage','talentDetail','savedJobs'];
+  'applicants','projects','chatList','chatRoom','profileViews','alerts','mypage','talentDetail','savedJobs','invite'];
 function openLink(link){
   if(!link) return false;
   const [screen, rawParam] = String(link).split(':');
@@ -1594,6 +1594,7 @@ async function doSignup(){
     toast('가입이 완료됐어요');
     syncPushSubscription();
     go('home');
+    openPendingDeepLink(); // 공개 공고 페이지에서 '지원하기'로 들어왔다면 그 공고로 이동
     maybeShowOnboardingNudge();
   }catch(e){ toast(e.message); }
 }
@@ -1695,6 +1696,7 @@ async function finishOAuthSignup(){
     toast('가입이 완료됐어요');
     syncPushSubscription();
     go('home');
+    openPendingDeepLink(); // 공개 공고 페이지에서 '지원하기'로 들어왔다면 그 공고로 이동
     maybeShowOnboardingNudge();
   }catch(e){ toast(e.message); }
 }
@@ -2561,6 +2563,7 @@ async function screenOnboarding(){
       <button class="btn btn-primary" onclick="go('signup')">회원가입</button>
       <button class="btn btn-outline" onclick="go('login','freelancer')">프리랜서로 로그인</button>
       <button class="btn btn-outline" onclick="go('login','company')">기업으로 로그인</button>
+      <a href="/jobs" style="text-align:center; font-size:13.5px; font-weight:700; color:var(--slate); padding:6px 0;">로그인 없이 모집 중인 공고 둘러보기 →</a>
     </div>
   </div>`;
 }
@@ -4412,6 +4415,7 @@ function isMobileDevice(){
 async function screenInvite(){
   const data = await apiFetch('/referral/me');
   const invited = data.invited || [];
+  const rewards = data.rewards || { count: 0, max: 0 };
   const isCompany = state.role === 'company';
   const code = jsAttrStr(data.code);
   const showKakao = !isMobileDevice();
@@ -4434,19 +4438,27 @@ async function screenInvite(){
       <button class="btn btn-outline" style="flex:1.45; white-space:nowrap; padding-left:6px; padding-right:6px;" onclick="copyText('${code}', '추천인 코드를 복사했어요')">추천인 코드 복사</button>
     </div>
     <div class="page-sub" style="word-break:break-all; margin-bottom:6px;">${esc(inviteLink(data.code))}</div>
+    <div class="card" style="margin:14px 0 4px; cursor:default;">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+        <div><div class="li-tt">적립된 이용권</div><div class="page-sub" style="margin-top:2px;">정식 출시 후 쓸 수 있어요</div></div>
+        <div style="font-size:26px; font-weight:800; color:var(--ink); white-space:nowrap;">${rewards.count}<span style="font-size:14px; color:var(--slate); font-weight:700;"> 장</span></div>
+      </div>
+      <div class="page-sub" style="margin-top:10px; line-height:1.6;">초대한 친구가 <b style="color:var(--ink);">프로필을 완성</b>하거나(프리랜서) <b style="color:var(--ink);">첫 공고를 등록</b>하면(기업) 1장씩 적립돼요. 최대 ${rewards.max}장까지 적립되고, 친구가 탈퇴하면 그 친구 몫은 취소돼요.</div>
+    </div>
     <div class="section-label with-ic">${I.talent}초대로 가입한 친구 <b style="color:var(--ink); margin-left:4px;">${invited.length}명</b></div>
     ${invited.length ? invited.map(v=>`
       <div class="list-item" style="cursor:default;"><div class="li-l"><div class="li-icon">${I.user}</div>
-        <div><div class="li-tt">${esc(v.name)}</div><div class="page-sub" style="margin-top:2px;">${v.role==='company'?'기업회원':'프리랜서'} · ${(parseServerTime(v.created_at)||new Date()).toLocaleDateString('ko-KR')} 가입</div></div></div></div>`).join('')
+        <div><div class="li-tt">${esc(v.name)}</div><div class="page-sub" style="margin-top:2px;">${v.role==='company'?'기업회원':'프리랜서'} · ${(parseServerTime(v.created_at)||new Date()).toLocaleDateString('ko-KR')} 가입</div></div></div>
+        <div class="page-sub" style="white-space:nowrap; font-weight:700; color:${v.rewarded?'var(--ink)':'var(--slate)'};">${v.rewarded ? '이용권 적립' : (v.role==='company' ? '첫 공고 전' : '프로필 작성 중')}</div></div>`).join('')
       : `<div class="reco-empty">아직 초대로 가입한 친구가 없어요.<br>초대 링크를 공유해보세요.</div>`}
-    <div class="page-sub" style="margin-top:14px;">초대 혜택은 고객센터 &gt; 이벤트·혜택에서 안내해요.</div>
+    <div class="page-sub" style="margin-top:14px;">이용권을 쓰는 곳(예: 기업 제안권·프리미엄 등록)은 정식 출시 때 고객센터 &gt; 이벤트·혜택에서 안내해요.</div>
   </div>`;
 }
 
 // 관리자 전용: 가입 경로 통계 + 채널별 공유 링크 만들기
 const SOURCE_LABELS = {
   '': '직접 방문·알 수 없음', referral: '친구 초대', okky: 'OKKY', openchat: '카카오 오픈채팅', linkedin: '링크드인',
-  naver_cafe: '네이버 카페', blog: '블로그', instagram: '인스타그램', google_ads: '구글 광고', naver_ads: '네이버 광고',
+  naver_cafe: '네이버 카페', blog: '블로그', jobpage: '공개 공고 페이지(검색 등)', instagram: '인스타그램', google_ads: '구글 광고', naver_ads: '네이버 광고',
   meta_ads: '메타(페북·인스타) 광고', email: '이메일', offline: '오프라인·명함',
 };
 const sourceLabel = (s) => SOURCE_LABELS[s] || s;
@@ -4492,7 +4504,7 @@ async function screenAdminSignupStats(){
     <div class="card">
       <div class="page-sub" style="margin-bottom:8px;">OKKY·오픈채팅 등에 글을 올릴 때 이 링크를 쓰면, 그 링크로 가입한 회원이 위 표에 채널별로 집계돼요.</div>
       <div class="form-field"><label class="form-label">채널</label>
-        <select id="lb-source" class="form-input">${Object.entries(SOURCE_LABELS).filter(([k])=>k && k!=='referral').map(([k,l])=>`<option value="${k}">${esc(l)}</option>`).join('')}</select></div>
+        <select id="lb-source" class="form-input">${Object.entries(SOURCE_LABELS).filter(([k])=>k && k!=='referral' && k!=='jobpage').map(([k,l])=>`<option value="${k}">${esc(l)}</option>`).join('')}</select></div>
       <div class="form-field"><label class="form-label">캠페인 이름 <span style="font-weight:400; color:var(--slate-light);">(선택, 영문·숫자)</span></label>
         <input id="lb-campaign" class="form-input" placeholder="예: okbank_ta_1001"></div>
       <button class="btn btn-primary" onclick="buildChannelLink()">링크 만들고 복사</button>
