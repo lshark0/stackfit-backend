@@ -4,6 +4,7 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const { initDb, get, USE_POSTGRES } = require('./src/db');
 const { checkDeadlineAlerts, closeExpiredJobs } = require('./src/deadlineAlerts');
+const { sendInterviewReminders } = require('./src/interviews');
 
 const authRoutes = require('./src/routes/auth');
 const profileRoutes = require('./src/routes/profile');
@@ -139,6 +140,7 @@ const WRITE_RULES = [
   { name: '제안 보내기', re: /^\/api\/talents\/\d+\/propose$/, limit: Number(process.env.PROPOSE_HOURLY_LIMIT) || 30 },
   { name: '채팅 메시지', re: /^\/api\/conversations\/\d+\/messages$/, limit: 200 },
   { name: '대화 시작', re: /^\/api\/conversations\/?$/, limit: 60 },
+  { name: '인터뷰 일정', re: /^\/api\/conversations\/\d+\/interview$/, limit: 30 },
   { name: '공고 등록', re: /^\/api\/jobs\/?$|^\/api\/jobs\/\d+\/duplicate$/, limit: 20 },
   { name: '공고 지원', re: /^\/api\/jobs\/\d+\/apply$/, limit: 60 },
   { name: '신고·문의', re: /^\/api\/jobs\/\d+\/report$|^\/api\/support\/inquiries$/, limit: 10 },
@@ -317,6 +319,12 @@ async function main() {
   };
   runScheduledChecks();
   setInterval(runScheduledChecks, 6 * 60 * 60 * 1000);
+
+  // 인터뷰 1시간 전 알림: 5분마다 확인합니다.
+  const runInterviewReminders = () => sendInterviewReminders()
+    .catch((e) => console.warn('[IT Free] 인터뷰 알림 확인 실패:', e.message));
+  runInterviewReminders();
+  setInterval(runInterviewReminders, 5 * 60 * 1000);
 }
 
 main().catch((err) => {

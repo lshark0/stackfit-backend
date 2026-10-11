@@ -3,6 +3,7 @@ const { run, get, all } = require('../db');
 const { requireAuth } = require('../middleware/requireAuth');
 const { wrapAllRoutes } = require('../middleware/asyncHandler');
 const { pushTo } = require('../notify');
+const { getInterview, saveInterview, cancelInterview } = require('../interviews');
 
 const router = express.Router();
 wrapAllRoutes(router);
@@ -121,7 +122,45 @@ router.get('/:id/messages', requireAuth, async (req, res) => {
     ).catch(() => {});
   }
 
-  res.json({ messages: msgs });
+  const job = conv.job_id ? await get('SELECT title FROM jobs WHERE id = ?', [conv.job_id]) : null;
+  res.json({
+    messages: msgs,
+    interview: await getInterview(conv.id),
+    counterpartName: senderRow ? senderRow.name : null,
+    jobTitle: job ? job.title : null,
+  });
+});
+
+// 내가 참여한 대화만 다룰 수 있습니다.
+async function myConversation(req) {
+  const conv = await get('SELECT * FROM conversations WHERE id = ?', [req.params.id]);
+  if (!conv || (conv.company_id !== req.user.id && conv.freelancer_id !== req.user.id)) return null;
+  return conv;
+}
+
+router.get('/:id/interview', requireAuth, async (req, res) => {
+  const conv = await myConversation(req);
+  if (!conv) return res.status(404).json({ error: '대화를 찾을 수 없습니다.' });
+  res.json({ interview: await getInterview(conv.id) });
+});
+
+// 인터뷰 잡기·변경 (당근 '약속 잡기'처럼 대화 중 일정과 장소를 정함). 대화 참여자 누구나 잡거나 바꿀 수 있습니다.
+router.post('/:id/interview', requireAuth, async (req, res) => {
+  const conv = await myConversation(req);
+  if (!conv) return res.status(404).json({ error: '대화를 찾을 수 없습니다.' });
+  const result = await saveInterview(conv, req.user.id, req.body || {});
+  if (result.error) return res.status(400).json({ error: result.error });
+  const msgs = await all('SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at ASC, id ASC', [conv.id]);
+  res.json({ interview: result.interview, unchanged: !!result.unchanged, messages: msgs });
+});
+
+router.delete('/:id/interview', requireAuth, async (req, res) => {
+  const conv = await myConversation(req);
+  if (!conv) return res.status(404).json({ error: '대화를 찾을 수 없습니다.' });
+  const result = await cancelInterview(conv, req.user.id);
+  if (result.error) return res.status(400).json({ error: result.error });
+  const msgs = await all('SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at ASC, id ASC', [conv.id]);
+  res.json({ interview: result.interview, messages: msgs });
 });
 
 router.post('/:id/messages', requireAuth, async (req, res) => {
@@ -188,6 +227,10 @@ router.delete('/:id/messages/:messageId', requireAuth, async (req, res) => {
   if (msg.sender_id !== req.user.id) {
     return res.status(403).json({ error: '본인이 보낸 메시지만 취소할 수 있어요.' });
   }
+  // 인터뷰 일정 카드는 기록으로 남깁니다(일정은 '인터뷰 취소'로 취소).
+  if (msg.kind && msg.kind !== 'text') {
+    return res.status(400).json({ error: '인터뷰 일정 기록은 지울 수 없어요. 일정을 취소하려면 인터뷰 취소를 눌러주세요.' });
+  }
 
   await run('DELETE FROM messages WHERE id = ?', [msgId]);
 
@@ -203,7 +246,7 @@ router.delete('/:id/messages/:messageId', requireAuth, async (req, res) => {
   );
   if (notif) {
     const latestMine = await get(
-      'SELECT body FROM messages WHERE conversation_id = ? AND sender_id = ? ORDER BY id DESC LIMIT 1',
+      "SELECT body FROM messages WHERE conversation_id = ? AND sender_id = ? AND kind = 'text' ORDER BY id DESC LIMIT 1",
       [conv.id, req.user.id]
     );
     if (latestMine) {

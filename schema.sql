@@ -323,3 +323,20 @@ CREATE TABLE IF NOT EXISTS referral_rewards (
   created_at   TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_referral_rewards_referrer ON referral_rewards(referrer_id);
+
+-- 채팅 중 잡은 인터뷰 일정 (대화방 1개당 1건, 변경하면 덮어씀). interview_at은 한국시간 'YYYY-MM-DD HH:MM'
+CREATE TABLE IF NOT EXISTS interviews (
+  id               INTEGER PRIMARY KEY AUTOINCREMENT,
+  conversation_id  INTEGER NOT NULL UNIQUE REFERENCES conversations(id) ON DELETE CASCADE,
+  created_by       INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  interview_at     TEXT NOT NULL,
+  mode             TEXT NOT NULL DEFAULT 'offline',
+  place            TEXT NOT NULL DEFAULT '',
+  link             TEXT NOT NULL DEFAULT '',
+  note             TEXT NOT NULL DEFAULT '',
+  status           TEXT NOT NULL DEFAULT 'scheduled',
+  reminded         INTEGER NOT NULL DEFAULT 0,
+  created_at       TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at       TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_interviews_upcoming ON interviews(status, reminded, interview_at);

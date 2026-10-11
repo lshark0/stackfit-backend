@@ -87,6 +87,9 @@ if (USE_POSTGRES) {
     await ensureColumnPg('users', 'oauth_id', 'TEXT');
     // 알림을 누르면 이동할 화면 링크
     await ensureColumnPg('notifications', 'link', 'TEXT');
+    // 채팅 메시지 종류: 일반 글(text) / 인터뷰 일정 카드(interview). meta_json에 카드 내용을 담습니다.
+    await ensureColumnPg('messages', 'kind', "TEXT NOT NULL DEFAULT 'text'");
+    await ensureColumnPg('messages', 'meta_json', 'TEXT');
     // 프리랜서 연락처 + 제안 받기 설정
     await ensureColumnPg('freelancer_profiles', 'phone', "TEXT NOT NULL DEFAULT ''");
     await ensureColumnPg('freelancer_profiles', 'email', "TEXT NOT NULL DEFAULT ''");
@@ -197,6 +200,8 @@ if (USE_POSTGRES) {
     try { db.exec('ALTER TABLE users ADD COLUMN oauth_id TEXT'); } catch (e) {}
     const addCol = (table, col, ddl) => { try { db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${ddl}`); } catch (e) {} };
     addCol('notifications', 'link', 'TEXT');
+    addCol('messages', 'kind', "TEXT NOT NULL DEFAULT 'text'");
+    addCol('messages', 'meta_json', 'TEXT');
     addCol('freelancer_profiles', 'phone', "TEXT NOT NULL DEFAULT ''");
     addCol('freelancer_profiles', 'email', "TEXT NOT NULL DEFAULT ''");
     addCol('freelancer_profiles', 'accept_proposals', 'INTEGER NOT NULL DEFAULT 1');
