@@ -2164,7 +2164,9 @@ async function screenInterviewForm(){
       <div class="form-field" style="flex:1;"><label class="form-label">날짜</label>
         <input id="iv-date" type="date" class="form-input" min="${today}" value="${iv ? iv.date : tomorrow}"></div>
       <div class="form-field" style="flex:1;"><label class="form-label">시간</label>
-        <input id="iv-time" type="time" class="form-input" step="600" value="${iv ? iv.time : '14:00'}"></div>
+        <input id="iv-time" class="form-input" inputmode="text" maxlength="12" autocomplete="off" placeholder="예: 14:30" value="${iv ? iv.time : '14:00'}"
+          oninput="ivTimePreview()" onblur="ivTimeTidy()">
+        <div id="ivTimeHint" class="page-sub" style="margin-top:4px;">${esc(ivTimeHintText(iv ? iv.time : '14:00'))}</div></div>
     </div>
     <div class="form-field"><label class="form-label">방식</label>
       <div class="iv-mode" id="ivModeRow">
@@ -2181,10 +2183,50 @@ async function screenInterviewForm(){
     <div style="height:20px;"></div>
   </div>`;
 }
+// 시간은 직접 입력합니다. '21:30', '2130', '930', '9:30', '21시', '오후 9시 30분', '오후 9:30' 모두 받아 'HH:MM'으로 맞춥니다.
+function normalizeIvTime(raw){
+  let str = String(raw || '').replace(/\s+/g, '');
+  if(!str) return null;
+  let pm = null;
+  if(/^(오후|pm)/i.test(str)){ pm = true; str = str.replace(/^(오후|pm)/i, ''); }
+  else if(/^(오전|am)/i.test(str)){ pm = false; str = str.replace(/^(오전|am)/i, ''); }
+  let h, m;
+  let mt = str.match(/^(\d{1,2})시(?:(\d{1,2})분?)?$/) || str.match(/^(\d{1,2})[:.](\d{1,2})$/);
+  if(mt){ h = Number(mt[1]); m = Number(mt[2] || 0); }
+  else if(/^\d{1,4}$/.test(str)){
+    if(str.length <= 2){ h = Number(str); m = 0; }                      // 9 → 9:00, 21 → 21:00
+    else { h = Number(str.slice(0, -2)); m = Number(str.slice(-2)); }   // 930 → 9:30, 2130 → 21:30
+  } else return null;
+  if(pm === true && h >= 1 && h <= 11) h += 12;   // 오후 9 → 21
+  if(pm === false && h === 12) h = 0;             // 오전 12 → 0
+  if(pm !== null && (h < 0 || h > 23)) return null;
+  if(!(h >= 0 && h <= 23 && m >= 0 && m <= 59)) return null;
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+}
+function ivTimeHintText(raw){
+  const t = normalizeIvTime(raw);
+  if(!t) return raw ? '시간을 다시 확인해주세요 (예: 14:30)' : '예: 14:30 · 오후 2시 30분';
+  const [h, m] = t.split(':').map(Number);
+  return `${h < 12 ? '오전' : '오후'} ${h % 12 === 0 ? 12 : h % 12}:${String(m).padStart(2,'0')}`;
+}
+function ivTimePreview(){
+  const el = document.getElementById('iv-time'), hint = document.getElementById('ivTimeHint');
+  if(!el || !hint) return;
+  hint.textContent = ivTimeHintText(el.value);
+  hint.style.color = el.value && !normalizeIvTime(el.value) ? 'var(--danger)' : '';
+}
+function ivTimeTidy(){
+  const el = document.getElementById('iv-time');
+  const t = el && normalizeIvTime(el.value);
+  if(t){ el.value = t; ivTimePreview(); }
+}
 async function submitInterview(convId){
+  const timeRaw = document.getElementById('iv-time').value;
+  const time = normalizeIvTime(timeRaw);
+  if(timeRaw.trim() && !time){ toast('시간을 다시 확인해주세요 (예: 14:30)'); return; }
   const body = {
     date: document.getElementById('iv-date').value,
-    time: document.getElementById('iv-time').value,
+    time: time || '',
     mode: ivFormMode,
     place: document.getElementById('iv-place').value.trim(),
     link: document.getElementById('iv-link').value.trim(),
