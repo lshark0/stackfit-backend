@@ -2171,7 +2171,7 @@ async function screenInterviewForm(){
         ${Object.entries(IV_MODE_LABEL).map(([k,l])=>`<div class="chip ${ivFormMode===k?'active':''}" data-mode="${k}" onclick="setIvMode('${k}')">${l}</div>`).join('')}
       </div></div>
     <div class="form-field" id="ivPlaceField" ${ivFormMode==='offline'?'':'hidden'}><label class="form-label">장소</label>
-      <input id="iv-place" class="form-input" maxlength="120" placeholder="예: 길음역 9번 출구, 본사 3층 회의실" value="${esc(iv && iv.mode==='offline' ? iv.place : '')}"></div>
+      <input id="iv-place" class="form-input" maxlength="120" placeholder="예: 강남역 1번 출구 ㅇㅇ 빌딩" value="${esc(iv && iv.mode==='offline' ? iv.place : '')}"></div>
     <div class="form-field" id="ivLinkField" ${ivFormMode==='online'?'':'hidden'}><label class="form-label">화상 회의 링크 <span style="font-weight:400; color:var(--slate-light);">(선택)</span></label>
       <input id="iv-link" class="form-input" maxlength="300" inputmode="url" placeholder="https://meet.google.com/..." value="${esc(iv && iv.mode==='online' ? iv.link : '')}"></div>
     <div class="form-field"><label class="form-label">메모 <span style="font-weight:400; color:var(--slate-light);">(선택)</span></label>
