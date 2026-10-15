@@ -4,7 +4,7 @@ const { signedFileUrl } = require('../fileAccess');
 const { computeMatch } = require('../match');
 const { requireAuth, requireRole } = require('../middleware/requireAuth');
 const { wrapAllRoutes } = require('../middleware/asyncHandler');
-const { addNotification, pushTo } = require('../notify');
+const { addNotification, pushTo, notifyAdmins } = require('../notify');
 const { publicTalent } = require('../contact');
 const { freelancerMissingFields } = require('../profileCheck');
 const { pairScore } = require('../recommend');
@@ -63,6 +63,15 @@ router.post('/jobs/:id/apply', requireAuth, requireRole('freelancer'), async (re
     body: `"${job.title}" 공고에 지원이 완료됐습니다.`,
     link: 'myApplications',
   });
+  // 관리자가 대신 만든 기업 계정이 아직 연결 전이면, 기업이 지원을 볼 수 없으므로 관리자에게 연결 안내를 부탁합니다.
+  const owner = await get('SELECT claim_pending FROM users WHERE id = ?', [job.company_id]);
+  if (owner && Number(owner.claim_pending) === 1) {
+    notifyAdmins({
+      title: '대리 등록 공고에 지원이 왔어요',
+      body: `"${job.title}" · 기업 계정 연결 전이에요. 담당자에게 계정 연결 링크를 보내주세요.`,
+      link: 'adminProxyJobs', tag: `proxy-apply-${job.id}`,
+    });
+  }
 
   res.status(201).json({ applied: true });
 });

@@ -99,6 +99,11 @@ if (USE_POSTGRES) {
     await ensureColumnPg('career_verification_files', 'doc_kind', "TEXT NOT NULL DEFAULT ''");
     // 새 공고 맞춤 알림 받기(1=받음)
     await ensureColumnPg('freelancer_profiles', 'job_alerts', 'INTEGER NOT NULL DEFAULT 1');
+    // 관리자 공고 대리 등록: 등록한 관리자, 대신 만든 기업 계정의 '계정 연결 전' 상태
+    await ensureColumnPg('jobs', 'proxy_by', 'INTEGER');
+    await ensureColumnPg('users', 'claim_pending', 'INTEGER NOT NULL DEFAULT 0');
+    await ensureColumnPg('users', 'claim_nonce', 'TEXT');
+    await ensureColumnPg('users', 'proxy_created_by', 'INTEGER');
     // 프리랜서 연락처 + 제안 받기 설정
     await ensureColumnPg('freelancer_profiles', 'phone', "TEXT NOT NULL DEFAULT ''");
     await ensureColumnPg('freelancer_profiles', 'email', "TEXT NOT NULL DEFAULT ''");
@@ -217,6 +222,10 @@ if (USE_POSTGRES) {
     addCol('career_verifications', 'reviewed_by', "TEXT NOT NULL DEFAULT ''");
     addCol('career_verification_files', 'doc_kind', "TEXT NOT NULL DEFAULT ''");
     addCol('freelancer_profiles', 'job_alerts', 'INTEGER NOT NULL DEFAULT 1');
+    addCol('jobs', 'proxy_by', 'INTEGER');
+    addCol('users', 'claim_pending', 'INTEGER NOT NULL DEFAULT 0');
+    addCol('users', 'claim_nonce', 'TEXT');
+    addCol('users', 'proxy_created_by', 'INTEGER');
     addCol('freelancer_profiles', 'phone', "TEXT NOT NULL DEFAULT ''");
     addCol('freelancer_profiles', 'email', "TEXT NOT NULL DEFAULT ''");
     addCol('freelancer_profiles', 'accept_proposals', 'INTEGER NOT NULL DEFAULT 1');

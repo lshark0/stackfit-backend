@@ -273,11 +273,10 @@ router.get('/:id', optionalAuth, async (req, res) => {
   res.json({ ...full, match, applied, saved, following, applicantCount: Number(applicantCount), similarJobs });
 });
 
-router.post('/', requireAuth, requireRole('company'), async (req, res) => {
-  const { title, stack, certs, period, rate, work_type, location, category, description, deadline, duty, grade } = req.body || {};
-  if (!title || typeof title !== 'string' || !title.trim()) {
-    return res.status(400).json({ error: '공고 제목은 필수입니다.' });
-  }
+// 공고 저장(기업 본인 등록과 관리자 대리 등록이 함께 씁니다). 제목이 없으면 null.
+async function createJob(companyId, body, { proxyBy = null } = {}) {
+  const { title, stack, certs, period, rate, work_type, location, category, description, deadline, duty, grade } = body || {};
+  if (!title || typeof title !== 'string' || !title.trim()) return null;
   const clamp = (v, max, fallback) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : fallback);
   const safeStack = (Array.isArray(stack) ? stack : [])
     .filter((s) => typeof s === 'string' && s.trim())
@@ -290,10 +289,10 @@ router.post('/', requireAuth, requireRole('company'), async (req, res) => {
   const safeDeadline = typeof deadline === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(deadline.trim()) ? deadline.trim() : null;
 
   const r = await run(
-    `INSERT INTO jobs (company_id, title, stack_json, certs_json, period, rate, work_type, location, category, description, deadline, duty, grade)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    `INSERT INTO jobs (company_id, title, stack_json, certs_json, period, rate, work_type, location, category, description, deadline, duty, grade, proxy_by)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     [
-      req.user.id,
+      companyId,
       clamp(title, 120, title.trim()),
       JSON.stringify(safeStack),
       JSON.stringify(safeCerts),
@@ -306,11 +305,18 @@ router.post('/', requireAuth, requireRole('company'), async (req, res) => {
       safeDeadline,
       pickFrom(duty, DUTY_OPTIONS, null),
       pickFrom(grade, GRADE_OPTIONS, null),
+      proxyBy,
     ]
   );
   const job = await get('SELECT * FROM jobs WHERE id = ?', [r.lastInsertRowid]);
-  grantReferralRewardLater(req.user.id); // 초대받아 가입한 기업이 첫 공고를 올리면 초대한 회원에게 이용권 적립
+  grantReferralRewardLater(companyId); // 초대받아 가입한 기업이 첫 공고를 올리면 초대한 회원에게 이용권 적립
   notifyNewJobLater(job.id); // 기술이 맞는 프리랜서·관심 기업으로 둔 프리랜서에게 새 공고 알림
+  return job;
+}
+
+router.post('/', requireAuth, requireRole('company'), async (req, res) => {
+  const job = await createJob(req.user.id, req.body);
+  if (!job) return res.status(400).json({ error: '공고 제목은 필수입니다.' });
   res.status(201).json(await withCompanyAndStack(job));
 });
 
@@ -473,3 +479,5 @@ router.delete('/:id', requireAuth, requireRole('company'), async (req, res) => {
 });
 
 module.exports = router;
+module.exports.createJob = createJob;
+module.exports.withCompanyAndStack = withCompanyAndStack;

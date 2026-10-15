@@ -1,6 +1,6 @@
 const express = require('express');
 const { run, get } = require('../db');
-const { hashPassword, verifyPassword, signToken } = require('../auth');
+const { hashPassword, verifyPassword, signToken, verifyToken } = require('../auth');
 const { requireAuth } = require('../middleware/requireAuth');
 const { wrapAllRoutes } = require('../middleware/asyncHandler');
 const { normalizeMobile, normalizePhone, normalizeBirthDate } = require('../contact');
@@ -205,6 +205,46 @@ router.post('/login', async (req, res) => {
   await securityLog.logEvent('login_success', { email, ip, userId: user.id, detail: isAdminEmail(user.email) ? '관리자 (2단계 인증 미설정)' : '' });
   const token = signToken({ id: user.id, role: user.role, email: user.email });
   res.json({ token, user: { id: user.id, email: user.email, role: user.role, isAdmin: isAdminEmail(user.email) } });
+});
+
+// 계정 연결: 관리자가 공고를 대신 등록하며 만든 기업 계정을, 담당자가 링크로 들어와 비밀번호를 정해 넘겨받습니다.
+async function claimTarget(token) {
+  const p = verifyToken(String(token || ''));
+  if (!p || p.purpose !== 'company_claim' || !Number.isInteger(p.uid) || !p.n) return null;
+  const u = await get("SELECT id, email, role, claim_pending, claim_nonce FROM users WHERE id = ? AND role = 'company'", [p.uid]);
+  if (!u || Number(u.claim_pending) !== 1 || u.claim_nonce !== p.n) return null;
+  return u;
+}
+router.get('/claim', async (req, res) => {
+  const u = await claimTarget(req.query.token);
+  if (!u) return res.status(400).json({ error: '계정 연결 링크가 만료됐거나 이미 사용됐어요. IT Free에 새 링크를 요청해주세요.' });
+  const c = await get('SELECT name, contact_person, phone FROM companies WHERE user_id = ?', [u.id]);
+  const { n } = await get('SELECT COUNT(*) AS n FROM jobs WHERE company_id = ?', [u.id]);
+  res.json({ email: u.email, companyName: c ? c.name : '', contactPerson: c ? c.contact_person : '', needPhone: !(c && c.phone), jobs: Number(n) });
+});
+router.post('/claim', async (req, res) => {
+  const { token, password } = req.body || {};
+  const u = await claimTarget(token);
+  if (!u) return res.status(400).json({ error: '계정 연결 링크가 만료됐거나 이미 사용됐어요. IT Free에 새 링크를 요청해주세요.' });
+  if (typeof password !== 'string' || password.length < MIN_PASSWORD_LEN || !PASSWORD_RE.test(password)) {
+    return res.status(400).json({ error: `비밀번호는 영문과 숫자를 포함해 ${MIN_PASSWORD_LEN}자 이상이어야 해요.` });
+  }
+  const c = await get('SELECT phone FROM companies WHERE user_id = ?', [u.id]);
+  let phone = c && c.phone;
+  if (!phone) {
+    phone = normalizeMobile((req.body || {}).phone);
+    if (!phone) return res.status(400).json({ error: '담당자 휴대폰 번호를 정확히 입력해주세요. (예: 010-1234-5678)' });
+  }
+  const { hash, salt } = hashPassword(password);
+  const upd = await run(
+    'UPDATE users SET password_hash = ?, password_salt = ?, claim_pending = 0, claim_nonce = NULL WHERE id = ? AND claim_pending = 1',
+    [hash, salt, u.id]
+  );
+  if (!upd.changes) return res.status(409).json({ error: '이미 연결된 계정이에요. 로그인해주세요.' });
+  await run('UPDATE companies SET phone = ? WHERE user_id = ?', [phone, u.id]);
+  await securityLog.logEvent('login_success', { email: u.email, ip: securityLog.clientIp(req), userId: u.id, detail: '대리 등록 기업 계정 연결' });
+  const sessionToken = signToken({ id: u.id, role: 'company', email: u.email });
+  res.json({ token: sessionToken, user: { id: u.id, email: u.email, role: 'company', isAdmin: isAdminEmail(u.email) } });
 });
 
 router.get('/me', requireAuth, async (req, res) => {

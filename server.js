@@ -30,6 +30,7 @@ const aiRoutes = require('./src/routes/ai');
 const publicPagesRoutes = require('./src/routes/publicPages');
 const careerVerifyRoutes = require('./src/routes/careerVerify');
 const planRoutes = require('./src/routes/plans');
+const proxyJobRoutes = require('./src/routes/proxyJobs');
 const mfaRoutes = require('./src/routes/mfa');
 const { resetMfaFromEnv } = require('./src/mfa');
 const { verifyToken, verifySessionToken } = require('./src/auth');
@@ -84,6 +85,7 @@ app.use('/api/auth/identity/verify', authLimiter);
 app.use('/api/auth/change-password', authLimiter);
 app.use('/api/auth/mfa/verify', authLimiter);
 app.use('/api/auth/mfa/enable', authLimiter);
+app.use('/api/auth/claim', authLimiter); // 계정 연결 링크 대입 방지
 // DELETE /api/auth/me(회원탈퇴)의 비밀번호 확인 무차별 대입만 제한 — GET(세션 확인)은 자주 호출되므로 제외
 app.use('/api/auth/me', (req, res, next) => (req.method === 'DELETE' ? authLimiter(req, res, next) : next()));
 
@@ -299,6 +301,7 @@ app.use('/api/companies', companyRoutes);
 app.use('/api/recommend', recommendRoutes);
 app.use('/api/portfolios', portfolioRoutes);
 app.use('/api/push', pushRoutes);
+app.use('/api/admin/proxy', proxyJobRoutes); // 관리자 공고 대리 등록
 app.use('/api/admin', adminRoutes);
 app.use('/api/support', supportRoutes);
 app.use('/api/announcements', announcementsRoutes);

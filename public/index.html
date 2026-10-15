@@ -721,6 +721,8 @@ function go(screen, param){
   }
   // 프로필 수정 중 선택기·수행 프로젝트 화면을 다녀오는 경우가 아니면 임시 입력값을 버립니다.
   if(!['profileEdit','pickerScreen','portfolioEdit'].includes(screen)) profileDraft = null;
+  // 공고 대리 등록은 공고 등록 화면(과 기술 선택기)에 머무는 동안만 유지합니다.
+  if(!['jobPost','pickerScreen'].includes(screen)) proxyCompany = null;
   state.screen = screen; state.param = param ?? null;
   history.pushState({screen: state.screen, param: state.param}, '', location.pathname);
   render();
@@ -738,12 +740,16 @@ function talentDetailBack(){ goBackFrom(talentDetailReturn, 'talent'); }
 // 화면 안의 뒤로가기 화살표가 항상 마이페이지로 돌아가는 화면들.
 // 이 화면들은 드로어 메뉴 등 여러 곳에서 열릴 수 있어서, 휴대폰의 '뒤로가기'
 // 제스처도 그 화살표와 똑같이 항상 마이페이지로 보내도록 popstate에서 함께 처리합니다.
-const MYPAGE_CHILD_SCREENS = ['proposalSettings','changePassword','deleteAccount','savedJobs','followedCompanies','adminReports','adminInquiries','adminPerformance','plans','adminCareerVerify','careerVerify','adminSignupStats','adminAiUsage','adminSecurity','mfaSetup','profileViews','companyProfileEdit','profileEdit','notices','events','faq','supportInquiry'];
+let proxyCompany = null; // 관리자 공고 대리 등록 중인 기업 {id, name}
+let claimToken = null;   // 기업 계정 연결 링크로 들어온 경우
+const MYPAGE_CHILD_SCREENS = ['adminProxyJobs','proposalSettings','changePassword','deleteAccount','savedJobs','followedCompanies','adminReports','adminInquiries','adminPerformance','plans','adminCareerVerify','careerVerify','adminSignupStats','adminAiUsage','adminSecurity','mfaSetup','profileViews','companyProfileEdit','profileEdit','notices','events','faq','supportInquiry'];
 
 // 회원 유형별로만 열 수 있는 화면. 다른 유형의 화면이 열리려 하면(뒤로가기 기록, 예전 알림 등) 홈으로 보냅니다.
 const FREELANCER_ONLY = ['careerVerify','receivedProposals','myApplications','portfolios','portfolioEdit','savedJobs','followedCompanies','profileViews','profileEdit','proposalSettings','reportJob'];
 const COMPANY_ONLY = ['talent','talentDetail','applicants','allApplicants','jobPost','companyProfileEdit','proposeForm','sentProposals','savedTalents'];
 function screenAllowed(screen){
+  // 관리자가 기업을 골라 공고를 대신 등록할 때는 회원 유형과 관계없이 공고 등록 화면을 엽니다.
+  if(screen==='jobPost' && state.isAdmin && proxyCompany) return true;
   if(state.role==='company' && FREELANCER_ONLY.includes(screen)) return false;
   if(state.role==='freelancer' && COMPANY_ONLY.includes(screen)) return false;
   return true;
@@ -751,7 +757,7 @@ function screenAllowed(screen){
 
 // 알림/푸시에 담긴 링크('screen' 또는 'screen:param')로 해당 화면을 엽니다.
 const LINKABLE_SCREENS = ['home','jobs','jobDetail','myApplications','receivedProposals','sentProposals','savedTalents',
-  'applicants','projects','chatList','chatRoom','profileViews','alerts','mypage','talentDetail','savedJobs','invite','careerVerify','adminCareerVerify','adminReports','adminInquiries','supportInquiry','plans'];
+  'applicants','projects','chatList','chatRoom','profileViews','alerts','mypage','talentDetail','savedJobs','invite','careerVerify','adminCareerVerify','adminReports','adminInquiries','supportInquiry','plans','adminProxyJobs'];
 function openLink(link){
   if(!link) return false;
   const [screen, rawParam] = String(link).split(':');
@@ -1763,6 +1769,8 @@ async function consumeOAuthHash(){
     history.replaceState(null, '', window.location.pathname);
 
     // 로그인과 무관한 파라미터(예: 홈화면 앱 실행 시 붙는 ?src=pwa)는 그냥 무시합니다.
+    // 관리자가 대신 만든 기업 계정을 넘겨받는 링크(/?claim=...)
+    if(params.get('claim')){ claimToken = params.get('claim'); go('claimAccount'); return true; }
     const isOAuthCallback = ['oauth_error','token','oauth_pending','mfa'].some(k => params.has(k));
     if(!isOAuthCallback) return false;
 
@@ -2769,6 +2777,28 @@ async function postJob(){
     go('jobs');
   }catch(e){ toast(e.message); }
 }
+async function proxyPostJob(){
+  if(!proxyCompany){ go('adminProxyJobs'); return; }
+  const title = document.getElementById('pj-title').value.trim();
+  if(!title){ toast('공고 제목을 입력해주세요'); return; }
+  try{
+    await apiFetch('/admin/proxy/jobs', {method:'POST', body:{
+      companyId: proxyCompany.id, consent: true,
+      title, stack: [...pendingJobStack], certs: [...pendingJobCerts],
+      period: document.getElementById('pj-period').value.trim(),
+      rate: document.getElementById('pj-rate').value.trim(),
+      work_type: document.getElementById('pj-type').value.trim(),
+      location: jobLocationValue(),
+      duty: document.getElementById('pj-duty').value,
+      grade: document.getElementById('pj-grade').value,
+      deadline: document.getElementById('pj-deadline').value.trim(),
+      description: document.getElementById('pj-desc').value.trim(),
+    }});
+    toast(`${proxyCompany.name}의 공고를 대신 등록했어요`);
+    proxyCompany = null;
+    go('adminProxyJobs');
+  }catch(e){ toast(e.message); }
+}
 async function updateJob(id){
   const title = document.getElementById('pj-title').value.trim();
   if(!title){ toast('공고 제목을 입력해주세요'); return; }
@@ -3211,6 +3241,7 @@ async function screenJobDetail(){
       <div class="org" style="display:flex; align-items:center; gap:6px;">${esc(j.org)}${!isCompany?`<span onclick="toggleFollowCompany(${j.company_id})" style="cursor:pointer; color:${j.following?'var(--amber-deep)':'var(--slate-light)'}; display:inline-flex;" title="관심기업 등록">${I.star}</span>`:''}</div>
       <h2>${esc(j.title)}</h2>
       <div style="margin-top:8px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+        ${j.proxy_by?`<span class="sbadge pending" title="기업 담당자의 동의를 받아 IT Free가 대신 등록한 공고예요">IT Free 대리 등록</span>`:''}
         ${j.applied?`<span class="sbadge applied">${I.checkCircle}지원완료</span>`:''}
         ${!isCompany && (j.status!=='open' || j.d_day==='마감')?`<span class="sbadge fail">${I.xCircle}마감된 공고</span>`:''}
         ${ratingBadge(j.rating_avg, j.rating_count)}
@@ -4285,7 +4316,8 @@ async function screenMypage(){
     <div class="list-item" onclick="go('adminAiUsage')"><div class="li-l"><div class="li-icon">${I.sparkle}</div><div class="li-tt">AI 사용량 통계</div></div>${I.back}</div>
     <div class="list-item" onclick="go('adminSecurity')"><div class="li-l"><div class="li-icon">${I.verified}</div><div class="li-tt">보안 로그</div></div>${I.back}</div>
     <div class="list-item" onclick="go('adminReports')"><div class="li-l"><div class="li-icon">${I.alertCircle}</div><div class="li-tt">신고 관리</div></div>${I.back}</div>
-    <div class="list-item" onclick="go('adminInquiries')"><div class="li-l"><div class="li-icon">${I.alertCircle}</div><div class="li-tt">1:1 문의 관리</div></div>${I.back}</div>` : ''}
+    <div class="list-item" onclick="go('adminInquiries')"><div class="li-l"><div class="li-icon">${I.alertCircle}</div><div class="li-tt">1:1 문의 관리</div></div>${I.back}</div>
+    <div class="list-item" onclick="go('adminProxyJobs')"><div class="li-l"><div class="li-icon">${I.plus}</div><div class="li-tt">공고 대리 등록</div></div>${I.back}</div>` : ''}
     <div class="section-label with-ic">${I.building}약관 및 정책</div>
     <div class="list-item" onclick="window.open('/terms.html','_blank')"><div class="li-l"><div class="li-icon">${I.building}</div><div class="li-tt">이용약관</div></div>${I.back}</div>
     <div class="list-item" onclick="window.open('/privacy.html','_blank')"><div class="li-l"><div class="li-icon">${I.eye}</div><div class="li-tt">개인정보처리방침</div></div>${I.back}</div>
@@ -5183,6 +5215,116 @@ async function screenAdminAiUsage(){
   </div>`;
 }
 
+/* ---------------- 관리자: 공고 대리 등록 ---------------- */
+// 초기에 공고를 먼저 채우기 위해, 기업 담당자 동의를 받아 관리자가 공고를 대신 올립니다.
+let proxySearch = '', proxyResults = null, proxyConsent = false;
+async function screenAdminProxyJobs(){
+  if(!state.isAdmin){ go('mypage'); return ''; }
+  const d = await apiFetch('/admin/proxy/jobs');
+  return `${statusbar()}
+  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('mypage')">${I.back}</div><div class="page-title" style="font-size:19.5px;">공고 대리 등록</div></div></div>
+  <div class="content">
+    <div class="page-sub" style="margin-bottom:12px; line-height:1.6;">기업 담당자의 <b>동의를 받은 공고만</b> 대신 등록해요. 공고에는 'IT Free 대리 등록' 표시가 붙어요.<br>
+      가입한 기업은 그 계정으로 올리고 기업에 알림이 가요. 가입 전 기업은 계정을 대신 만들고, <b>계정 연결 링크</b>를 담당자에게 보내면 비밀번호를 정해 넘겨받아요.</div>
+    <label class="list-item" style="cursor:pointer;"><div class="li-l"><input type="checkbox" ${proxyConsent?'checked':''} onchange="proxyConsent=this.checked" style="width:18px; height:18px;">
+      <div class="li-tt" style="font-size:13.5px;">기업 담당자에게 공고 대리 등록 동의를 받았어요</div></div></label>
+
+    <div class="section-label with-ic">${I.search}가입한 기업에서 고르기</div>
+    <div style="display:flex; gap:8px;">
+      <input id="px-q" class="form-input" style="flex:1;" placeholder="회사명·담당자·이메일" value="${esc(proxySearch)}" onkeydown="if(event.key==='Enter') searchProxyCompanies()">
+      <button class="btn btn-outline" style="width:auto; padding:0 16px;" onclick="searchProxyCompanies()">검색</button>
+    </div>
+    ${proxyResults ? (proxyResults.length ? proxyResults.map(c=>`
+      <div class="list-item"><div class="li-l"><div class="li-icon">${I.building}</div><div><div class="li-tt">${esc(c.name)}</div>
+        <div class="page-sub" style="margin-top:2px;">${esc([c.contactPerson, c.email].filter(Boolean).join(' · '))}${c.claimPending ? ' · 계정 연결 전' : ''}</div></div></div>
+        <button class="btn btn-primary" style="width:auto; padding:6px 12px; font-size:12.5px;" onclick="startProxyPost(${c.id}, '${jsAttrStr(c.name)}')">공고 등록</button></div>`).join('')
+      : `<div class="reco-empty">검색 결과가 없어요. 아래에서 기업을 새로 만들어주세요.</div>`) : ''}
+
+    <div class="section-label with-ic">${I.plus}가입 전 기업 새로 만들기</div>
+    <div class="form-field"><label class="form-label">회사명</label><input id="px-name" class="form-input" maxlength="60"></div>
+    <div class="form-field"><label class="form-label">담당자 이름</label><input id="px-person" class="form-input" maxlength="60"></div>
+    <div class="form-field"><label class="form-label">담당자 이메일 <span style="font-weight:400; color:var(--slate-light);">(로그인 아이디가 돼요)</span></label><input id="px-email" class="form-input" type="email"></div>
+    <div class="form-field"><label class="form-label">담당자 휴대폰 <span style="font-weight:400; color:var(--slate-light);">(선택)</span></label><input id="px-phone" class="form-input" placeholder="010-1234-5678"></div>
+    <button class="btn btn-outline" onclick="createProxyCompany()">기업 계정 만들고 공고 등록하기</button>
+
+    <div class="section-label with-ic">${I.jobs}대리 등록한 공고 <b style="color:var(--ink); margin-left:4px;">${d.jobs.length}건</b></div>
+    ${d.jobs.length ? d.jobs.map(j=>`
+      <div class="card">
+        <div class="card-top"><div style="min-width:0;"><div class="card-title" onclick="go('jobDetail', ${j.id})" style="cursor:pointer;">${esc(j.title)}</div>
+          <div class="card-org">${esc(j.companyName)} · 지원자 ${j.applicants}명 · ${j.status==='open'?'모집 중':'마감'}</div></div>
+          ${j.claimPending ? `<span class="sbadge pending">계정 연결 전</span>` : `<span class="sbadge pass">기업 연결됨</span>`}</div>
+        ${j.claimPending ? `<button class="btn btn-outline" style="margin-top:10px; font-size:12.5px;" onclick="copyClaimLink(${j.companyId})">계정 연결 링크 복사 (담당자에게 보내기)</button>` : ''}
+      </div>`).join('') : `<div class="reco-empty">아직 대리 등록한 공고가 없어요.</div>`}
+  </div>`;
+}
+async function searchProxyCompanies(){
+  proxySearch = (document.getElementById('px-q')?.value || '').trim();
+  if(!proxySearch){ toast('검색어를 입력해주세요'); return; }
+  try{ proxyResults = (await apiFetch('/admin/proxy/companies?q=' + encodeURIComponent(proxySearch))).companies; render(); }
+  catch(e){ toast(e.message); }
+}
+function startProxyPost(id, name){
+  if(!proxyConsent){ toast('기업 담당자 동의를 먼저 확인해주세요'); return; }
+  proxyCompany = { id, name };
+  jobDraft = null; pendingJobStack = []; pendingJobCerts = [];
+  go('jobPost');
+}
+async function createProxyCompany(){
+  if(!proxyConsent){ toast('기업 담당자 동의를 먼저 확인해주세요'); return; }
+  const v = (id) => (document.getElementById(id)?.value || '').trim();
+  try{
+    const r = await apiFetch('/admin/proxy/companies', {method:'POST', body:{
+      consent: true, name: v('px-name'), contactPerson: v('px-person'), email: v('px-email'), phone: v('px-phone'),
+    }});
+    await copyText(r.claimLink, '기업 계정을 만들고 계정 연결 링크를 복사했어요');
+    startProxyPost(r.company.id, r.company.name);
+  }catch(e){ toast(e.message); }
+}
+async function copyClaimLink(companyId){
+  try{
+    const r = await apiFetch(`/admin/proxy/companies/${companyId}/claim-link`, {method:'POST'});
+    copyText(r.claimLink, '계정 연결 링크를 복사했어요. 30일 동안 쓸 수 있고, 이전 링크는 더 이상 쓸 수 없어요');
+  }catch(e){ toast(e.message); }
+}
+
+/* ---------------- 기업 계정 연결 (관리자가 대신 만든 계정 넘겨받기) ---------------- */
+async function screenClaimAccount(){
+  let info = null, err = '';
+  try{ info = await apiFetch('/auth/claim?token=' + encodeURIComponent(claimToken || '')); }
+  catch(e){ err = e.message; }
+  return `${statusbar()}
+  <div class="app-header"><div class="page-title">기업 계정 연결</div></div>
+  <div class="content">
+    ${info ? `
+    <div class="banner light" style="cursor:default;">
+      <div class="banner-eyebrow">IT Free</div>
+      <div class="banner-title" style="font-size:17px;">${esc(info.companyName)} 계정을 넘겨받으세요</div>
+      <div class="banner-sub" style="color:var(--slate);">IT Free가 담당자님 동의를 받아 공고${info.jobs ? ` ${info.jobs}건` : ''}을 대신 등록했어요. 비밀번호를 정하면 이 계정으로 로그인해 공고와 지원자를 직접 관리할 수 있어요.</div>
+    </div>
+    <div class="form-field" style="margin-top:14px;"><label class="form-label">로그인 이메일</label><input class="form-input" value="${esc(info.email)}" disabled></div>
+    ${info.needPhone ? `<div class="form-field"><label class="form-label">담당자 휴대폰</label><input id="cl-phone" class="form-input" placeholder="010-1234-5678"></div>` : ''}
+    <div class="form-field"><label class="form-label">비밀번호 <span style="font-weight:400; color:var(--slate-light);">(영문+숫자 8자 이상)</span></label><input id="cl-pw" class="form-input" type="password" autocomplete="new-password"></div>
+    <div class="form-field"><label class="form-label">비밀번호 확인</label><input id="cl-pw2" class="form-input" type="password" autocomplete="new-password"></div>
+    <div class="page-sub" style="margin-bottom:12px; line-height:1.6;">계정을 연결하면 <a href="/terms.html" target="_blank" style="text-decoration:underline;">이용약관</a>과 <a href="/privacy.html" target="_blank" style="text-decoration:underline;">개인정보처리방침</a>에 동의하는 것으로 봐요.</div>
+    <button class="btn btn-primary" onclick="submitClaimAccount()">비밀번호 정하고 시작하기</button>`
+    : `<div class="reco-empty">${esc(err || '링크를 확인할 수 없어요.')}</div>
+    <button class="btn btn-outline" style="margin-top:12px;" onclick="go('login')">로그인하러 가기</button>`}
+  </div>`;
+}
+async function submitClaimAccount(){
+  const pw = document.getElementById('cl-pw').value, pw2 = document.getElementById('cl-pw2').value;
+  if(pw !== pw2){ toast('비밀번호가 서로 달라요'); return; }
+  const phoneEl = document.getElementById('cl-phone');
+  try{
+    const data = await apiFetch('/auth/claim', {method:'POST', body:{ token: claimToken, password: pw, phone: phoneEl ? phoneEl.value.trim() : undefined }});
+    claimToken = null;
+    saveToken(data.token); state.role = data.user.role; state.userId = data.user.id; state.isAdmin = !!data.user.isAdmin;
+    toast('계정을 연결했어요. 이제 공고와 지원자를 직접 관리할 수 있어요');
+    syncPushSubscription();
+    go('jobs');
+  }catch(e){ toast(e.message); }
+}
+
 /* ---------------- 요금제: 기업 구독 · 프리랜서 프리미엄 (출시 전 사전 신청) ---------------- */
 async function screenPlans(){
   const d = await apiFetch('/plans');
@@ -5634,9 +5776,13 @@ async function screenJobPost(){
   }
   jobDraft = null;
   const loc = splitLocation(job && job.location);
+  const proxy = !isEdit && state.isAdmin && proxyCompany;
   return `${statusbar()}
-  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('${isEdit?'jobDetail':'jobs'}'${isEdit?`, ${state.param}`:''})">${I.back}</div><div class="page-title">${isEdit?'공고 수정':'새 공고 등록'}</div></div></div>
+  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="${proxy ? "go('adminProxyJobs')" : `go('${isEdit?'jobDetail':'jobs'}'${isEdit?`, ${state.param}`:''})`}">${I.back}</div><div class="page-title">${isEdit?'공고 수정':proxy?'공고 대리 등록':'새 공고 등록'}</div></div></div>
   <div class="content">
+    ${proxy ? `<div class="banner light" style="cursor:default; margin-bottom:12px;"><div class="banner-eyebrow">관리자 · 대리 등록</div>
+      <div class="banner-title" style="font-size:16px;">${esc(proxyCompany.name)}의 공고를 대신 등록해요</div>
+      <div class="banner-sub" style="color:var(--slate);">공고에 'IT Free 대리 등록' 표시가 붙고, 기술이 맞는 프리랜서에게 새 공고 알림이 가요.</div></div>` : ''}
     <div class="form-field"><label class="form-label">공고 제목</label><input id="pj-title" class="form-input" placeholder="예: 클라우드 전환 인프라 아키텍트" value="${job?esc(job.title):''}"></div>
     <div class="form-field">
       <label class="form-label">필요 기술스택</label>
@@ -5665,7 +5811,7 @@ async function screenJobPost(){
     </select></div>
     <div class="form-field"><label class="form-label">지원 마감일 (선택)</label><input id="pj-deadline" class="form-input" type="date" value="${job&&job.deadline?job.deadline:''}"></div>
     <div class="form-field"><label class="form-label">상세 내용</label><textarea id="pj-desc" class="form-input" placeholder="업무 범위, 우대사항 등을 입력하세요">${job?esc(job.description):''}</textarea></div>
-    <button class="btn btn-primary" onclick="${isEdit?`updateJob(${state.param})`:'postJob()'}">${isEdit?'수정 완료':'공고 등록하기'}</button>
+    <button class="btn btn-primary" onclick="${isEdit?`updateJob(${state.param})`:proxy?'proxyPostJob()':'postJob()'}">${isEdit?'수정 완료':proxy?'대신 등록하기':'공고 등록하기'}</button>
     <div style="height:20px;"></div>
   </div>`;
 }
@@ -5674,7 +5820,7 @@ async function screenJobPost(){
 let renderSeq = 0;
 async function render(){
   const el = document.getElementById('screen');
-  const needsAuth = !["onboarding","serverSetup","signup","login","oauthRole","mfaVerify"].includes(state.screen);
+  const needsAuth = !["onboarding","serverSetup","signup","login","oauthRole","mfaVerify","claimAccount"].includes(state.screen);
   if(needsAuth && !state.token){ state.screen = "onboarding"; }
   // 다른 회원 유형 전용 화면이 열리려 하면 홈으로 돌려보냅니다.
   if(state.token && state.role && !screenAllowed(state.screen)){
@@ -5704,7 +5850,7 @@ async function render(){
       savedJobs: screenSavedJobs, followedCompanies: screenFollowedCompanies, profileViews: screenProfileViews, receivedProposals: screenReceivedProposals,
       proposeForm: screenProposeForm, pickerScreen: screenPicker,
       reviewForm: screenReviewForm,
-      adminReports: screenAdminReports, adminInquiries: screenAdminInquiries, plans: screenPlans, reportJob: screenReportJob,
+      adminReports: screenAdminReports, adminInquiries: screenAdminInquiries, plans: screenPlans, adminProxyJobs: screenAdminProxyJobs, claimAccount: screenClaimAccount, reportJob: screenReportJob,
       invite: screenInvite, careerVerify: screenCareerVerify, adminCareerVerify: screenAdminCareerVerify, adminPerformance: screenAdminPerformance, adminSignupStats: screenAdminSignupStats, adminAiUsage: screenAdminAiUsage, adminSecurity: screenAdminSecurity, mfaVerify: screenMfaVerify, mfaSetup: screenMfaSetup,
       notices: screenNotices, events: screenEvents, faq: screenFaq, aiChat: screenAiChat, supportInquiry: screenSupportInquiry,
       announcementForm: screenAnnouncementForm,
