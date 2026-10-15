@@ -4712,18 +4712,18 @@ async function screenInvite(){
     <div class="page-sub" style="word-break:break-all; margin-bottom:6px;">${esc(inviteLink(data.code))}</div>
     <div class="card" style="margin:14px 0 4px; cursor:default;">
       <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
-        <div><div class="li-tt">적립된 이용권</div><div class="page-sub" style="margin-top:2px;">정식 출시 후 쓸 수 있어요</div></div>
-        <div style="font-size:26px; font-weight:800; color:var(--ink); white-space:nowrap;">${rewards.count}<span style="font-size:14px; color:var(--slate); font-weight:700;"> 장</span></div>
+        <div><div class="li-tt">적립된 1개월 이용권</div><div class="page-sub" style="margin-top:2px;">정식 출시 후 ${esc(rewards.passLabel || (isCompany ? '기업 구독 스타터 1개월' : '프리랜서 프리미엄 1개월'))} 무료</div></div>
+        <div style="font-size:26px; font-weight:800; color:var(--ink); white-space:nowrap;">${rewards.count}<span style="font-size:14px; color:var(--slate); font-weight:700;"> 개</span></div>
       </div>
-      <div class="page-sub" style="margin-top:10px; line-height:1.6;">초대한 친구가 <b style="color:var(--ink);">프로필을 완성</b>하거나(프리랜서) <b style="color:var(--ink);">첫 공고를 등록</b>하면(기업) 1장씩 적립돼요. 최대 ${rewards.max}장까지 적립되고, 친구가 탈퇴하면 그 친구 몫은 취소돼요.</div>
+      <div class="page-sub" style="margin-top:10px; line-height:1.6;">초대한 친구가 <b style="color:var(--ink);">프로필을 완성</b>하거나(프리랜서) <b style="color:var(--ink);">첫 공고를 등록</b>하면(기업) 1개월 이용권이 1개씩 적립돼요. 최대 ${rewards.max}개까지 적립되고, 친구가 탈퇴하면 그 친구 몫은 취소돼요.</div>
     </div>
     <div class="section-label with-ic">${I.talent}초대로 가입한 친구 <b style="color:var(--ink); margin-left:4px;">${invited.length}명</b></div>
     ${invited.length ? invited.map(v=>`
       <div class="list-item" style="cursor:default;"><div class="li-l"><div class="li-icon">${I.user}</div>
         <div><div class="li-tt">${esc(v.name)}</div><div class="page-sub" style="margin-top:2px;">${v.role==='company'?'기업회원':'프리랜서'} · ${(parseServerTime(v.created_at)||new Date()).toLocaleDateString('ko-KR')} 가입</div></div></div>
-        <div class="page-sub" style="white-space:nowrap; font-weight:700; color:${v.rewarded?'var(--ink)':'var(--slate)'};">${v.rewarded ? '이용권 적립' : (v.role==='company' ? '첫 공고 전' : '프로필 작성 중')}</div></div>`).join('')
+        <div class="page-sub" style="white-space:nowrap; font-weight:700; color:${v.rewarded?'var(--ink)':'var(--slate)'};">${v.rewarded ? '1개월 이용권 적립' : (v.role==='company' ? '첫 공고 전' : '프로필 작성 중')}</div></div>`).join('')
       : `<div class="reco-empty">아직 초대로 가입한 친구가 없어요.<br>초대 링크를 공유해보세요.</div>`}
-    <div class="page-sub" style="margin-top:14px;">이용권을 쓰는 곳(예: 기업 제안권·프리미엄 등록)은 정식 출시 때 고객센터 &gt; 이벤트·혜택에서 안내해요.</div>
+    <div class="page-sub" style="margin-top:14px;">1개월 이용권 1개로 정식 출시 후 ${isCompany ? '기업 구독 스타터를' : '프리랜서 프리미엄을'} 1개월 무료로 쓸 수 있어요. 여러 개면 이어서 쓸 수 있고, 사용 방법은 출시 때 고객센터 &gt; 이벤트·혜택에서 안내해요.</div>
   </div>`;
 }
 
@@ -5217,7 +5217,7 @@ async function screenPlans(){
     <div class="page-sub" style="margin-top:14px; line-height:1.65;">
       · 정식 출시 전이라 <b>지금은 결제되지 않아요.</b> 사전 신청하면 출시될 때 가장 먼저 알려드려요.<br>
       · 가격과 구성은 출시 때 바뀔 수 있어요.<br>
-      · 친구 초대로 적립한 이용권은 출시 후 함께 쓸 수 있어요.
+      · 친구 초대로 적립한 1개월 이용권으로 출시 후 ${isCompany ? '스타터를' : '프리미엄을'} 1개월씩 무료로 쓸 수 있어요. <a style="text-decoration:underline; cursor:pointer;" onclick="go('invite')">친구 초대</a>
     </div>
   </div>`;
 }

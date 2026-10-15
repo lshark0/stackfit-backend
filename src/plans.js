@@ -30,6 +30,12 @@ const PLANS = [
   },
 ];
 const PLAN_IDS = PLANS.map((p) => p.id);
+// 친구 초대 보상: '1개월 이용권' 1개 = 정식 출시 후 아래 요금제를 1개월 무료로 쓰는 이용권(받는 사람의 회원 유형 기준)
+const REFERRAL_PASS = {
+  company: { planId: 'company_starter', label: '기업 구독 스타터 1개월' },
+  freelancer: { planId: 'freelancer_premium', label: '프리랜서 프리미엄 1개월' },
+};
+const referralPassFor = (role) => REFERRAL_PASS[role] || REFERRAL_PASS.freelancer;
 const planById = (id) => PLANS.find((p) => p.id === id) || null;
 
-module.exports = { PLANS, PLAN_IDS, planById };
+module.exports = { PLANS, PLAN_IDS, planById, REFERRAL_PASS, referralPassFor };

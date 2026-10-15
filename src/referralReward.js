@@ -1,9 +1,11 @@
 const { run, get, all } = require('./db');
 const { addNotification } = require('./notify');
 const { freelancerMissingFields } = require('./profileCheck');
+const { referralPassFor } = require('./plans');
 
 // 친구 초대 보상: 초대한 친구가 실제로 활동을 시작하면(프리랜서는 필수 프로필 완성, 기업은 기술스택이 있는 첫 공고 등록)
-// 초대한 사람에게 '정식 출시 후 쓸 수 있는 이용권'을 1장 적립합니다. 지금은 적립만 하고, 결제 기능이 생기면 열람권·등록권 등으로 씁니다.
+// 초대한 사람에게 '1개월 이용권'을 1개 적립합니다. 정식 출시 후 기업은 기업 구독 스타터, 프리랜서는 프리랜서 프리미엄을
+// 1개월 무료로 쓰는 데 씁니다(src/plans.js REFERRAL_PASS). 지금은 적립만 합니다.
 // 가입만 한 계정으로는 적립되지 않게 해 가짜 계정으로 쌓는 것을 막고, 1명당 적립 한도를 둡니다.
 const REWARD_MAX = Math.max(0, Number(process.env.REFERRAL_REWARD_MAX) || 20);
 
@@ -44,11 +46,11 @@ async function grantReferralReward(inviteeId, { notify = true } = {}) {
     throw e;
   }
   if (notify) {
+    const inviter = await get('SELECT role FROM users WHERE id = ?', [u.referred_by]);
+    const pass = referralPassFor(inviter && inviter.role);
     await addNotification(u.referred_by, {
-      tag: '친구 초대', title: '이용권 1장이 적립됐어요',
-      body: u.role === 'company'
-        ? '초대한 기업회원이 첫 공고를 등록했어요. 적립된 이용권은 정식 출시 후 쓸 수 있어요.'
-        : '초대한 친구가 프로필을 완성했어요. 적립된 이용권은 정식 출시 후 쓸 수 있어요.',
+      tag: '친구 초대', title: '1개월 이용권이 적립됐어요',
+      body: `${u.role === 'company' ? '초대한 기업회원이 첫 공고를 등록했어요.' : '초대한 친구가 프로필을 완성했어요.'} 정식 출시 후 ${pass.label}을 무료로 쓸 수 있어요.`,
       link: 'invite',
     }).catch(() => {});
   }

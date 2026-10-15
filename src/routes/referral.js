@@ -4,6 +4,7 @@ const { requireAuth } = require('../middleware/requireAuth');
 const { wrapAllRoutes } = require('../middleware/asyncHandler');
 const { ensureReferralCode } = require('../attribution');
 const { REWARD_MAX, grantReferralReward } = require('../referralReward');
+const { referralPassFor } = require('../plans');
 
 const router = express.Router();
 wrapAllRoutes(router);
@@ -22,7 +23,7 @@ router.get('/share-config', (req, res) => {
   res.json({ kakaoJsKey: process.env.KAKAO_JS_KEY || null });
 });
 
-// 내 초대 코드, 내가 초대해 가입한 친구 목록, 적립된 이용권
+// 내 초대 코드, 내가 초대해 가입한 친구 목록, 적립된 1개월 이용권
 router.get('/me', requireAuth, async (req, res) => {
   const code = await ensureReferralCode(req.user.id);
   const rows = await all(
@@ -43,7 +44,7 @@ router.get('/me', requireAuth, async (req, res) => {
   }
   res.json({
     code,
-    rewards: { count: rewarded.size, max: REWARD_MAX },
+    rewards: { count: rewarded.size, max: REWARD_MAX, passLabel: referralPassFor(req.user.role).label },
     invited: rows.map((r) => ({
       role: r.role,
       name: maskName(r.role === 'company' ? r.company_name : r.freelancer_name),
