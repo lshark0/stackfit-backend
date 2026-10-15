@@ -29,6 +29,7 @@ const referralRoutes = require('./src/routes/referral');
 const aiRoutes = require('./src/routes/ai');
 const publicPagesRoutes = require('./src/routes/publicPages');
 const careerVerifyRoutes = require('./src/routes/careerVerify');
+const planRoutes = require('./src/routes/plans');
 const mfaRoutes = require('./src/routes/mfa');
 const { resetMfaFromEnv } = require('./src/mfa');
 const { verifyToken, verifySessionToken } = require('./src/auth');
@@ -304,6 +305,7 @@ app.use('/api/announcements', announcementsRoutes);
 app.use('/api/referral', referralRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/career-verification', careerVerifyRoutes);
+app.use('/api/plans', planRoutes);
 app.use(publicPagesRoutes); // /jobs, /jobs/:id, /sitemap.xml, /robots.txt (로그인 없이 보는 공개 페이지)
 
 app.use((req, res) => res.status(404).json({ error: 'Not found' }));

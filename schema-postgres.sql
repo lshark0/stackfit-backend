@@ -369,3 +369,12 @@ CREATE TABLE IF NOT EXISTS career_verification_files (
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_career_verification_files_v ON career_verification_files(verification_id);
+
+-- 요금제 사전 신청(정식 출시 전 수요 확인용). 결제는 아직 받지 않습니다.
+CREATE TABLE IF NOT EXISTS plan_interests (
+  id         SERIAL PRIMARY KEY,
+  user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  plan_id    TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (user_id, plan_id)
+);

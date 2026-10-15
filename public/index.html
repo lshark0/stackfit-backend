@@ -738,7 +738,7 @@ function talentDetailBack(){ goBackFrom(talentDetailReturn, 'talent'); }
 // 화면 안의 뒤로가기 화살표가 항상 마이페이지로 돌아가는 화면들.
 // 이 화면들은 드로어 메뉴 등 여러 곳에서 열릴 수 있어서, 휴대폰의 '뒤로가기'
 // 제스처도 그 화살표와 똑같이 항상 마이페이지로 보내도록 popstate에서 함께 처리합니다.
-const MYPAGE_CHILD_SCREENS = ['proposalSettings','changePassword','deleteAccount','savedJobs','followedCompanies','adminReports','adminInquiries','adminPerformance','adminCareerVerify','careerVerify','adminSignupStats','adminAiUsage','adminSecurity','mfaSetup','profileViews','companyProfileEdit','profileEdit','notices','events','faq','supportInquiry'];
+const MYPAGE_CHILD_SCREENS = ['proposalSettings','changePassword','deleteAccount','savedJobs','followedCompanies','adminReports','adminInquiries','adminPerformance','plans','adminCareerVerify','careerVerify','adminSignupStats','adminAiUsage','adminSecurity','mfaSetup','profileViews','companyProfileEdit','profileEdit','notices','events','faq','supportInquiry'];
 
 // 회원 유형별로만 열 수 있는 화면. 다른 유형의 화면이 열리려 하면(뒤로가기 기록, 예전 알림 등) 홈으로 보냅니다.
 const FREELANCER_ONLY = ['careerVerify','receivedProposals','myApplications','portfolios','portfolioEdit','savedJobs','followedCompanies','profileViews','profileEdit','proposalSettings','reportJob'];
@@ -751,7 +751,7 @@ function screenAllowed(screen){
 
 // 알림/푸시에 담긴 링크('screen' 또는 'screen:param')로 해당 화면을 엽니다.
 const LINKABLE_SCREENS = ['home','jobs','jobDetail','myApplications','receivedProposals','sentProposals','savedTalents',
-  'applicants','projects','chatList','chatRoom','profileViews','alerts','mypage','talentDetail','savedJobs','invite','careerVerify','adminCareerVerify','adminReports','adminInquiries','supportInquiry'];
+  'applicants','projects','chatList','chatRoom','profileViews','alerts','mypage','talentDetail','savedJobs','invite','careerVerify','adminCareerVerify','adminReports','adminInquiries','supportInquiry','plans'];
 function openLink(link){
   if(!link) return false;
   const [screen, rawParam] = String(link).split(':');
@@ -4266,6 +4266,8 @@ async function screenMypage(){
     ${!isCompany?`
     <div class="list-item" onclick="go('careerVerify')"><div class="li-l"><div class="li-icon">${I.verified}</div>
       <div><div class="li-tt">경력 검증</div><div class="page-sub" style="margin-top:2px;">${Number(profile.verified)===1 ? '검증 완료 · 배지 표시 중' : '증빙 서류로 경력 검증 배지 받기'}</div></div></div>${I.back}</div>` : ''}
+    <div class="list-item" onclick="go('plans')"><div class="li-l"><div class="li-icon">${I.sparkle}</div>
+      <div><div class="li-tt">${isCompany ? '기업 구독' : '프리랜서 프리미엄'}</div><div class="page-sub" style="margin-top:2px;">${isCompany ? '프리미엄 등록·제안권·AI 리포트 월 묶음 · 출시 예정' : '상단 노출·우선 알림·지원서 강조 · 출시 예정'}</div></div></div>${I.back}</div>
     ${me.user.hasPassword ? `<div class="list-item" onclick="go('changePassword')"><div class="li-l"><div class="li-icon">${I.gear}</div><div class="li-tt">비밀번호 변경</div></div>${I.back}</div>` : ''}
     ${state.isAdmin && !me.user.mfaVerified ? `
     <div class="section-label with-ic">${I.gear}관리자</div>
@@ -4983,6 +4985,7 @@ async function revokeCareerVerify(id){
 // 창업지원단 심사 의견("기능 구현과 실제 거래 성과는 구분해야")에 맞춰, 실제 매칭·계약이 얼마나 일어나는지 숫자로 봅니다.
 let perfDays = 90;
 let lastPerf = null;
+let planSummary = null;
 function setPerfDays(d){ perfDays = d; render(); }
 const fmtPct = (v) => v === null || v === undefined ? '-' : `${v}%`;
 function fmtDur(d){
@@ -4992,8 +4995,11 @@ function fmtDur(d){
 }
 async function screenAdminPerformance(){
   if(!state.isAdmin){ go('mypage'); return ''; }
-  const p = await apiFetch('/admin/performance?days=' + perfDays);
-  lastPerf = p;
+  const [p, plansSum] = await Promise.all([
+    apiFetch('/admin/performance?days=' + perfDays),
+    apiFetch('/plans/admin/summary').catch(() => null),
+  ]);
+  lastPerf = p; planSummary = plansSum;
   const periods = [[30,'30일'],[90,'90일'],[365,'1년'],[3650,'전체']];
   const f = p.funnel;
   const steps = [['공고 등록', f.jobs], ['지원', f.applications], ['기업 제안', f.proposals], ['인터뷰 일정', f.interviews], ['매칭(합격·수락)', f.matched], ['계약 체결', f.contracted], ['프로젝트 완료', f.completed]];
@@ -5049,6 +5055,11 @@ async function screenAdminPerformance(){
     </div>
     <div class="page-sub" style="margin-top:6px;">연락처 공유 시도는 매칭 전 채팅에서 전화번호·이메일·메신저 ID를 가린 횟수예요 (대화 ${p.trust.maskedConversations}곳).</div>
 
+    ${planSummary ? `
+    <div class="section-label with-ic">${I.sparkle}요금제 사전 신청</div>
+    <div class="hero-stat">${planSummary.plans.map(p=>`<div class="hs"><div class="hs-num">${p.count}</div><div class="hs-lbl">${esc(p.role==='company' ? '기업 ' + p.name : p.name)}</div></div>`).join('')}</div>
+    <div class="page-sub" style="margin-top:6px;">결제 전 사전 신청 수예요. 가격·구성을 정할 때 수요 근거로 써요.</div>` : ''}
+
     <button class="btn btn-outline" style="margin-top:16px;" onclick="copyPerfSummary()">사업계획서용 요약 복사</button>
     <div style="height:20px;"></div>
   </div>`;
@@ -5066,6 +5077,7 @@ function copyPerfSummary(){
     `- 재이용률: 기업 ${fmtPct(p.reuse.companies.rate)}(${p.reuse.companies.repeat}/${p.reuse.companies.total}), 프리랜서 ${fmtPct(p.reuse.freelancers.rate)}(${p.reuse.freelancers.repeat}/${p.reuse.freelancers.total})`,
     `- 경력 검증 프리랜서: ${p.trust.verifiedFreelancers}명 / 전체 ${p.trust.totalFreelancers}명`,
     `- 매칭 전 연락처 공유 차단: ${p.trust.maskedMessages}회`,
+    ...(planSummary ? [`- 요금제 사전 신청: ` + planSummary.plans.map(x => `${x.role==='company' ? '기업 ' + x.name : x.name} ${x.count}건`).join(', ')] : []),
   ];
   copyText(lines.join('\n'), '성과 요약을 복사했어요');
 }
@@ -5157,6 +5169,51 @@ async function screenAdminAiUsage(){
       · 1인 1일 한도: ${Object.entries(s.limits).map(([k,v])=>`${limitLabel[k]||k} ${v}회`).join(', ')}
     </div>
   </div>`;
+}
+
+/* ---------------- 요금제: 기업 구독 · 프리랜서 프리미엄 (출시 전 사전 신청) ---------------- */
+async function screenPlans(){
+  const d = await apiFetch('/plans');
+  const isCompany = state.role === 'company';
+  const won = (n) => n.toLocaleString('ko-KR') + '원';
+  const mine = new Set(d.myInterests || []);
+  return `${statusbar()}
+  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('mypage')">${I.back}</div><div class="page-title" style="font-size:19.5px;">${isCompany ? '기업 구독' : '프리랜서 프리미엄'}</div></div></div>
+  <div class="content">
+    <div class="banner light" style="cursor:default;">
+      <div class="banner-eyebrow">${isCompany ? 'Business Plan' : 'Premium'} · 출시 예정</div>
+      <div class="banner-title">${isCompany ? '필요한 만큼 매달 묶음으로' : '기업에게 먼저 보이세요'}</div>
+      <div class="banner-sub" style="color:var(--slate);">${isCompany
+        ? '공고 등록·인재 검색·추천 %는 지금처럼 <b>무료</b>예요. 구독하면 프리미엄 등록·제안권·AI 매칭 리포트를 매달 묶음으로 더 싸게 쓸 수 있어요.'
+        : '지원·제안 받기·채팅·계약 관리 같은 기본 기능은 계속 <b>무료</b>예요. 프리미엄은 더 많은 기업에게 먼저 보이도록 도와줘요.'}</div>
+    </div>
+    ${d.plans.map(p => `
+      <div class="card" style="margin-top:12px; ${p.recommended ? 'border:1.5px solid var(--amber, #F5A623);' : ''}">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
+          <div><div class="card-title" style="font-size:16px;">${esc(p.name)}${p.recommended ? ' <span class="sbadge pending" style="margin-left:4px;">추천</span>' : ''}</div>
+            <div class="page-sub" style="margin-top:2px;">${esc(p.summary)}</div></div>
+          ${mine.has(p.id) ? `<span class="sbadge pass" style="flex:0 0 auto;">${I.checkCircle}신청함</span>` : ''}
+        </div>
+        <div style="margin-top:10px;"><span style="font-size:22px; font-weight:800;">${p.period} ${won(p.price)}</span>
+          <span class="page-sub"> · 부가세 ${p.vatIncluded ? '포함' : '별도'} · 예정 가격</span></div>
+        <ul style="margin:10px 0 0; padding-left:18px; line-height:1.75; font-size:13.5px;">${p.features.map(f => `<li>${esc(f)}</li>`).join('')}</ul>
+        ${mine.has(p.id)
+          ? `<button class="btn btn-outline" style="margin-top:12px;" onclick="togglePlanInterest('${p.id}', false)">사전 신청 취소</button>`
+          : `<button class="btn btn-primary" style="margin-top:12px;" onclick="togglePlanInterest('${p.id}', true)">사전 신청 · 출시 알림 받기</button>`}
+      </div>`).join('')}
+    <div class="page-sub" style="margin-top:14px; line-height:1.65;">
+      · 정식 출시 전이라 <b>지금은 결제되지 않아요.</b> 사전 신청하면 출시될 때 가장 먼저 알려드려요.<br>
+      · 가격과 구성은 출시 때 바뀔 수 있어요.<br>
+      · 친구 초대로 적립한 이용권은 출시 후 함께 쓸 수 있어요.
+    </div>
+  </div>`;
+}
+async function togglePlanInterest(planId, on){
+  try{
+    await apiFetch(`/plans/${planId}/interest`, { method: on ? 'POST' : 'DELETE' });
+    toast(on ? '사전 신청했어요. 출시되면 알려드릴게요' : '사전 신청을 취소했어요');
+    render();
+  }catch(e){ toast(e.message); }
 }
 
 // 관리자 전용: 1:1 문의 확인·답변. 답변은 회원의 '문의·신고 내역'에 보이고 알림·푸시로도 전달됩니다.
@@ -5635,7 +5692,7 @@ async function render(){
       savedJobs: screenSavedJobs, followedCompanies: screenFollowedCompanies, profileViews: screenProfileViews, receivedProposals: screenReceivedProposals,
       proposeForm: screenProposeForm, pickerScreen: screenPicker,
       reviewForm: screenReviewForm,
-      adminReports: screenAdminReports, adminInquiries: screenAdminInquiries, reportJob: screenReportJob,
+      adminReports: screenAdminReports, adminInquiries: screenAdminInquiries, plans: screenPlans, reportJob: screenReportJob,
       invite: screenInvite, careerVerify: screenCareerVerify, adminCareerVerify: screenAdminCareerVerify, adminPerformance: screenAdminPerformance, adminSignupStats: screenAdminSignupStats, adminAiUsage: screenAdminAiUsage, adminSecurity: screenAdminSecurity, mfaVerify: screenMfaVerify, mfaSetup: screenMfaSetup,
       notices: screenNotices, events: screenEvents, faq: screenFaq, aiChat: screenAiChat, supportInquiry: screenSupportInquiry,
       announcementForm: screenAnnouncementForm,
