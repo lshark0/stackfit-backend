@@ -12,6 +12,7 @@ const { signedFileUrl } = require('../fileAccess');
 const { normalizeEmail } = require('../contact');
 const { grantReferralRewardLater } = require('../referralReward');
 const { notifyAdmins } = require('../notify');
+const { notifyNewJobLater } = require('../coldStart');
 
 // 잡코리아 문의·신고 양식과 동일한 첨부 가능 파일 종류(용량 10MB)
 const REPORT_ATTACH_EXT = ['.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.hwp', '.jpg', '.jpeg', '.gif', '.png', '.pdf', '.zip'];
@@ -309,6 +310,7 @@ router.post('/', requireAuth, requireRole('company'), async (req, res) => {
   );
   const job = await get('SELECT * FROM jobs WHERE id = ?', [r.lastInsertRowid]);
   grantReferralRewardLater(req.user.id); // 초대받아 가입한 기업이 첫 공고를 올리면 초대한 회원에게 이용권 적립
+  notifyNewJobLater(job.id); // 기술이 맞는 프리랜서·관심 기업으로 둔 프리랜서에게 새 공고 알림
   res.status(201).json(await withCompanyAndStack(job));
 });
 

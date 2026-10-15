@@ -97,6 +97,8 @@ if (USE_POSTGRES) {
     await ensureColumnPg('career_verifications', 'ai_result_json', 'TEXT');
     await ensureColumnPg('career_verifications', 'reviewed_by', "TEXT NOT NULL DEFAULT ''");
     await ensureColumnPg('career_verification_files', 'doc_kind', "TEXT NOT NULL DEFAULT ''");
+    // 새 공고 맞춤 알림 받기(1=받음)
+    await ensureColumnPg('freelancer_profiles', 'job_alerts', 'INTEGER NOT NULL DEFAULT 1');
     // 프리랜서 연락처 + 제안 받기 설정
     await ensureColumnPg('freelancer_profiles', 'phone', "TEXT NOT NULL DEFAULT ''");
     await ensureColumnPg('freelancer_profiles', 'email', "TEXT NOT NULL DEFAULT ''");
@@ -214,6 +216,7 @@ if (USE_POSTGRES) {
     addCol('career_verifications', 'ai_result_json', 'TEXT');
     addCol('career_verifications', 'reviewed_by', "TEXT NOT NULL DEFAULT ''");
     addCol('career_verification_files', 'doc_kind', "TEXT NOT NULL DEFAULT ''");
+    addCol('freelancer_profiles', 'job_alerts', 'INTEGER NOT NULL DEFAULT 1');
     addCol('freelancer_profiles', 'phone', "TEXT NOT NULL DEFAULT ''");
     addCol('freelancer_profiles', 'email', "TEXT NOT NULL DEFAULT ''");
     addCol('freelancer_profiles', 'accept_proposals', 'INTEGER NOT NULL DEFAULT 1');

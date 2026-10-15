@@ -3861,6 +3861,9 @@ async function screenProposalSettings(){
     ${row('제안 받기', '기업이 회원님에게 포지션을 제안할 수 있어요', accepting, "setProposalSetting('accept_proposals', this.checked, this)")}
     ${row('제안 받지 않기', '인재풀에 “제안 받지 않음”으로 표시되고, 새 제안이 오지 않아요', !accepting, "setProposalSetting('accept_proposals', !this.checked, this)")}
 
+    <div class="section-label with-ic" style="margin-top:18px;">${I.bell || I.sent}새 공고 알림</div>
+    ${row('내 기술에 맞는 새 공고 알림', '기술이 맞는 공고나 관심 기업의 공고가 올라오면 알려드려요 (하루 최대 5건)', Number(p.job_alerts ?? 1) === 1, "setProposalSetting('job_alerts', this.checked, this)")}
+
     <div class="section-label with-ic" style="margin-top:18px;">${I.chat}제안받을 연락처</div>
     <div class="page-sub" style="margin:-4px 0 8px;">켜둔 연락처는 제안을 보내려는 기업이 프로필에서 볼 수 있어요.</div>
     ${row(`휴대폰 <span style="color:var(--danger); font-size:11px;">(필수)</span>`,
@@ -3882,6 +3885,7 @@ async function setProposalSetting(key, value, el){
   try{
     await apiFetch('/profile/proposal-settings', {method:'PUT', body:{ [key]: !!value }});
     if(key==='accept_proposals') toast(value ? '이제 기업의 제안을 받아요' : '제안을 받지 않도록 설정했어요');
+    else if(key==='job_alerts') toast(value ? '새 공고 알림을 켰어요' : '새 공고 알림을 껐어요');
     else toast(value ? '연락처를 공개했어요' : '연락처를 비공개로 바꿨어요');
   }catch(e){
     toast(e.message);
@@ -4695,8 +4699,8 @@ async function screenInvite(){
       <div class="banner-eyebrow">My Invite Code</div>
       <div style="font-family:var(--mono); font-size:30px; font-weight:800; letter-spacing:.14em; color:var(--ink); margin:6px 0 4px;">${esc(data.code)}</div>
       <div class="banner-sub" style="color:var(--slate);">${isCompany
-        ? '협력사 · 거래처 담당자나 함께 일했던 프리랜서에게 공유해보세요.'
-        : '함께 일했던 동료 프리랜서나 기업 담당자에게 공유해보세요.'}<br>가입할 때 이 코드를 입력하거나, 아래 링크로 들어오면 자동으로 연결돼요.</div>
+        ? '함께 일했던 프리랜서나 협력사 담당자에게 공유해보세요. <b>프리랜서가 이 링크로 가입하면 우리 회사가 자동으로 관심 기업에 추가</b>돼, 공고를 올리면 바로 알림이 가요.'
+        : '함께 일했던 동료나 <b>일했던 회사·수행사 담당자</b>에게 공유해보세요. 초대한 회사가 첫 공고를 올리면 <b>가장 먼저 알려드려요.</b>'}<br>가입할 때 이 코드를 입력하거나, 아래 링크로 들어오면 자동으로 연결돼요.</div>
     </div>
     ${showKakao ? `<button class="btn" style="margin:12px 0 0; background:#FEE500; color:#191600; border:none; font-weight:800;" onclick="shareKakao('${code}')">
       <span style="display:inline-flex; width:22px; height:22px; border-radius:50%; background:#191600; color:#FEE500; align-items:center; justify-content:center; font-size:12px; margin-right:8px;">💬</span>카카오톡으로 공유</button>` : ''}
@@ -5042,10 +5046,19 @@ async function screenAdminPerformance(){
     </div>
 
     <div class="section-label with-ic">${I.jobs}분야별 성과</div>
-    ${p.byCategory.length ? `<table class="stat-table"><thead><tr><th>분야</th><th class="num">공고</th><th class="num">지원·제안</th><th class="num">계약</th><th class="num">계약률</th></tr></thead>
-      <tbody>${p.byCategory.map(c=>`<tr><td>${esc(c.category)}</td><td class="num">${c.jobs}</td><td class="num">${c.contacts}</td><td class="num"><b>${c.contracted}</b></td><td class="num">${fmtPct(c.contractRate)}</td></tr>`).join('')}</tbody></table>
+    ${(() => {
+      const perf = p.byCategory.filter(c => c.jobs || c.contacts || c.contracted);
+      const bal = p.byCategory.filter(c => c.talents !== null && c.talents !== undefined);
+      return (perf.length ? `<table class="stat-table"><thead><tr><th>분야</th><th class="num">공고</th><th class="num">지원·제안</th><th class="num">계약</th><th class="num">계약률</th></tr></thead>
+      <tbody>${perf.map(c=>`<tr><td>${esc(c.category)}</td><td class="num">${c.jobs}</td><td class="num">${c.contacts}</td><td class="num"><b>${c.contracted}</b></td><td class="num">${fmtPct(c.contractRate)}</td></tr>`).join('')}</tbody></table>
       <div class="page-sub" style="margin-top:6px;">계약이 나오는 분야에 홍보·영업을 먼저 집중하면 첫 계약 사례를 빨리 만들 수 있어요.</div>`
-      : `<div class="reco-empty">이 기간에 등록된 공고가 없어요.</div>`}
+      : `<div class="reco-empty">이 기간에 등록된 공고가 없어요.</div>`)
+      + (bal.length ? `
+      <div class="section-label with-ic">${I.talent}양면 균형 · 먼저 모을 쪽</div>
+      <table class="stat-table"><thead><tr><th>분야</th><th class="num">모집 중 공고</th><th class="num">인재</th><th>먼저 모을 쪽</th></tr></thead>
+      <tbody>${bal.map(c=>`<tr><td>${esc(c.category)}</td><td class="num">${c.openJobs}</td><td class="num">${c.talents}</td><td>${c.recruit ? `<b>${esc(c.recruit)}</b>` : '-'}</td></tr>`).join('')}</tbody></table>
+      <div class="page-sub" style="margin-top:6px;">모집 중 공고가 없으면 기업을, 공고 1건당 그 분야 인재가 5명 미만이면 프리랜서를 먼저 모아요. 인재는 그 분야 기술을 가진 프리랜서 수예요.</div>` : '');
+    })()}
 
     <div class="section-label with-ic">${I.verified}신뢰 · 직접 거래 방지</div>
     <div class="hero-stat">

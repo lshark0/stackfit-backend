@@ -1,5 +1,6 @@
 const { all, get } = require('./db');
 const { pairScore } = require('./recommend');
+const { CATEGORIES, matchesCategory } = require('./stackCatalog');
 
 // 관리자 성과 지표: '기능이 있다'가 아니라 '실제로 거래가 이뤄지는지'를 숫자로 보여줍니다.
 //  - 매칭 퍼널: 공고 → 지원·제안 → 인터뷰 → 매칭(합격·수락) → 계약 체결 → 완료
@@ -49,7 +50,7 @@ async function computePerformance(days) {
   const inWin = (v) => { const t = toMs(v); return t !== null && t >= since; };
 
   const [jobs, apps, props, projects, interviews, profiles, masked, cvPending] = await Promise.all([
-    all(`SELECT id, company_id, category, stack_json, duty, grade, created_at FROM jobs ORDER BY id DESC LIMIT ${ROW_LIMIT}`),
+    all(`SELECT id, company_id, category, stack_json, duty, grade, status, created_at FROM jobs ORDER BY id DESC LIMIT ${ROW_LIMIT}`),
     all(`SELECT id, job_id, freelancer_id, status, created_at, match_score FROM applications ORDER BY id DESC LIMIT ${ROW_LIMIT}`),
     all(`SELECT id, company_id, freelancer_id, job_id, status, created_at, responded_at, match_score FROM proposals ORDER BY id DESC LIMIT ${ROW_LIMIT}`),
     all(`SELECT id, job_id, company_id, freelancer_id, status, contracted_at, completed_at, created_at FROM projects ORDER BY id DESC LIMIT ${ROW_LIMIT}`),
@@ -162,9 +163,21 @@ async function computePerformance(days) {
   for (const a of appsW) { const c = cat(catOf(a.job_id)); c.contacts++; if (a.status === 'accepted') c.matched++; }
   for (const p of propsW) { const c = cat(p.job_id ? catOf(p.job_id) : '공고 없는 제안'); c.contacts++; if (p.status === 'accepted') c.matched++; }
   for (const p of contractedW) cat(p.job_id ? catOf(p.job_id) : '공고 없는 제안').contracted++;
+  // 양면 균형: 분야별 모집 중 공고 수와 그 분야 기술을 가진 프리랜서 수를 함께 봐서, 어느 쪽을 먼저 모을지 정합니다.
+  //  - 모집 중 공고가 없는데 인재가 있으면 '기업'을, 공고 1건당 인재가 5명 미만이면 '프리랜서'를 먼저 모읍니다.
+  const parseStack = (v) => { try { const a = JSON.parse(v || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } };
+  const profileStacks = profiles.map((p) => parseStack(p.stack_json)).filter((st) => st.length);
+  for (const name of CATEGORIES) cat(name);
+  const balanceOf = (c) => {
+    const openJobs = jobs.filter((j) => j.status === 'open' && (j.category || '미분류') === c.category).length;
+    const talents = CATEGORIES.includes(c.category) ? profileStacks.filter((st) => matchesCategory(st, c.category)).length : null;
+    const recruit = talents === null ? '' : openJobs === 0 ? (talents > 0 ? '기업' : '양쪽') : talents < openJobs * 5 ? '프리랜서' : '';
+    return { openJobs, talents, recruit };
+  };
   const byCategory = [...cats.values()]
-    .map((c) => ({ ...c, contractRate: pct(c.contracted, c.contacts) }))
-    .sort((a, b) => b.contracted - a.contracted || b.contacts - a.contacts || b.jobs - a.jobs);
+    .map((c) => ({ ...c, ...balanceOf(c), contractRate: pct(c.contracted, c.contacts) }))
+    .filter((c) => c.jobs || c.contacts || c.contracted || c.openJobs || c.talents)
+    .sort((a, b) => b.contracted - a.contracted || b.contacts - a.contacts || b.jobs - a.jobs || (b.talents || 0) - (a.talents || 0));
 
   // ----- 신뢰·직접 거래 방지 -----
   const maskedW = masked.filter((m) => inWin(m.created_at));

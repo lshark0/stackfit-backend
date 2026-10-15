@@ -56,11 +56,15 @@ async function recordSignupAttribution(userId, attribution) {
     [source, medium, campaign, referredBy, userId]
   );
   if (referredBy) {
-    await addNotification(referredBy, {
-      tag: '친구 초대', title: '초대한 친구가 가입했어요',
-      body: '내 초대 코드로 새 회원이 가입했어요. 마이페이지 > 친구 초대에서 확인할 수 있어요.',
-      link: 'mypage',
-    }).catch(() => {});
+    // 교차 초대(기업 ↔ 프리랜서)는 서로 이어 줍니다. 순환 참조를 피하려고 사용할 때 불러옵니다.
+    const { linkCrossInvite } = require('./coldStart');
+    const cross = await linkCrossInvite(userId, referredBy).catch(() => null);
+    const body = cross === 'freelancer_follows_company'
+      ? '초대한 프리랜서가 가입해 회사를 관심 기업으로 추가했어요. 공고를 올리면 바로 알림이 가요.'
+      : cross === 'company_invited_by_freelancer'
+        ? '초대한 회사가 가입했어요. 첫 공고를 올리면 가장 먼저 알려드릴게요.'
+        : '내 초대 코드로 새 회원이 가입했어요. 마이페이지 > 친구 초대에서 확인할 수 있어요.';
+    await addNotification(referredBy, { tag: '친구 초대', title: '초대한 회원이 가입했어요', body, link: 'invite' }).catch(() => {});
   }
   return { referredBy };
 }
