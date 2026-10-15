@@ -4809,7 +4809,7 @@ async function screenCareerVerify(){
       ${latest.status === 'pending' ? `<div class="para" style="margin-top:8px;">AI가 서류를 확인하고 있어요. 보통 1분 안에 끝나고, 결과는 알림으로도 알려드려요.</div>` : ''}
       ${latest.status === 'needs_review' ? `<div class="para" style="margin-top:8px;">AI가 판단하기 어려운 부분이 있어 관리자가 한 번 더 확인하고 있어요. 보통 영업일 기준 1~2일 걸려요.</div>` : ''}
       ${['rejected','revoked'].includes(latest.status) && latest.admin_note ? `<div class="para" style="margin-top:8px;">${latest.status === 'revoked' ? '취소' : '반려'} 사유: ${esc(latest.admin_note)}</div>` : ''}
-      ${latest.status === 'supplement' && latest.admin_note ? `<div class="para" style="margin-top:8px;">${esc(latest.admin_note)}</div>` : ''}
+      ${latest.status === 'supplement' && latest.admin_note ? `<div class="para" style="margin-top:8px; white-space:pre-line; line-height:1.65;">${esc(latest.admin_note)}</div>` : ''}
       ${open ? `<button class="btn btn-outline" style="margin-top:10px;" onclick="cancelCareerVerify()">제출 취소</button>` : ''}
     </div>` : ''}
     ${open ? '' : `
@@ -4826,6 +4826,9 @@ async function screenCareerVerify(){
       · 인정 서류: 건강보험 자격득실확인서, 경력증명서, SW기술자 경력확인서(KOSA), 재직·퇴직증명서 — 기관·회사가 발급한 서류만 인정돼요(직접 쓴 경력기술서 X)<br>
       · AI(Anthropic Claude)가 서류의 이름·근무 기간을 프로필과 비교해요. 판단이 어려운 서류만 관리자가 확인해요.<br>
       · 한 서류로 전체 경력이 확인되지 않으면 <b>여러 서류를 함께</b> 올려주세요(예: KOSA 경력확인서 + 건강보험 자격득실확인서).<br>
+      · <b>건강보험 자격득실확인서</b>: 국민건강보험공단 홈페이지·'The건강보험' 앱이나 정부24에서 무료 발급. 직원으로 다닌 회사와 입사·퇴사일이 나와요('전체 이력'으로 발급).<br>
+      · <b>경력증명서</b>: 다닌 회사나 프리랜서 프로젝트를 맡긴 회사(수행사·발주처)에 요청. 회사 이름·참여 기간·담당 업무와 회사 직인이 있어야 해요.<br>
+      · <b>SW기술자 경력확인서</b>: KOSA(한국소프트웨어산업협회)에 경력을 신고하고 발급받아요. 빠진 기간이 있으면 먼저 신고한 뒤 새로 발급받아 주세요.<br>
       · <b>주민등록번호 뒷자리는 가리고</b> 올려주세요.<br>
       · 심사가 끝나면 <b>서류는 바로 삭제</b>되고 결과만 남아요. 하루 3번까지 신청할 수 있어요.
     </div>
@@ -4920,7 +4923,7 @@ async function decideCareerVerify(id, decision){
     if(!note){ toast('반려 사유를 적어야 반려할 수 있어요'); return; }
   }
   if(decision === 'supplement'){
-    note = (prompt('보완 안내 문구 (프리랜서에게 그대로 안내돼요)', '제출해 주신 서류는 확인되었으나, 프로필에 적으신 경력과 서류상 확인되는 경력 기간에 차이가 있습니다. 서류에 없는 기간의 경력을 증빙할 건강보험 자격득실확인서나 경력증명서를 함께 올려주시면 더 빠르게 처리됩니다.') || '').trim();
+    note = (prompt('보완 안내 문구 (프리랜서에게 그대로 안내돼요)', '제출해 주신 서류는 확인되었으나, 프로필에 적으신 경력과 서류상 확인되는 경력 기간에 차이가 있습니다. 서류에 없는 기간(OOOO~OOOO년)을 증빙할 서류를 처음 올리신 서류와 함께 한 번에 올려주시면 더 빠르게 처리됩니다. 직원으로 다닌 기간은 건강보험 자격득실확인서(국민건강보험공단·정부24 무료 발급), 프리랜서로 참여한 기간은 그 프로젝트를 맡긴 회사의 경력증명서(회사 이름·참여 기간·담당 업무·직인 포함)를 올려주세요.') || '').trim();
     if(!note){ toast('안내 문구를 적어야 보완 요청할 수 있어요'); return; }
   }
   const go2 = async () => {

@@ -25,12 +25,25 @@ const REVIEW_SCHEMA = {
     profile_consistency: { type: 'string', enum: ['일치', '대체로 일치', '불일치', '확인 불가'] },
     tampering_signs: { type: 'array', items: { type: 'string' } },
     missing_career: { type: 'string' },
+    missing_periods: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          period: { type: 'string' },
+          what: { type: 'string' },
+          work_type: { type: 'string', enum: ['직장 근무', '프리랜서 프로젝트', '모름'] },
+        },
+        required: ['period', 'what', 'work_type'],
+        additionalProperties: false,
+      },
+    },
     decision: { type: 'string', enum: ['approve', 'reject', 'request_more', 'needs_review'] },
     reason_for_user: { type: 'string' },
     notes_for_admin: { type: 'string' },
   },
   required: ['document_type', 'issued_by_organization', 'name_on_document', 'name_match', 'career_years_on_document', 'employers',
-    'profile_consistency', 'tampering_signs', 'missing_career', 'decision', 'reason_for_user', 'notes_for_admin'],
+    'profile_consistency', 'tampering_signs', 'missing_career', 'missing_periods', 'decision', 'reason_for_user', 'notes_for_admin'],
   additionalProperties: false,
 };
 
@@ -43,6 +56,10 @@ const INSTRUCTIONS = `당신은 IT 프리랜서 매칭 서비스 'IT Free'의 �
 2. 이름: 서류의 이름과 프로필 이름이 같은 사람인지 확인합니다. 가운데 글자가 가려진 경우(홍*동)는 보이는 글자가 맞으면 '일치'로 봅니다.
 3. 경력: 서류에 나온 근무 기간을 합해 대략적인 경력 연수(career_years_on_document, 알 수 없으면 0)를 적고, 프로필의 경력·직무와 크게 어긋나는지 봅니다. 프로필 경력이 서류보다 2년 넘게 길면 '불일치'입니다.
    불일치라면 missing_career에 서류로 확인되지 않는 경력을 명사구로 적습니다. 예: "2023년 이후 경력이나 서류에 없는 초기 경력(2001~2005년 프로젝트 등)". 차이가 없으면 빈 문자열입니다.
+   missing_periods에는 서류로 확인되지 않는 기간을 하나씩 적습니다(최대 4개, 없으면 빈 배열).
+   - period: 기간. 예: "2023년 6월 이후", "2001~2005년"
+   - what: 그 기간에 프로필(자기소개·수행 프로젝트)에 적힌 일. 예: "삼성그룹 UNIX 유지보수 프로젝트". 모르면 "프로필에 적힌 경력"
+   - work_type: 회사에 직원으로 다닌 기간이면 '직장 근무', 프리랜서로 프로젝트를 맡은 기간이면 '프리랜서 프로젝트', 알 수 없으면 '모름'
 4. 위조 흔적: 글꼴·정렬이 일부만 다르거나, 날짜·이름 위에 덧쓴 흔적, 발급번호·직인이 이상한 부분이 있으면 tampering_signs에 적습니다. 없으면 빈 배열입니다.
 
 결정(decision)
@@ -88,13 +105,48 @@ const DOC_NAME = {
   '건강보험 자격득실확인서': '건강보험 자격득실확인서', '경력증명서': '경력증명서', 'SW기술자 경력확인서': 'SW기술자 경력확인서',
   '재직·퇴직증명서': '재직·퇴직증명서',
 };
-// 보완 안내 문구: 관리자 검토 없이 프리랜서가 바로 무엇을 더 올리면 되는지 알려줍니다.
+// 빠진 기간의 근무 형태별로 어떤 서류를 어디서 받으면 되는지 구체적으로 안내합니다.
+const DOC_FOR = {
+  '직장 근무': ['health'],
+  '프리랜서 프로젝트': ['career'],
+  '모름': ['health', 'career'],
+};
+const DOC_LABEL = {
+  health: '건강보험 자격득실확인서',
+  career: '그 프로젝트를 맡긴 회사의 경력증명서(또는 KOSA 경력확인서 재발급)',
+};
+const HOW_TO = {
+  health: "건강보험 자격득실확인서: 국민건강보험공단 홈페이지·'The건강보험' 앱이나 정부24에서 무료로 바로 발급돼요. 직원으로 다닌 회사 이름과 입사·퇴사일이 모두 나오도록 '전체 이력'으로 발급해주세요.",
+  career: '경력증명서: 프로젝트를 맡긴 회사(수행사·발주처)에 요청해 받는 서류예요. 회사 이름, 참여 기간, 프로젝트명·담당 업무가 적혀 있고 회사 직인이 찍혀 있어야 해요. 이 기간을 KOSA(한국소프트웨어산업협회)에 경력 신고한 뒤 SW기술자 경력확인서를 새로 발급받아 올려주셔도 돼요.',
+};
+
+// 보완 안내 문구: 관리자 검토 없이 프리랜서가 바로 무엇을, 어디서 받아 올리면 되는지 알려줍니다.
 function supplementMessage(result, profileYears, docCount) {
   const docName = docCount > 1 ? '서류' : (DOC_NAME[result.document_type] || '서류');
   const years = clip(profileYears, 20);
-  const missing = clip(result.missing_career, 120) || '서류에 없는 기간의 경력';
-  return `제출해 주신 ${docName}${josa(docName, '은', '는')} 확인되었으나, 프로필에 적으신 경력${years ? `(${years})` : ''}과 서류상 확인되는 경력 기간에 차이가 있습니다. `
-    + `${missing}${josa(missing, '을', '를')} 증빙할 건강보험 자격득실확인서나 경력증명서를 함께 올려주시면 더 빠르게 처리됩니다.`;
+  const head = `제출해 주신 ${docName}${josa(docName, '은', '는')} 확인되었으나, 프로필에 적으신 경력${years ? `(${years})` : ''}과 서류상 확인되는 경력 기간에 차이가 있습니다.`;
+  const tail = '처음 올리신 서류와 함께 한 번에 올려주시면 더 빠르게 처리됩니다.';
+  const periods = (Array.isArray(result.missing_periods) ? result.missing_periods : []).slice(0, 4)
+    .map((m) => ({ period: clip(m && m.period, 40), what: clip(m && m.what, 60), type: DOC_FOR[m && m.work_type] ? m.work_type : '모름' }))
+    .filter((m) => m.period);
+  const needed = new Set();
+  let body;
+  if (periods.length) {
+    const lines = periods.map((m) => {
+      DOC_FOR[m.type].forEach((d) => needed.add(d));
+      const doc = m.type === '모름'
+        ? '직원으로 다녔다면 건강보험 자격득실확인서, 프리랜서로 참여했다면 그 프로젝트를 맡긴 회사의 경력증명서'
+        : DOC_LABEL[DOC_FOR[m.type][0]];
+      return `· ${m.period}${m.what ? ` ${m.what}` : ''} → ${doc}`;
+    });
+    body = `${head} 아래 기간을 증빙할 서류를 ${tail}\n${lines.join('\n')}`;
+  } else {
+    const missing = clip(result.missing_career, 120) || '서류에 없는 기간의 경력';
+    DOC_FOR['모름'].forEach((d) => needed.add(d));
+    body = `${head} ${missing}${josa(missing, '을', '를')} 증빙할 서류를 ${tail}\n`
+      + '· 직원으로 다닌 기간 → 건강보험 자격득실확인서\n· 프리랜서로 참여한 기간 → 그 프로젝트를 맡긴 회사의 경력증명서';
+  }
+  return `${body}\n\n[발급 방법]\n${[...needed].map((d) => `· ${HOW_TO[d]}`).join('\n')}`;
 }
 
 // 제출 한 건의 서류 파일들(여러 개 가능). 예전 방식(한 파일을 제출 행에 저장)도 함께 읽습니다.
@@ -202,6 +254,8 @@ async function reviewSubmission(id) {
       profile_consistency: clip(result.profile_consistency, 10),
       tampering_signs: (Array.isArray(result.tampering_signs) ? result.tampering_signs : []).slice(0, 5).map((t) => scrubIds(clip(t, 120))),
       missing_career: scrubIds(clip(result.missing_career, 120)),
+      missing_periods: (Array.isArray(result.missing_periods) ? result.missing_periods : []).slice(0, 4)
+        .map((m) => ({ period: scrubIds(clip(m && m.period, 40)), what: scrubIds(clip(m && m.what, 60)), work_type: clip(m && m.work_type, 15) })),
       doc_count: docs.length,
       ai_decision: clip(result.decision, 15),
       notes_for_admin: scrubIds(clip(result.notes_for_admin, 400)),
