@@ -85,7 +85,11 @@ router.post('/', requireAuth, requireRole('freelancer'), (req, res, next) => {
           return res.status(400).json({ error: '사진 파일은 3.5MB 이하만 올릴 수 있어요. 크면 PDF로 저장해서 올려주세요.' });
         }
       }
-      const kind = DOC_KINDS.includes((req.body || {}).doc_kind) ? req.body.doc_kind : '기타';
+      // 서류마다 종류를 고릅니다(doc_kinds를 파일 순서대로). 예전 앱은 doc_kind 하나만 보냅니다.
+      const fallbackKind = DOC_KINDS.includes((req.body || {}).doc_kind) ? req.body.doc_kind : '기타';
+      const rawKinds = [].concat((req.body || {}).doc_kinds || []);
+      const kinds = files.map((_, i) => (DOC_KINDS.includes(rawKinds[i]) ? rawKinds[i] : fallbackKind));
+      const kind = [...new Set(kinds)].join(' + ').slice(0, 200);
       const memo = String((req.body || {}).memo || '').trim().slice(0, 300);
       if (await get("SELECT id FROM career_verifications WHERE user_id = ? AND status IN ('pending','needs_review')", [req.user.id])) {
         return res.status(409).json({ error: '이미 검토 중인 서류가 있어요. 검토가 끝난 뒤 다시 올려주세요.' });
@@ -100,8 +104,8 @@ router.post('/', requireAuth, requireRole('freelancer'), (req, res, next) => {
       );
       const newId = Number(ins.lastInsertRowid);
       for (let i = 0; i < files.length; i++) {
-        await run('INSERT INTO career_verification_files (verification_id, filename, original_name, data) VALUES (?,?,?,?)',
-          [newId, `cv_${crypto.randomBytes(12).toString('hex')}${extOf(files[i].originalname)}`, names[i], files[i].buffer]);
+        await run('INSERT INTO career_verification_files (verification_id, filename, original_name, doc_kind, data) VALUES (?,?,?,?,?)',
+          [newId, `cv_${crypto.randomBytes(12).toString('hex')}${extOf(files[i].originalname)}`, names[i], kinds[i], files[i].buffer]);
       }
       // AI 심사는 1분 가까이 걸릴 수 있어 응답을 먼저 돌려주고 뒤에서 진행합니다(결과는 알림으로 안내).
       setImmediate(() => reviewSubmission(newId).catch((e) => console.error('[AI] 경력 검증 심사 오류:', e.message)));
@@ -136,11 +140,11 @@ router.get('/admin', requireAuth, requireAdmin, async (req, res) => {
   const openIds = rows.filter((r) => open(r.status)).map((r) => r.id);
   const filesById = new Map();
   if (openIds.length) {
-    const files = await all(`SELECT verification_id, filename, original_name FROM career_verification_files
+    const files = await all(`SELECT verification_id, filename, original_name, doc_kind FROM career_verification_files
       WHERE verification_id IN (${openIds.map(() => '?').join(',')}) ORDER BY id ASC`, openIds);
     for (const f of files) {
       if (!filesById.has(f.verification_id)) filesById.set(f.verification_id, []);
-      filesById.get(f.verification_id).push({ name: f.original_name, url: signedFileUrl(f.filename) });
+      filesById.get(f.verification_id).push({ name: f.original_name, kind: f.doc_kind, url: signedFileUrl(f.filename) });
     }
   }
   res.json({
@@ -154,7 +158,7 @@ router.get('/admin', requireAuth, requireAdmin, async (req, res) => {
         role_title: r.role_title, years: r.years, grade: r.grade,
         ai: aiResult,
         docs: open(r.status)
-          ? [...(r.doc_filename ? [{ name: r.doc_original_name, url: signedFileUrl(r.doc_filename) }] : []), ...(filesById.get(r.id) || [])]
+          ? [...(r.doc_filename ? [{ name: r.doc_original_name, kind: r.doc_kind, url: signedFileUrl(r.doc_filename) }] : []), ...(filesById.get(r.id) || [])]
           : [],
       };
     }),

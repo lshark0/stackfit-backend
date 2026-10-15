@@ -364,6 +364,7 @@ CREATE TABLE IF NOT EXISTS career_verification_files (
   verification_id INTEGER NOT NULL REFERENCES career_verifications(id) ON DELETE CASCADE,
   filename        TEXT NOT NULL UNIQUE,
   original_name   TEXT NOT NULL DEFAULT '',
+  doc_kind        TEXT NOT NULL DEFAULT '',
   data            BYTEA,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

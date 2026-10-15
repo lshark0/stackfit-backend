@@ -96,6 +96,7 @@ if (USE_POSTGRES) {
     // 경력 검증 AI 심사 결과(JSON)와 처리 주체('ai' 또는 'admin')
     await ensureColumnPg('career_verifications', 'ai_result_json', 'TEXT');
     await ensureColumnPg('career_verifications', 'reviewed_by', "TEXT NOT NULL DEFAULT ''");
+    await ensureColumnPg('career_verification_files', 'doc_kind', "TEXT NOT NULL DEFAULT ''");
     // 프리랜서 연락처 + 제안 받기 설정
     await ensureColumnPg('freelancer_profiles', 'phone', "TEXT NOT NULL DEFAULT ''");
     await ensureColumnPg('freelancer_profiles', 'email', "TEXT NOT NULL DEFAULT ''");
@@ -212,6 +213,7 @@ if (USE_POSTGRES) {
     addCol('proposals', 'match_score', 'INTEGER');
     addCol('career_verifications', 'ai_result_json', 'TEXT');
     addCol('career_verifications', 'reviewed_by', "TEXT NOT NULL DEFAULT ''");
+    addCol('career_verification_files', 'doc_kind', "TEXT NOT NULL DEFAULT ''");
     addCol('freelancer_profiles', 'phone', "TEXT NOT NULL DEFAULT ''");
     addCol('freelancer_profiles', 'email', "TEXT NOT NULL DEFAULT ''");
     addCol('freelancer_profiles', 'accept_proposals', 'INTEGER NOT NULL DEFAULT 1');

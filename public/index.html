@@ -4788,9 +4788,48 @@ const CV_STATUS = {
   supplement: ['보완 필요', 'pending'],
 };
 let careerPollTimer = null;
+// 올릴 서류 목록: 서류마다 종류와 파일을 따로 고릅니다(최대 5개). 화면을 다시 그려도 고른 파일이 남도록 여기에 보관합니다.
+const CV_MAX_DOCS = 5;
+let cvRows = null, cvKinds = [], cvMemo = '';
+function cvNextKind(){
+  const used = (cvRows || []).map(r => r.kind);
+  return cvKinds.find(k => !used.includes(k) && k !== '기타') || cvKinds[0];
+}
+function cvRowsHtml(){
+  return cvRows.map((r, i) => `
+    <div class="card" style="padding:12px 14px; margin-bottom:8px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <div style="font-weight:800; font-size:13.5px;">서류 ${i+1}</div>
+        ${cvRows.length > 1 ? `<button class="btn btn-outline" style="width:auto; padding:4px 10px; font-size:12px;" onclick="cvRemoveRow(${i})">삭제</button>` : ''}
+      </div>
+      <select class="form-input" onchange="cvRows[${i}].kind=this.value">${cvKinds.map(k=>`<option ${k===r.kind?'selected':''}>${esc(k)}</option>`).join('')}</select>
+      <label class="btn btn-outline" style="cursor:pointer; justify-content:flex-start; gap:8px; margin-top:8px;">${I.plus}<span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${r.file ? esc(r.file.name) : '파일 선택 (PDF·JPG·PNG)'}</span>
+        <input type="file" accept=".pdf,.jpg,.jpeg,.png" style="display:none;" onchange="cvPickFile(${i}, this)"></label>
+    </div>`).join('') + (cvRows.length < CV_MAX_DOCS
+      ? `<button class="btn btn-outline" style="margin-bottom:6px;" onclick="cvAddRow()">${I.plus} 서류 추가 <span style="font-weight:400; color:var(--slate-light);">(${cvRows.length}/${CV_MAX_DOCS})</span></button>` : '');
+}
+function cvRefreshRows(){ const el = document.getElementById('cv-rows'); if(el) el.innerHTML = cvRowsHtml(); }
+function cvAddRow(){ if(cvRows.length >= CV_MAX_DOCS) return; cvRows.push({ kind: cvNextKind(), file: null }); cvRefreshRows(); }
+function cvRemoveRow(i){ cvRows.splice(i, 1); cvRefreshRows(); }
+function cvPickFile(i, input){
+  const file = input.files[0];
+  if(!file) return;
+  const ext = (file.name.split('.').pop() || '').toLowerCase();
+  if(!['pdf','jpg','jpeg','png'].includes(ext)){ toast('PDF, JPG, PNG 파일만 올릴 수 있어요'); return; }
+  if(file.size > 10 * 1024 * 1024){ toast('파일 하나당 10MB 이하만 올릴 수 있어요'); return; }
+  if(ext !== 'pdf' && file.size > 3.5 * 1024 * 1024){ toast('사진은 3.5MB 이하만 올릴 수 있어요. PDF로 저장해서 올려주세요'); return; }
+  cvRows[i].file = file;
+  cvRefreshRows();
+}
 async function screenCareerVerify(){
   const d = await apiFetch('/career-verification/me');
   const latest = d.latest;
+  cvKinds = d.docKinds || [];
+  // 처음 들어오면 서류 1개(보완 요청을 받았다면 처음 서류 + 추가 서류 2개)로 시작합니다.
+  if(!cvRows){
+    cvRows = [{ kind: cvKinds[0], file: null }];
+    if(latest && latest.status === 'supplement') cvRows.push({ kind: cvNextKind(), file: null });
+  }
   const open = latest && (latest.status === 'pending' || latest.status === 'needs_review');
   // AI 심사 중이면 5초마다 결과를 다시 확인합니다(이 화면을 보고 있을 때만).
   clearTimeout(careerPollTimer);
@@ -4820,12 +4859,10 @@ async function screenCareerVerify(){
     ${open ? '' : `
     <div class="section-label">${latest && latest.status === 'supplement' ? '서류 함께 올리기' : d.verified ? '서류 다시 올리기' : '증빙 서류 올리기'}</div>
     ${latest && latest.status === 'supplement' ? `<div class="page-sub" style="margin:-2px 0 10px; line-height:1.6;">처음 올리신 서류와 추가 서류를 <b>한 번에 함께</b> 골라 올려주세요. AI가 서류들의 경력 기간을 합쳐서 확인해요.</div>` : ''}
-    <div class="form-field"><label class="form-label">대표 서류 종류</label>
-      <select id="cv-kind" class="form-input">${d.docKinds.map(k=>`<option>${esc(k)}</option>`).join('')}</select></div>
-    <div class="form-field"><label class="form-label">파일 <span style="font-weight:400; color:var(--slate-light);">(최대 5개 · PDF 10MB · 사진 JPG·PNG 3.5MB 이하)</span></label>
-      <input id="cv-file" type="file" class="form-input" accept=".pdf,.jpg,.jpeg,.png" multiple></div>
-    <div class="form-field"><label class="form-label">설명 <span style="font-weight:400; color:var(--slate-light);">(선택)</span></label>
-      <input id="cv-memo" class="form-input" maxlength="300" placeholder="예: 2019~2024 ㅇㅇ정보 SI 개발 경력"></div>
+    <div class="page-sub" style="margin:-2px 0 8px;">서류마다 종류를 고르고 파일을 붙여주세요. 여러 서류를 함께 올리면 AI가 근무 기간을 합쳐서 확인해요. (PDF 10MB · 사진 3.5MB 이하)</div>
+    <div id="cv-rows">${cvRowsHtml()}</div>
+    <div class="form-field" style="margin-top:6px;"><label class="form-label">설명 <span style="font-weight:400; color:var(--slate-light);">(선택)</span></label>
+      <input id="cv-memo" class="form-input" maxlength="300" value="${esc(cvMemo)}" oninput="cvMemo=this.value" placeholder="예: 2019~2024 ㅇㅇ정보 SI 개발 경력"></div>
     <button class="btn btn-primary" onclick="submitCareerVerify()">AI 심사 받기</button>`}
     <div class="page-sub" style="margin-top:16px; line-height:1.65;">
       · 인정 서류: 건강보험 자격득실확인서, 경력증명서, SW기술자 경력확인서(KOSA), 재직·퇴직증명서 — 기관·회사가 발급한 서류만 인정돼요(직접 쓴 경력기술서 X)<br>
@@ -4840,26 +4877,24 @@ async function screenCareerVerify(){
   </div>`;
 }
 async function submitCareerVerify(){
-  const files = [...document.getElementById('cv-file').files];
-  if(!files.length){ toast('증빙 서류 파일을 선택해주세요'); return; }
-  if(files.length > 5){ toast('서류는 한 번에 5개까지 올릴 수 있어요'); return; }
-  for(const file of files){
-    const ext = (file.name.split('.').pop() || '').toLowerCase();
-    if(!['pdf','jpg','jpeg','png'].includes(ext)){ toast('PDF, JPG, PNG 파일만 올릴 수 있어요'); return; }
-    if(file.size > 10 * 1024 * 1024){ toast('파일 하나당 10MB 이하만 올릴 수 있어요'); return; }
-    if(ext !== 'pdf' && file.size > 3.5 * 1024 * 1024){ toast('사진은 3.5MB 이하만 올릴 수 있어요. PDF로 저장해서 올려주세요'); return; }
-  }
-  if(files.reduce((n,f)=>n+f.size,0) > 20 * 1024 * 1024){ toast('서류 파일 합계는 20MB 이하로 올려주세요'); return; }
+  const rows = (cvRows || []).filter(r => r.file);
+  if(!rows.length){ toast('증빙 서류 파일을 선택해주세요'); return; }
+  const empty = (cvRows || []).findIndex(r => !r.file);
+  if(empty >= 0){ toast(`서류 ${empty+1}의 파일을 선택하거나 삭제해주세요`); return; }
+  if(rows.length > CV_MAX_DOCS){ toast(`서류는 한 번에 ${CV_MAX_DOCS}개까지 올릴 수 있어요`); return; }
+  if(rows.reduce((n,r)=>n+r.file.size,0) > 20 * 1024 * 1024){ toast('서류 파일 합계는 20MB 이하로 올려주세요'); return; }
   const fd = new FormData();
-  fd.append('doc_kind', document.getElementById('cv-kind').value);
-  fd.append('memo', document.getElementById('cv-memo').value.trim());
-  files.forEach(f => fd.append('docs', f));
+  fd.append('doc_kind', rows[0].kind);
+  fd.append('memo', (cvMemo || '').trim());
+  rows.forEach(r => fd.append('doc_kinds', r.kind));
+  rows.forEach(r => fd.append('docs', r.file));
   try{
     toast('올리는 중...');
     const res = await fetch(API_BASE + '/career-verification', { method:'POST', headers: state.token ? {Authorization:'Bearer '+state.token} : {}, body: fd });
     const data = await res.json().catch(()=>({}));
     if(!res.ok) throw new Error(data.error || '제출하지 못했어요');
     toast('제출했어요. AI가 바로 심사를 시작해요');
+    cvRows = null; cvMemo = '';
     render();
   }catch(e){ toast(e.message); }
 }
@@ -4910,7 +4945,7 @@ async function screenAdminCareerVerify(){
         <div class="para" style="margin-top:8px;">${esc(v.doc_kind)}${v.memo ? ` · ${esc(v.memo)}` : ''}</div>
         <div class="page-sub" style="margin-top:2px;">${fmtDate(v.created_at)} 제출${v.reviewed_at ? ` · ${fmtDate(v.reviewed_at)} 처리` : ''}${v.admin_note ? ` · ${esc(v.admin_note)}` : ''}</div>
         ${careerAiSummary(v.ai)}
-        ${(v.docs || []).length ? `<div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">${v.docs.map((f,i)=>`<a class="chip" href="${esc(fileUrl(f.url))}" target="_blank" rel="noopener">📄 ${v.docs.length > 1 ? `서류 ${i+1}` : '서류 보기'}</a>`).join('')}</div>` : ''}
+        ${(v.docs || []).length ? `<div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">${v.docs.map((f,i)=>`<a class="chip" href="${esc(fileUrl(f.url))}" target="_blank" rel="noopener">📄 ${esc(f.kind || (v.docs.length > 1 ? `서류 ${i+1}` : '서류 보기'))}</a>`).join('')}</div>` : ''}
         ${['pending','needs_review'].includes(v.status) ? `
         <div style="display:flex; gap:8px; margin-top:12px;">
           <button class="btn btn-outline" onclick="decideCareerVerify(${v.id}, 'rejected')">반려</button>

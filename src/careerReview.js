@@ -151,9 +151,9 @@ function supplementMessage(result, profileYears, docCount) {
 
 // 제출 한 건의 서류 파일들(여러 개 가능). 예전 방식(한 파일을 제출 행에 저장)도 함께 읽습니다.
 async function loadDocs(row) {
-  const files = await all('SELECT filename, original_name, data FROM career_verification_files WHERE verification_id = ? ORDER BY id ASC', [row.id]);
-  const docs = files.filter((f) => f.data).map((f) => ({ filename: f.filename, name: f.original_name, data: f.data }));
-  if (row.doc_data) docs.unshift({ filename: row.doc_filename, name: row.doc_original_name, data: row.doc_data });
+  const files = await all('SELECT filename, original_name, doc_kind, data FROM career_verification_files WHERE verification_id = ? ORDER BY id ASC', [row.id]);
+  const docs = files.filter((f) => f.data).map((f) => ({ filename: f.filename, name: f.original_name, kind: f.doc_kind, data: f.data }));
+  if (row.doc_data) docs.unshift({ filename: row.doc_filename, name: row.doc_original_name, kind: row.doc_kind, data: row.doc_data });
   return docs;
 }
 
@@ -230,7 +230,8 @@ async function reviewSubmission(id) {
     try {
       const content = [];
       docs.forEach((d, i) => {
-        content.push({ type: 'text', text: `[서류 ${i + 1}] ${clip(d.name, 80)}` });
+        // 회원이 고른 서류 종류는 참고용입니다(실제 종류는 AI가 서류를 보고 판단).
+        content.push({ type: 'text', text: `[서류 ${i + 1}] 회원이 고른 종류: ${clip(d.kind, 40) || '미선택'} · 파일명: ${clip(d.name, 80)}` });
         content.push(docBlockFor(d));
       });
       content.push({ type: 'text', text: `${profile.text}\n\n${INSTRUCTIONS}` });
