@@ -108,6 +108,52 @@ router.post('/job-reports/:id/resolve', requireAuth, requireAdmin, async (req, r
   res.json({ status: resolvedStatus, action });
 });
 
+// 1:1 문의 관리: 처리대기가 먼저 오도록 정렬합니다. 답변은 앱 안 '문의·신고 내역'과 알림으로 회원에게 전달됩니다.
+router.get('/inquiries', requireAuth, requireAdmin, async (req, res) => {
+  const rows = await all(
+    `SELECT q.id, q.user_id, q.reason, q.content, q.reply_email, q.status, q.admin_note, q.created_at, q.resolved_at,
+       q.attachment_filename, q.attachment_original_name,
+       u.email AS account_email, u.role, f.name AS freelancer_name, c.name AS company_name, c.contact_person
+     FROM support_inquiries q
+     LEFT JOIN users u ON u.id = q.user_id
+     LEFT JOIN freelancer_profiles f ON f.user_id = q.user_id
+     LEFT JOIN companies c ON c.user_id = q.user_id
+     ORDER BY CASE WHEN q.status = 'pending' THEN 0 ELSE 1 END, q.id DESC
+     LIMIT 200`
+  );
+  res.json({
+    pending: rows.filter((r) => r.status === 'pending').length,
+    inquiries: rows.map((r) => ({
+      id: r.id, reason: r.reason, content: r.content, reply_email: r.reply_email, status: r.status,
+      answer: r.admin_note || '', created_at: r.created_at, resolved_at: r.resolved_at,
+      attachment_original_name: r.attachment_original_name, attachment_url: signedFileUrl(r.attachment_filename),
+      role: r.role || '', account_email: r.account_email || '',
+      name: r.role === 'company' ? [r.company_name, r.contact_person].filter(Boolean).join(' · ') : (r.freelancer_name || ''),
+    })),
+  });
+});
+
+// 1:1 문의 답변: 답변을 저장하고(다시 고칠 수 있음) 회원에게 알림·푸시를 보냅니다.
+//  status: 'resolved'(답변 완료, 답변 필수) / 'dismissed'(답변 없이 종료, 메모 선택)
+router.post('/inquiries/:id/answer', requireAuth, requireAdmin, async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) return res.status(400).json({ error: '올바르지 않은 문의 ID입니다.' });
+  const status = (req.body || {}).status === 'dismissed' ? 'dismissed' : 'resolved';
+  const answer = String((req.body || {}).answer || '').trim().slice(0, 2000);
+  if (status === 'resolved' && !answer) return res.status(400).json({ error: '답변 내용을 적어주세요.' });
+  const q = await get('SELECT id, user_id, reason, status, admin_note FROM support_inquiries WHERE id = ?', [id]);
+  if (!q) return res.status(404).json({ error: '문의를 찾을 수 없어요.' });
+  await run('UPDATE support_inquiries SET status = ?, admin_note = ?, resolved_at = ? WHERE id = ?', [status, answer, nowStr(), id]);
+  if (answer) {
+    const edited = q.status !== 'pending' && q.admin_note;
+    const title = edited ? '문의 답변이 수정됐어요' : '문의에 답변이 등록됐어요';
+    const body = `[${q.reason}] ${answer.replace(/\s+/g, ' ')}`;
+    await addNotification(q.user_id, { tag: '문의', title, body: body.slice(0, 80), link: 'supportInquiry:1' });
+    pushTo(q.user_id, { kind: 'result', title, body: body.slice(0, 100), tag: `inquiry-${id}`, link: 'supportInquiry:1' });
+  }
+  res.json({ ok: true, status });
+});
+
 // 가입 경로 통계: 기간(days) 동안 가입한 회원을 채널(signup_source)·캠페인·유형별로 집계합니다.
 // 회원 수가 많지 않은 초기 단계라 DB별 날짜 함수 차이를 피하려고 필요한 컬럼만 읽어 메모리에서 집계합니다.
 const toKstDate = (v) => {

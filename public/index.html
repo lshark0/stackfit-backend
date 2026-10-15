@@ -738,7 +738,7 @@ function talentDetailBack(){ goBackFrom(talentDetailReturn, 'talent'); }
 // 화면 안의 뒤로가기 화살표가 항상 마이페이지로 돌아가는 화면들.
 // 이 화면들은 드로어 메뉴 등 여러 곳에서 열릴 수 있어서, 휴대폰의 '뒤로가기'
 // 제스처도 그 화살표와 똑같이 항상 마이페이지로 보내도록 popstate에서 함께 처리합니다.
-const MYPAGE_CHILD_SCREENS = ['proposalSettings','changePassword','deleteAccount','savedJobs','followedCompanies','adminReports','adminPerformance','adminCareerVerify','careerVerify','adminSignupStats','adminAiUsage','adminSecurity','mfaSetup','profileViews','companyProfileEdit','profileEdit','notices','events','faq','supportInquiry'];
+const MYPAGE_CHILD_SCREENS = ['proposalSettings','changePassword','deleteAccount','savedJobs','followedCompanies','adminReports','adminInquiries','adminPerformance','adminCareerVerify','careerVerify','adminSignupStats','adminAiUsage','adminSecurity','mfaSetup','profileViews','companyProfileEdit','profileEdit','notices','events','faq','supportInquiry'];
 
 // 회원 유형별로만 열 수 있는 화면. 다른 유형의 화면이 열리려 하면(뒤로가기 기록, 예전 알림 등) 홈으로 보냅니다.
 const FREELANCER_ONLY = ['careerVerify','receivedProposals','myApplications','portfolios','portfolioEdit','savedJobs','followedCompanies','profileViews','profileEdit','proposalSettings','reportJob'];
@@ -751,7 +751,7 @@ function screenAllowed(screen){
 
 // 알림/푸시에 담긴 링크('screen' 또는 'screen:param')로 해당 화면을 엽니다.
 const LINKABLE_SCREENS = ['home','jobs','jobDetail','myApplications','receivedProposals','sentProposals','savedTalents',
-  'applicants','projects','chatList','chatRoom','profileViews','alerts','mypage','talentDetail','savedJobs','invite','careerVerify','adminCareerVerify','adminReports'];
+  'applicants','projects','chatList','chatRoom','profileViews','alerts','mypage','talentDetail','savedJobs','invite','careerVerify','adminCareerVerify','adminReports','adminInquiries','supportInquiry'];
 function openLink(link){
   if(!link) return false;
   const [screen, rawParam] = String(link).split(':');
@@ -3755,13 +3755,15 @@ async function submitJobReport(jobId){
 // 고객센터 > 문의·신고 (잡코리아 스타일, 특정 공고에 매이지 않는 일반 문의. 프리랜서·기업 공통)
 let supportTab = 'form';
 let supportAttachmentFile = null;
-function setSupportTab(tab){ supportTab = tab; render(); }
+function setSupportTab(tab){ supportTab = tab; state.param = null; render(); }
 function onSupportFileChange(input){
   supportAttachmentFile = input.files && input.files[0] ? input.files[0] : null;
   const label = document.getElementById('sp-filename');
   if(label) label.textContent = supportAttachmentFile ? supportAttachmentFile.name : '파일을 추가하세요';
 }
 async function screenSupportInquiry(){
+  // 답변 알림으로 들어오면(supportInquiry:1) 문의 내역 탭을 바로 보여줍니다.
+  if(state.param === 1) supportTab = 'history';
   const [inquiriesData, profile] = await Promise.all([
     apiFetch('/support/inquiries').then(r=>r.inquiries).catch(()=>[]),
     apiFetch('/profile').catch(()=>null),
@@ -3807,7 +3809,9 @@ async function screenSupportInquiry(){
           <div class="para" style="margin-top:6px;">${esc(r.content)}</div>
           ${r.attachment_url ? `<a href="${viewerUrl(r.attachment_url)}" target="_blank" style="display:inline-block; margin-top:6px; font-size:12px; color:var(--ink); font-weight:600;">📎 ${esc(r.attachment_original_name||'첨부파일')}</a>` : ''}
           <div class="page-sub" style="margin-top:6px;">${(parseServerTime(r.created_at)||new Date()).toLocaleString('ko-KR')}</div>
-          ${r.admin_note ? `<div class="page-sub" style="margin-top:4px;">답변: ${esc(r.admin_note)}</div>` : ''}
+          ${r.admin_note ? `<div style="margin-top:8px; padding:10px 12px; border-radius:10px; background:var(--paper-dim);">
+            <div style="font-weight:800; font-size:12.5px; margin-bottom:4px;">IT Free 답변${r.resolved_at ? ` · ${fmtDate(r.resolved_at)}` : ''}</div>
+            <div class="para" style="white-space:pre-line; font-size:13px;">${esc(r.admin_note)}</div></div>` : ''}
         </div>`).join('') : emptyArt(ART.noJobs, '접수한 문의·신고가 없어요', '')}
     `}
   </div>`;
@@ -4275,7 +4279,8 @@ async function screenMypage(){
     <div class="list-item" onclick="go('adminSignupStats')"><div class="li-l"><div class="li-icon">${I.talent}</div><div class="li-tt">가입 경로 통계</div></div>${I.back}</div>
     <div class="list-item" onclick="go('adminAiUsage')"><div class="li-l"><div class="li-icon">${I.sparkle}</div><div class="li-tt">AI 사용량 통계</div></div>${I.back}</div>
     <div class="list-item" onclick="go('adminSecurity')"><div class="li-l"><div class="li-icon">${I.verified}</div><div class="li-tt">보안 로그</div></div>${I.back}</div>
-    <div class="list-item" onclick="go('adminReports')"><div class="li-l"><div class="li-icon">${I.alertCircle}</div><div class="li-tt">신고 관리</div></div>${I.back}</div>` : ''}
+    <div class="list-item" onclick="go('adminReports')"><div class="li-l"><div class="li-icon">${I.alertCircle}</div><div class="li-tt">신고 관리</div></div>${I.back}</div>
+    <div class="list-item" onclick="go('adminInquiries')"><div class="li-l"><div class="li-icon">${I.alertCircle}</div><div class="li-tt">1:1 문의 관리</div></div>${I.back}</div>` : ''}
     <div class="section-label with-ic">${I.building}약관 및 정책</div>
     <div class="list-item" onclick="window.open('/terms.html','_blank')"><div class="li-l"><div class="li-icon">${I.building}</div><div class="li-tt">이용약관</div></div>${I.back}</div>
     <div class="list-item" onclick="window.open('/privacy.html','_blank')"><div class="li-l"><div class="li-icon">${I.eye}</div><div class="li-tt">개인정보처리방침</div></div>${I.back}</div>
@@ -5119,6 +5124,58 @@ async function screenAdminAiUsage(){
   </div>`;
 }
 
+// 관리자 전용: 1:1 문의 확인·답변. 답변은 회원의 '문의·신고 내역'에 보이고 알림·푸시로도 전달됩니다.
+let adminInquiryFilter = 'pending';
+function setAdminInquiryFilter(f){ adminInquiryFilter = f; render(); }
+async function screenAdminInquiries(){
+  if(!state.isAdmin){ go('mypage'); return ''; }
+  const d = await apiFetch('/admin/inquiries');
+  const list = adminInquiryFilter === 'pending' ? d.inquiries.filter(q=>q.status==='pending') : d.inquiries;
+  const badge = {
+    pending: `<span class="sbadge pending">${I.clockSm}처리대기</span>`,
+    resolved: `<span class="sbadge pass">${I.checkCircle}답변완료</span>`,
+    dismissed: `<span class="sbadge fail">종료</span>`,
+  };
+  const roleLabel = { freelancer: '프리랜서', company: '기업' };
+  return `${statusbar()}
+  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('mypage')">${I.back}</div><div class="page-title" style="font-size:19.5px;">1:1 문의 관리</div></div></div>
+  <div class="content">
+    <div class="tab-switch">
+      <div class="tab ${adminInquiryFilter==='pending'?'active':''}" onclick="setAdminInquiryFilter('pending')">처리대기 ${d.pending}</div>
+      <div class="tab ${adminInquiryFilter==='all'?'active':''}" onclick="setAdminInquiryFilter('all')">전체</div>
+    </div>
+    <div class="page-sub" style="margin:8px 0 10px; line-height:1.6;">답변을 보내면 회원의 '문의·신고 내역'에 표시되고 알림으로도 전달돼요. 보낸 답변은 다시 고칠 수 있어요.</div>
+    ${list.length ? list.map(q=>`
+      <div class="card">
+        <div class="card-top">
+          <div style="min-width:0;">
+            <div class="card-title">${esc(q.reason || '문의')}</div>
+            <div class="card-org">${esc(q.name || '이름 없음')}${q.role ? ` · ${roleLabel[q.role] || q.role}` : ' · (탈퇴한 회원)'}</div>
+          </div>
+          ${badge[q.status] || ''}
+        </div>
+        <div class="para" style="margin-top:8px; white-space:pre-line; font-size:13px;">${esc(q.content)}</div>
+        ${q.attachment_url ? `<a href="${viewerUrl(q.attachment_url)}" target="_blank" style="display:inline-block; margin-top:6px; font-size:12px; color:var(--ink); font-weight:600;">📎 ${esc(q.attachment_original_name||'첨부파일')}</a>` : ''}
+        <div class="page-sub" style="margin-top:6px;">${(parseServerTime(q.created_at)||new Date()).toLocaleString('ko-KR')} 접수${q.resolved_at ? ` · ${fmtDate(q.resolved_at)} 처리` : ''}</div>
+        <div class="page-sub" style="margin-top:3px;">답변받을 이메일: ${q.reply_email ? `<a href="mailto:${esc(q.reply_email)}?subject=${esc(encodeURIComponent('[IT Free] 문의하신 내용에 답변드립니다'))}" style="color:var(--ink); font-weight:600;">${esc(q.reply_email)}</a>` : '-'}${q.account_email && q.account_email !== q.reply_email ? ` · 계정: ${esc(q.account_email)}` : ''}</div>
+        <textarea id="iq-answer-${q.id}" class="form-input" style="min-height:96px; margin-top:10px;" maxlength="2000" placeholder="회원에게 보낼 답변을 적어주세요">${esc(q.answer)}</textarea>
+        <div style="display:flex; gap:8px; margin-top:8px;">
+          ${q.status === 'pending' ? `<button class="btn btn-outline" style="font-size:12.5px;" onclick="answerInquiry(${q.id}, 'dismissed')">답변 없이 종료</button>` : ''}
+          <button class="btn btn-primary" style="font-size:12.5px;" onclick="answerInquiry(${q.id}, 'resolved')">${q.status === 'resolved' ? '답변 수정' : '답변 보내기'}</button>
+        </div>
+      </div>`).join('') : emptyArt(ART.noJobs, adminInquiryFilter === 'pending' ? '처리대기 중인 문의가 없어요' : '접수된 문의가 없어요', '')}
+  </div>`;
+}
+async function answerInquiry(id, status){
+  const answer = (document.getElementById('iq-answer-' + id)?.value || '').trim();
+  if(status === 'resolved' && !answer){ toast('답변 내용을 적어주세요'); return; }
+  const msg = status === 'resolved' ? '이 답변을 회원에게 보낼까요?\n알림으로도 전달돼요.' : '이 문의를 답변 없이 종료할까요?';
+  showConfirm(msg, async () => {
+    try{ await apiFetch(`/admin/inquiries/${id}/answer`, {method:'POST', body:{status, answer}}); toast(status === 'resolved' ? '답변을 보냈어요' : '종료했어요'); render(); }
+    catch(e){ toast(e.message); }
+  });
+}
+
 // 관리자 전용: 프리랜서가 신고한 공고를 검토해 반려/마감처리/삭제 중 하나로 처리합니다.
 async function screenAdminReports(){
   const data = await apiFetch('/admin/job-reports');
@@ -5543,7 +5600,7 @@ async function render(){
       savedJobs: screenSavedJobs, followedCompanies: screenFollowedCompanies, profileViews: screenProfileViews, receivedProposals: screenReceivedProposals,
       proposeForm: screenProposeForm, pickerScreen: screenPicker,
       reviewForm: screenReviewForm,
-      adminReports: screenAdminReports, reportJob: screenReportJob,
+      adminReports: screenAdminReports, adminInquiries: screenAdminInquiries, reportJob: screenReportJob,
       invite: screenInvite, careerVerify: screenCareerVerify, adminCareerVerify: screenAdminCareerVerify, adminPerformance: screenAdminPerformance, adminSignupStats: screenAdminSignupStats, adminAiUsage: screenAdminAiUsage, adminSecurity: screenAdminSecurity, mfaVerify: screenMfaVerify, mfaSetup: screenMfaSetup,
       notices: screenNotices, events: screenEvents, faq: screenFaq, aiChat: screenAiChat, supportInquiry: screenSupportInquiry,
       announcementForm: screenAnnouncementForm,
