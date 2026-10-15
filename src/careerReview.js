@@ -7,7 +7,7 @@
 // 최종 결정은 AI의 판단을 그대로 따르지 않고, 아래 규칙(이름 일치·공식 서류·위조 흔적 없음)을 서버가 다시 확인해 정합니다.
 const { run, get, all } = require('./db');
 const ai = require('./ai');
-const { addNotification, pushTo } = require('./notify');
+const { addNotification, pushTo, notifyAdmins: notifyAdminsAll } = require('./notify');
 
 // 서류 판독은 정확도가 중요해 기본은 Claude Opus 5.5. 환경변수(AI_CAREER_MODEL)로 바꿀 수 있습니다.
 const CAREER_MODEL = process.env.AI_CAREER_MODEL || 'claude-opus-5-5';
@@ -165,8 +165,9 @@ async function reviewSubmission(id) {
 
     const client = ai.getClient();
     const toAdmin = async (note) => {
-      await run("UPDATE career_verifications SET status = 'needs_review', ai_result_json = ?, reviewed_by = 'ai' WHERE id = ? AND status = 'pending'",
+      const upd = await run("UPDATE career_verifications SET status = 'needs_review', ai_result_json = ?, reviewed_by = 'ai' WHERE id = ? AND status = 'pending'",
         [JSON.stringify({ error: note }), id]);
+      if (upd.changes) await notifyAdmins(row, note);
       return 'needs_review';
     };
     if (!client) return toAdmin('AI가 설정되지 않아 관리자 확인으로 넘김');
@@ -209,8 +210,9 @@ async function reviewSubmission(id) {
       ? scrubIds(supplementMessage(result, profile.years, docs.length))
       : scrubIds(clip(result.reason_for_user, 300));
     if (status === 'needs_review') {
-      await run("UPDATE career_verifications SET status = 'needs_review', ai_result_json = ?, reviewed_by = 'ai', admin_note = ? WHERE id = ? AND status = 'pending'",
+      const upd = await run("UPDATE career_verifications SET status = 'needs_review', ai_result_json = ?, reviewed_by = 'ai', admin_note = ? WHERE id = ? AND status = 'pending'",
         [JSON.stringify(saved), reason, id]);
+      if (upd.changes) await notifyAdmins(row, saved.notes_for_admin || (saved.tampering_signs.length ? '위조 흔적 의심' : 'AI 판단 보류'));
       return status;
     }
     // 승인·반려·보완 요청이 정해지면 서류 원본은 바로 지웁니다.
@@ -237,6 +239,16 @@ async function notifyResult(userId, id, status, reason) {
       : `사유: ${reason || '공식 경력 증빙 서류로 확인되지 않았어요.'}`;
   await addNotification(userId, { tag: '경력검증', title, body: body.slice(0, 80), link: 'careerVerify' });
   pushTo(userId, { kind: 'result', title, body: body.slice(0, 100), tag: `career-${id}`, link: 'careerVerify' });
+}
+
+// AI가 판단하기 어려워 관리자 확인으로 넘어온 건을 관리자에게 알립니다.
+async function notifyAdmins(row, why) {
+  const p = await get('SELECT name FROM freelancer_profiles WHERE user_id = ?', [row.user_id]).catch(() => null);
+  await notifyAdminsAll({
+    title: '경력 검증 확인 요청',
+    body: `${clip(p && p.name, 20) || '프리랜서'} 님 서류 · ${clip(why, 60) || 'AI 판단 보류'}`,
+    link: 'adminCareerVerify', tag: `career-admin-${row.id}`,
+  });
 }
 
 // 서버가 재시작돼 검토가 끊긴 서류를 다시 심사합니다(2분 넘게 'AI 검토 중'인 건).

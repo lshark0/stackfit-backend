@@ -34,4 +34,9 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-module.exports = { requireAdmin, isAdminEmail };
+// 관리자에게 알림을 보낼 때 씁니다(src/notify.js).
+function adminEmails() {
+  return ADMIN_EMAILS.slice();
+}
+
+module.exports = { requireAdmin, isAdminEmail, adminEmails };

@@ -11,6 +11,7 @@ const { getRatingSummary, getRatingSummaries } = require('../ratings');
 const { signedFileUrl } = require('../fileAccess');
 const { normalizeEmail } = require('../contact');
 const { grantReferralRewardLater } = require('../referralReward');
+const { notifyAdmins } = require('../notify');
 
 // 잡코리아 문의·신고 양식과 동일한 첨부 가능 파일 종류(용량 10MB)
 const REPORT_ATTACH_EXT = ['.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.hwp', '.jpg', '.jpeg', '.gif', '.png', '.pdf', '.zip'];
@@ -420,7 +421,7 @@ router.post('/:id/report', requireAuth, requireRole('freelancer'), (req, res) =>
     const jobId = Number(req.params.id);
     if (!Number.isInteger(jobId)) return res.status(400).json({ error: '올바르지 않은 공고 ID입니다.' });
 
-    const job = await get('SELECT id FROM jobs WHERE id = ?', [jobId]);
+    const job = await get('SELECT id, title FROM jobs WHERE id = ?', [jobId]);
     if (!job) return res.status(404).json({ error: '공고를 찾을 수 없습니다.' });
 
     const { reason, content, email } = req.body || {};
@@ -448,6 +449,11 @@ router.post('/:id/report', requireAuth, requireRole('freelancer'), (req, res) =>
        VALUES (?,?,?,?,?,?,?,?)`,
       [req.user.id, jobId, reason, safeContent, safeEmail, attachmentFilename, attachmentOriginalName, attachmentData]
     );
+    notifyAdmins({
+      title: '공고 신고가 접수됐어요',
+      body: `[${reason}] ${String(job.title || '').slice(0, 40)}`,
+      link: 'adminReports', tag: `report-${jobId}`,
+    });
     res.status(201).json({ reported: true });
   });
 });

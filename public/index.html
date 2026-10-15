@@ -751,7 +751,7 @@ function screenAllowed(screen){
 
 // 알림/푸시에 담긴 링크('screen' 또는 'screen:param')로 해당 화면을 엽니다.
 const LINKABLE_SCREENS = ['home','jobs','jobDetail','myApplications','receivedProposals','sentProposals','savedTalents',
-  'applicants','projects','chatList','chatRoom','profileViews','alerts','mypage','talentDetail','savedJobs','invite','careerVerify'];
+  'applicants','projects','chatList','chatRoom','profileViews','alerts','mypage','talentDetail','savedJobs','invite','careerVerify','adminCareerVerify','adminReports'];
 function openLink(link){
   if(!link) return false;
   const [screen, rawParam] = String(link).split(':');

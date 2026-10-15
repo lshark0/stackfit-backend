@@ -6,6 +6,7 @@ const { requireAuth } = require('../middleware/requireAuth');
 const { wrapAllRoutes } = require('../middleware/asyncHandler');
 const { signedFileUrl } = require('../fileAccess');
 const { normalizeEmail } = require('../contact');
+const { notifyAdmins } = require('../notify');
 
 const router = express.Router();
 wrapAllRoutes(router);
@@ -75,6 +76,12 @@ router.post('/inquiries', requireAuth, (req, res) => {
        VALUES (?,?,?,?,?,?,?)`,
       [req.user.id, reason, safeContent, safeEmail, attachmentFilename, attachmentOriginalName, attachmentData]
     );
+    // 1:1 문의는 관리자 화면이 없어 알림에 문의 종류와 내용 앞부분을 담습니다(답변은 회원이 적은 이메일로).
+    notifyAdmins({
+      title: '1:1 문의가 접수됐어요',
+      body: `[${reason}] ${safeContent.replace(/\s+/g, ' ').slice(0, 60)}`,
+      tag: `inquiry-${Date.now()}`,
+    });
     res.status(201).json({ reported: true });
   });
 });
