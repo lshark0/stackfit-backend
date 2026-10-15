@@ -56,7 +56,7 @@ async function computePerformance(days) {
     all(`SELECT i.status, i.created_at, c.company_id, c.freelancer_id FROM interviews i JOIN conversations c ON c.id = i.conversation_id ORDER BY i.id DESC LIMIT ${ROW_LIMIT}`),
     all('SELECT user_id, stack_json, role_title, grade, verified FROM freelancer_profiles'),
     all(`SELECT conversation_id, created_at FROM messages WHERE meta_json LIKE ? ORDER BY id DESC LIMIT ${ROW_LIMIT}`, ['%contactMasked%']),
-    get("SELECT COUNT(*) AS c FROM career_verifications WHERE status = 'pending'"),
+    get("SELECT COUNT(*) AS c FROM career_verifications WHERE status IN ('pending','needs_review')"),
   ]);
   const jobById = new Map(jobs.map((j) => [j.id, j]));
   const profileById = new Map(profiles.map((p) => [p.user_id, p]));

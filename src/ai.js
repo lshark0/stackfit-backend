@@ -19,6 +19,7 @@ const PROFILE_MODEL = process.env.AI_PROFILE_MODEL || 'claude-haiku-4-5';
 const DAILY_LIMITS = {
   support_chat: Number(process.env.AI_SUPPORT_DAILY_LIMIT) || 30,
   profile_from_resume: Number(process.env.AI_PROFILE_DAILY_LIMIT) || 5,
+  career_verify: Number(process.env.AI_CAREER_DAILY_LIMIT) || 3,
 };
 
 // 서비스 전체 1일 이용 한도. 봇이 계정을 여러 개 만들어 AI를 대신 돌리게 하는

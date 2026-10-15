@@ -5,6 +5,7 @@ const rateLimit = require('express-rate-limit');
 const { initDb, get, USE_POSTGRES } = require('./src/db');
 const { checkDeadlineAlerts, closeExpiredJobs } = require('./src/deadlineAlerts');
 const { sendInterviewReminders } = require('./src/interviews');
+const { resumePendingReviews } = require('./src/careerReview');
 
 const authRoutes = require('./src/routes/auth');
 const profileRoutes = require('./src/routes/profile');
@@ -333,6 +334,12 @@ async function main() {
     .catch((e) => console.warn('[IT Free] 인터뷰 알림 확인 실패:', e.message));
   runInterviewReminders();
   setInterval(runInterviewReminders, 5 * 60 * 1000);
+
+  // 서버 재시작 등으로 끊긴 경력 검증 AI 심사를 이어서 처리합니다(기동 1분 뒤, 이후 5분마다).
+  const runCareerReviews = () => resumePendingReviews()
+    .catch((e) => console.warn('[IT Free] 경력 검증 재심사 확인 실패:', e.message));
+  setTimeout(runCareerReviews, 60 * 1000);
+  setInterval(runCareerReviews, 5 * 60 * 1000);
 }
 
 main().catch((err) => {

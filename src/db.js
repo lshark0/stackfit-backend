@@ -93,6 +93,9 @@ if (USE_POSTGRES) {
     // 지원·제안 시점의 추천 점수(0~100). 추천 점수가 높을수록 실제 계약으로 이어지는지 확인하는 데 씁니다.
     await ensureColumnPg('applications', 'match_score', 'INTEGER');
     await ensureColumnPg('proposals', 'match_score', 'INTEGER');
+    // 경력 검증 AI 심사 결과(JSON)와 처리 주체('ai' 또는 'admin')
+    await ensureColumnPg('career_verifications', 'ai_result_json', 'TEXT');
+    await ensureColumnPg('career_verifications', 'reviewed_by', "TEXT NOT NULL DEFAULT ''");
     // 프리랜서 연락처 + 제안 받기 설정
     await ensureColumnPg('freelancer_profiles', 'phone', "TEXT NOT NULL DEFAULT ''");
     await ensureColumnPg('freelancer_profiles', 'email', "TEXT NOT NULL DEFAULT ''");
@@ -207,6 +210,8 @@ if (USE_POSTGRES) {
     addCol('messages', 'meta_json', 'TEXT');
     addCol('applications', 'match_score', 'INTEGER');
     addCol('proposals', 'match_score', 'INTEGER');
+    addCol('career_verifications', 'ai_result_json', 'TEXT');
+    addCol('career_verifications', 'reviewed_by', "TEXT NOT NULL DEFAULT ''");
     addCol('freelancer_profiles', 'phone', "TEXT NOT NULL DEFAULT ''");
     addCol('freelancer_profiles', 'email', "TEXT NOT NULL DEFAULT ''");
     addCol('freelancer_profiles', 'accept_proposals', 'INTEGER NOT NULL DEFAULT 1');

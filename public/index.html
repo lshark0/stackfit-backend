@@ -4271,7 +4271,7 @@ async function screenMypage(){
     <div class="section-label with-ic">${I.gear}관리자</div>
     <div class="list-item" onclick="go('mfaSetup')"><div class="li-l"><div class="li-icon">${I.verified}</div><div class="li-tt">2단계 인증 <span class="page-sub">사용 중</span></div></div>${I.back}</div>
     <div class="list-item" onclick="go('adminPerformance')"><div class="li-l"><div class="li-icon">${I.layers}</div><div class="li-tt">성과 지표</div></div>${I.back}</div>
-    <div class="list-item" onclick="go('adminCareerVerify')"><div class="li-l"><div class="li-icon">${I.verified}</div><div class="li-tt">경력 검증 심사</div></div>${I.back}</div>
+    <div class="list-item" onclick="go('adminCareerVerify')"><div class="li-l"><div class="li-icon">${I.verified}</div><div class="li-tt">경력 검증 (AI 심사)</div></div>${I.back}</div>
     <div class="list-item" onclick="go('adminSignupStats')"><div class="li-l"><div class="li-icon">${I.talent}</div><div class="li-tt">가입 경로 통계</div></div>${I.back}</div>
     <div class="list-item" onclick="go('adminAiUsage')"><div class="li-l"><div class="li-icon">${I.sparkle}</div><div class="li-tt">AI 사용량 통계</div></div>${I.back}</div>
     <div class="list-item" onclick="go('adminSecurity')"><div class="li-l"><div class="li-icon">${I.verified}</div><div class="li-tt">보안 로그</div></div>${I.back}</div>
@@ -4777,18 +4777,26 @@ async function screenAdminSignupStats(){
 
 /* ---------------- 경력 검증 (프리랜서) ---------------- */
 // 경력 증빙 서류를 올리면 관리자가 확인해 '경력 검증' 배지를 붙여줍니다. 서류는 검토가 끝나면 바로 지워집니다.
-const CV_STATUS = { pending: ['검토 중', 'pending'], approved: ['검증 완료', 'pass'], rejected: ['반려', 'fail'] };
+const CV_STATUS = {
+  pending: ['AI 검토 중', 'pending'], needs_review: ['관리자 확인 중', 'pending'],
+  approved: ['검증 완료', 'pass'], rejected: ['반려', 'fail'], revoked: ['검증 취소', 'fail'],
+};
+let careerPollTimer = null;
 async function screenCareerVerify(){
   const d = await apiFetch('/career-verification/me');
   const latest = d.latest;
-  const pending = latest && latest.status === 'pending';
+  const open = latest && (latest.status === 'pending' || latest.status === 'needs_review');
+  // AI 심사 중이면 5초마다 결과를 다시 확인합니다(이 화면을 보고 있을 때만).
+  clearTimeout(careerPollTimer);
+  if(latest && latest.status === 'pending') careerPollTimer = setTimeout(() => { if(state.screen === 'careerVerify') render(); }, 5000);
+  const byAi = latest && latest.reviewed_by === 'ai';
   return `${statusbar()}
   <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('mypage')">${I.back}</div><div class="page-title" style="font-size:19.5px;">경력 검증</div></div></div>
   <div class="content">
     <div class="banner light" style="cursor:default;">
-      <div class="banner-eyebrow">Career Check</div>
+      <div class="banner-eyebrow">Career Check · AI 심사</div>
       <div class="banner-title" style="display:flex; align-items:center; gap:8px;">${d.verified ? `<span class="sbadge verified">${I.verified}경력 검증</span> 배지가 붙어 있어요` : '경력을 검증받고 배지를 받으세요'}</div>
-      <div class="banner-sub" style="color:var(--slate);">관리자가 증빙 서류로 프로필의 경력을 확인하면, 기업이 인재를 볼 때 <b>경력 검증</b> 배지가 함께 보여요.</div>
+      <div class="banner-sub" style="color:var(--slate);">증빙 서류를 올리면 <b>AI가 바로 심사</b>해요. 이름과 경력이 프로필과 맞으면 기업이 인재를 볼 때 <b>경력 검증</b> 배지가 함께 보여요.</div>
     </div>
     ${latest ? `
     <div class="card" style="margin-top:12px;">
@@ -4796,24 +4804,26 @@ async function screenCareerVerify(){
         <div class="card-title" style="font-size:14px;">최근 제출 · ${esc(latest.doc_kind)}</div>
         <span class="sbadge ${CV_STATUS[latest.status]?.[1] || 'pending'}">${esc(CV_STATUS[latest.status]?.[0] || latest.status)}</span>
       </div>
-      <div class="page-sub" style="margin-top:4px;">${fmtDate(latest.created_at)} 제출${latest.reviewed_at ? ` · ${fmtDate(latest.reviewed_at)} 처리` : ''}</div>
-      ${latest.status === 'rejected' && latest.admin_note ? `<div class="para" style="margin-top:8px;">반려 사유: ${esc(latest.admin_note)}</div>` : ''}
-      ${pending ? `<div class="page-sub" style="margin-top:8px;">보통 영업일 기준 1~2일 안에 확인해요. 결과는 알림으로 알려드려요.</div>
-        <button class="btn btn-outline" style="margin-top:10px;" onclick="cancelCareerVerify()">제출 취소</button>` : ''}
+      <div class="page-sub" style="margin-top:4px;">${fmtDate(latest.created_at)} 제출${latest.reviewed_at ? ` · ${fmtDate(latest.reviewed_at)} ${byAi ? 'AI 심사' : '처리'}` : ''}</div>
+      ${latest.status === 'pending' ? `<div class="para" style="margin-top:8px;">AI가 서류를 확인하고 있어요. 보통 1분 안에 끝나고, 결과는 알림으로도 알려드려요.</div>` : ''}
+      ${latest.status === 'needs_review' ? `<div class="para" style="margin-top:8px;">AI가 판단하기 어려운 부분이 있어 관리자가 한 번 더 확인하고 있어요. 보통 영업일 기준 1~2일 걸려요.</div>` : ''}
+      ${['rejected','revoked'].includes(latest.status) && latest.admin_note ? `<div class="para" style="margin-top:8px;">${latest.status === 'revoked' ? '취소' : '반려'} 사유: ${esc(latest.admin_note)}</div>` : ''}
+      ${open ? `<button class="btn btn-outline" style="margin-top:10px;" onclick="cancelCareerVerify()">제출 취소</button>` : ''}
     </div>` : ''}
-    ${pending ? '' : `
+    ${open ? '' : `
     <div class="section-label">${d.verified ? '서류 다시 올리기' : '증빙 서류 올리기'}</div>
     <div class="form-field"><label class="form-label">서류 종류</label>
       <select id="cv-kind" class="form-input">${d.docKinds.map(k=>`<option>${esc(k)}</option>`).join('')}</select></div>
-    <div class="form-field"><label class="form-label">파일 <span style="font-weight:400; color:var(--slate-light);">(PDF·JPG·PNG, 10MB 이하)</span></label>
+    <div class="form-field"><label class="form-label">파일 <span style="font-weight:400; color:var(--slate-light);">(PDF 10MB · 사진 JPG·PNG 3.5MB 이하)</span></label>
       <input id="cv-file" type="file" class="form-input" accept=".pdf,.jpg,.jpeg,.png"></div>
     <div class="form-field"><label class="form-label">설명 <span style="font-weight:400; color:var(--slate-light);">(선택)</span></label>
       <input id="cv-memo" class="form-input" maxlength="300" placeholder="예: 2019~2024 ㅇㅇ정보 SI 개발 경력"></div>
-    <button class="btn btn-primary" onclick="submitCareerVerify()">제출하기</button>`}
+    <button class="btn btn-primary" onclick="submitCareerVerify()">AI 심사 받기</button>`}
     <div class="page-sub" style="margin-top:16px; line-height:1.65;">
-      · 인정 서류: 건강보험 자격득실확인서, 경력증명서, SW기술자 경력확인서(KOSA), 재직·퇴직증명서<br>
+      · 인정 서류: 건강보험 자격득실확인서, 경력증명서, SW기술자 경력확인서(KOSA), 재직·퇴직증명서 — 기관·회사가 발급한 서류만 인정돼요(직접 쓴 경력기술서 X)<br>
+      · AI(Anthropic Claude)가 서류의 이름·근무 기간을 프로필과 비교해요. 판단이 어려운 서류만 관리자가 확인해요.<br>
       · <b>주민등록번호 뒷자리는 가리고</b> 올려주세요.<br>
-      · 올린 서류는 관리자만 볼 수 있고, <b>검토가 끝나면 바로 삭제</b>돼요(결과만 남아요).
+      · 심사가 끝나면 <b>서류는 바로 삭제</b>되고 결과만 남아요. 하루 3번까지 신청할 수 있어요.
     </div>
   </div>`;
 }
@@ -4823,6 +4833,7 @@ async function submitCareerVerify(){
   const ext = (file.name.split('.').pop() || '').toLowerCase();
   if(!['pdf','jpg','jpeg','png'].includes(ext)){ toast('PDF, JPG, PNG 파일만 올릴 수 있어요'); return; }
   if(file.size > 10 * 1024 * 1024){ toast('10MB 이하 파일만 올릴 수 있어요'); return; }
+  if(ext !== 'pdf' && file.size > 3.5 * 1024 * 1024){ toast('사진은 3.5MB 이하만 올릴 수 있어요. PDF로 저장해서 올려주세요'); return; }
   const fd = new FormData();
   fd.append('doc_kind', document.getElementById('cv-kind').value);
   fd.append('memo', document.getElementById('cv-memo').value.trim());
@@ -4832,7 +4843,7 @@ async function submitCareerVerify(){
     const res = await fetch(API_BASE + '/career-verification', { method:'POST', headers: state.token ? {Authorization:'Bearer '+state.token} : {}, body: fd });
     const data = await res.json().catch(()=>({}));
     if(!res.ok) throw new Error(data.error || '제출하지 못했어요');
-    toast('제출했어요. 검토가 끝나면 알려드릴게요');
+    toast('제출했어요. AI가 바로 심사를 시작해요');
     render();
   }catch(e){ toast(e.message); }
 }
@@ -4843,14 +4854,32 @@ function cancelCareerVerify(){
   });
 }
 
-/* ---------------- 관리자: 경력 검증 심사 ---------------- */
+/* ---------------- 관리자: 경력 검증 (AI 심사 결과 확인) ---------------- */
+function careerAiSummary(a){
+  if(!a) return '';
+  if(a.error) return `<div class="page-sub" style="margin-top:6px;">AI: ${esc(a.error)}</div>`;
+  const label = { approve: 'AI 의견: 승인', reject: 'AI 의견: 반려', needs_review: 'AI 의견: 확인 필요' }[a.ai_decision] || 'AI 의견';
+  const rows = [
+    ['서류', `${a.document_type || '-'}${a.issued_by_organization ? '' : ' (공식 발급 아님)'}`],
+    ['이름', a.name_match || '-'],
+    ['서류상 경력', a.career_years_on_document ? `약 ${a.career_years_on_document}년` : '-'],
+    ['프로필과', a.profile_consistency || '-'],
+    ['근무처', (a.employers || []).join(', ') || '-'],
+    ['위조 흔적', (a.tampering_signs || []).length ? a.tampering_signs.join(' / ') : '없음'],
+  ];
+  return `<div style="margin-top:8px; padding:10px 12px; border-radius:10px; background:var(--paper-dim);">
+    <div style="font-weight:800; font-size:13px; margin-bottom:4px;">${esc(label)}</div>
+    ${rows.map(([k,v])=>`<div class="page-sub" style="margin-top:2px;"><b style="color:var(--ink);">${esc(k)}</b> ${esc(v)}</div>`).join('')}
+    ${a.notes_for_admin ? `<div class="page-sub" style="margin-top:6px;">${esc(a.notes_for_admin)}</div>` : ''}
+  </div>`;
+}
 async function screenAdminCareerVerify(){
   if(!state.isAdmin){ go('mypage'); return ''; }
   const d = await apiFetch('/career-verification/admin');
   return `${statusbar()}
-  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('mypage')">${I.back}</div><div class="page-title" style="font-size:19.5px;">경력 검증 심사</div></div></div>
+  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('mypage')">${I.back}</div><div class="page-title" style="font-size:19.5px;">경력 검증 (AI 심사)</div></div></div>
   <div class="content">
-    <div class="page-sub" style="margin-bottom:10px;">검토 대기 ${d.pending}건 · 서류의 이름·기간·회사가 프로필 경력과 맞는지 확인해주세요. 처리하면 서류 원본은 바로 삭제돼요.</div>
+    <div class="page-sub" style="margin-bottom:10px; line-height:1.6;">AI가 먼저 심사해 승인·반려하고, 판단이 어려운 서류만 여기로 넘어와요. 확인 필요 <b>${d.pending}</b>건 · AI 검토 중 ${d.reviewing}건. 처리하면 서류 원본은 바로 삭제돼요.</div>
     ${d.items.length ? d.items.map(v=>`
       <div class="card">
         <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
@@ -4858,18 +4887,18 @@ async function screenAdminCareerVerify(){
             <div class="card-title" style="font-size:14.5px;">${esc(v.name)} ${gradeBadge(v.grade)}</div>
             <div class="page-sub" style="margin-top:3px;">${esc([v.role_title, v.years].filter(Boolean).join(' · ') || '프로필 경력 미입력')}</div>
           </div>
-          <span class="sbadge ${CV_STATUS[v.status]?.[1] || 'pending'}" style="flex:0 0 auto;">${esc(CV_STATUS[v.status]?.[0] || v.status)}</span>
+          <span class="sbadge ${CV_STATUS[v.status]?.[1] || 'pending'}" style="flex:0 0 auto;">${esc(CV_STATUS[v.status]?.[0] || v.status)}${v.reviewed_by === 'ai' && ['approved','rejected'].includes(v.status) ? ' · AI' : ''}</span>
         </div>
         <div class="para" style="margin-top:8px;">${esc(v.doc_kind)}${v.memo ? ` · ${esc(v.memo)}` : ''}</div>
         <div class="page-sub" style="margin-top:2px;">${fmtDate(v.created_at)} 제출${v.reviewed_at ? ` · ${fmtDate(v.reviewed_at)} 처리` : ''}${v.admin_note ? ` · ${esc(v.admin_note)}` : ''}</div>
-        <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">
-          ${v.doc_url ? `<a class="chip" href="${esc(fileUrl(v.doc_url))}" target="_blank" rel="noopener">📄 서류 보기</a>` : ''}
-        </div>
-        ${v.status === 'pending' ? `
+        ${careerAiSummary(v.ai)}
+        ${v.doc_url ? `<div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;"><a class="chip" href="${esc(fileUrl(v.doc_url))}" target="_blank" rel="noopener">📄 서류 보기</a></div>` : ''}
+        ${['pending','needs_review'].includes(v.status) ? `
         <div style="display:flex; gap:8px; margin-top:12px;">
           <button class="btn btn-outline" onclick="decideCareerVerify(${v.id}, 'rejected')">반려</button>
           <button class="btn btn-primary" onclick="decideCareerVerify(${v.id}, 'approved')">승인</button>
         </div>` : ''}
+        ${v.status === 'approved' ? `<button class="btn btn-outline" style="margin-top:10px;" onclick="revokeCareerVerify(${v.id})">검증 취소</button>` : ''}
       </div>`).join('') : `<div class="reco-empty">아직 제출된 서류가 없어요.</div>`}
   </div>`;
 }
@@ -4884,6 +4913,12 @@ async function decideCareerVerify(id, decision){
     catch(e){ toast(e.message); }
   };
   if(decision === 'approved') showConfirm('경력 검증을 승인할까요?\n프로필에 경력 검증 배지가 붙고, 서류 원본은 삭제돼요.', go2); else go2();
+}
+async function revokeCareerVerify(id){
+  const note = (prompt('검증을 취소하는 사유를 적어주세요 (프리랜서에게 그대로 안내돼요)\n예: 서류 위조 신고가 접수됐어요') || '').trim();
+  if(!note){ toast('사유를 적어야 취소할 수 있어요'); return; }
+  try{ await apiFetch(`/career-verification/admin/${id}/revoke`, {method:'POST', body:{note}}); toast('검증을 취소했어요'); render(); }
+  catch(e){ toast(e.message); }
 }
 
 /* ---------------- 관리자: 성과 지표 ---------------- */
@@ -5028,7 +5063,7 @@ async function screenAdminAiUsage(){
   const s = await apiFetch('/admin/ai-usage?days=' + adminAiDays);
   const periods = [[7,'7일'],[30,'30일'],[90,'90일'],[3650,'전체']];
   const daily = s.daily.slice(-14);
-  const limitLabel = { support_chat: 'AI 상담', profile_from_resume: '경력기술서 자동 채우기' };
+  const limitLabel = { support_chat: 'AI 상담', profile_from_resume: '경력기술서 자동 채우기', career_verify: '경력 검증 AI 심사' };
   return `${statusbar()}
   <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('mypage')">${I.back}</div><div class="page-title" style="font-size:19.5px;">AI 사용량 통계</div></div></div>
   <div class="content">
