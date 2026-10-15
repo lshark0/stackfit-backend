@@ -357,3 +357,14 @@ CREATE TABLE IF NOT EXISTS career_verifications (
 );
 CREATE INDEX IF NOT EXISTS idx_career_verifications_user ON career_verifications(user_id);
 CREATE INDEX IF NOT EXISTS idx_career_verifications_status ON career_verifications(status);
+
+-- 경력 검증 서류 파일(한 번에 여러 서류를 함께 올릴 수 있음). 심사가 끝나면 바로 지웁니다.
+CREATE TABLE IF NOT EXISTS career_verification_files (
+  id              SERIAL PRIMARY KEY,
+  verification_id INTEGER NOT NULL REFERENCES career_verifications(id) ON DELETE CASCADE,
+  filename        TEXT NOT NULL UNIQUE,
+  original_name   TEXT NOT NULL DEFAULT '',
+  data            BYTEA,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_career_verification_files_v ON career_verification_files(verification_id);

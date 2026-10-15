@@ -4780,6 +4780,7 @@ async function screenAdminSignupStats(){
 const CV_STATUS = {
   pending: ['AI 검토 중', 'pending'], needs_review: ['관리자 확인 중', 'pending'],
   approved: ['검증 완료', 'pass'], rejected: ['반려', 'fail'], revoked: ['검증 취소', 'fail'],
+  supplement: ['보완 필요', 'pending'],
 };
 let careerPollTimer = null;
 async function screenCareerVerify(){
@@ -4808,36 +4809,43 @@ async function screenCareerVerify(){
       ${latest.status === 'pending' ? `<div class="para" style="margin-top:8px;">AI가 서류를 확인하고 있어요. 보통 1분 안에 끝나고, 결과는 알림으로도 알려드려요.</div>` : ''}
       ${latest.status === 'needs_review' ? `<div class="para" style="margin-top:8px;">AI가 판단하기 어려운 부분이 있어 관리자가 한 번 더 확인하고 있어요. 보통 영업일 기준 1~2일 걸려요.</div>` : ''}
       ${['rejected','revoked'].includes(latest.status) && latest.admin_note ? `<div class="para" style="margin-top:8px;">${latest.status === 'revoked' ? '취소' : '반려'} 사유: ${esc(latest.admin_note)}</div>` : ''}
+      ${latest.status === 'supplement' && latest.admin_note ? `<div class="para" style="margin-top:8px;">${esc(latest.admin_note)}</div>` : ''}
       ${open ? `<button class="btn btn-outline" style="margin-top:10px;" onclick="cancelCareerVerify()">제출 취소</button>` : ''}
     </div>` : ''}
     ${open ? '' : `
-    <div class="section-label">${d.verified ? '서류 다시 올리기' : '증빙 서류 올리기'}</div>
-    <div class="form-field"><label class="form-label">서류 종류</label>
+    <div class="section-label">${latest && latest.status === 'supplement' ? '서류 함께 올리기' : d.verified ? '서류 다시 올리기' : '증빙 서류 올리기'}</div>
+    ${latest && latest.status === 'supplement' ? `<div class="page-sub" style="margin:-2px 0 10px; line-height:1.6;">처음 올리신 서류와 추가 서류를 <b>한 번에 함께</b> 골라 올려주세요. AI가 서류들의 경력 기간을 합쳐서 확인해요.</div>` : ''}
+    <div class="form-field"><label class="form-label">대표 서류 종류</label>
       <select id="cv-kind" class="form-input">${d.docKinds.map(k=>`<option>${esc(k)}</option>`).join('')}</select></div>
-    <div class="form-field"><label class="form-label">파일 <span style="font-weight:400; color:var(--slate-light);">(PDF 10MB · 사진 JPG·PNG 3.5MB 이하)</span></label>
-      <input id="cv-file" type="file" class="form-input" accept=".pdf,.jpg,.jpeg,.png"></div>
+    <div class="form-field"><label class="form-label">파일 <span style="font-weight:400; color:var(--slate-light);">(최대 5개 · PDF 10MB · 사진 JPG·PNG 3.5MB 이하)</span></label>
+      <input id="cv-file" type="file" class="form-input" accept=".pdf,.jpg,.jpeg,.png" multiple></div>
     <div class="form-field"><label class="form-label">설명 <span style="font-weight:400; color:var(--slate-light);">(선택)</span></label>
       <input id="cv-memo" class="form-input" maxlength="300" placeholder="예: 2019~2024 ㅇㅇ정보 SI 개발 경력"></div>
     <button class="btn btn-primary" onclick="submitCareerVerify()">AI 심사 받기</button>`}
     <div class="page-sub" style="margin-top:16px; line-height:1.65;">
       · 인정 서류: 건강보험 자격득실확인서, 경력증명서, SW기술자 경력확인서(KOSA), 재직·퇴직증명서 — 기관·회사가 발급한 서류만 인정돼요(직접 쓴 경력기술서 X)<br>
       · AI(Anthropic Claude)가 서류의 이름·근무 기간을 프로필과 비교해요. 판단이 어려운 서류만 관리자가 확인해요.<br>
+      · 한 서류로 전체 경력이 확인되지 않으면 <b>여러 서류를 함께</b> 올려주세요(예: KOSA 경력확인서 + 건강보험 자격득실확인서).<br>
       · <b>주민등록번호 뒷자리는 가리고</b> 올려주세요.<br>
       · 심사가 끝나면 <b>서류는 바로 삭제</b>되고 결과만 남아요. 하루 3번까지 신청할 수 있어요.
     </div>
   </div>`;
 }
 async function submitCareerVerify(){
-  const file = document.getElementById('cv-file').files[0];
-  if(!file){ toast('증빙 서류 파일을 선택해주세요'); return; }
-  const ext = (file.name.split('.').pop() || '').toLowerCase();
-  if(!['pdf','jpg','jpeg','png'].includes(ext)){ toast('PDF, JPG, PNG 파일만 올릴 수 있어요'); return; }
-  if(file.size > 10 * 1024 * 1024){ toast('10MB 이하 파일만 올릴 수 있어요'); return; }
-  if(ext !== 'pdf' && file.size > 3.5 * 1024 * 1024){ toast('사진은 3.5MB 이하만 올릴 수 있어요. PDF로 저장해서 올려주세요'); return; }
+  const files = [...document.getElementById('cv-file').files];
+  if(!files.length){ toast('증빙 서류 파일을 선택해주세요'); return; }
+  if(files.length > 5){ toast('서류는 한 번에 5개까지 올릴 수 있어요'); return; }
+  for(const file of files){
+    const ext = (file.name.split('.').pop() || '').toLowerCase();
+    if(!['pdf','jpg','jpeg','png'].includes(ext)){ toast('PDF, JPG, PNG 파일만 올릴 수 있어요'); return; }
+    if(file.size > 10 * 1024 * 1024){ toast('파일 하나당 10MB 이하만 올릴 수 있어요'); return; }
+    if(ext !== 'pdf' && file.size > 3.5 * 1024 * 1024){ toast('사진은 3.5MB 이하만 올릴 수 있어요. PDF로 저장해서 올려주세요'); return; }
+  }
+  if(files.reduce((n,f)=>n+f.size,0) > 20 * 1024 * 1024){ toast('서류 파일 합계는 20MB 이하로 올려주세요'); return; }
   const fd = new FormData();
   fd.append('doc_kind', document.getElementById('cv-kind').value);
   fd.append('memo', document.getElementById('cv-memo').value.trim());
-  fd.append('doc', file);
+  files.forEach(f => fd.append('docs', f));
   try{
     toast('올리는 중...');
     const res = await fetch(API_BASE + '/career-verification', { method:'POST', headers: state.token ? {Authorization:'Bearer '+state.token} : {}, body: fd });
@@ -4858,13 +4866,15 @@ function cancelCareerVerify(){
 function careerAiSummary(a){
   if(!a) return '';
   if(a.error) return `<div class="page-sub" style="margin-top:6px;">AI: ${esc(a.error)}</div>`;
-  const label = { approve: 'AI 의견: 승인', reject: 'AI 의견: 반려', needs_review: 'AI 의견: 확인 필요' }[a.ai_decision] || 'AI 의견';
+  const label = { approve: 'AI 의견: 승인', reject: 'AI 의견: 반려', request_more: 'AI 의견: 보완 요청', needs_review: 'AI 의견: 확인 필요' }[a.ai_decision] || 'AI 의견';
   const rows = [
     ['서류', `${a.document_type || '-'}${a.issued_by_organization ? '' : ' (공식 발급 아님)'}`],
     ['이름', a.name_match || '-'],
     ['서류상 경력', a.career_years_on_document ? `약 ${a.career_years_on_document}년` : '-'],
     ['프로필과', a.profile_consistency || '-'],
     ['근무처', (a.employers || []).join(', ') || '-'],
+    ...(a.missing_career ? [['부족한 경력', a.missing_career]] : []),
+    ...(a.doc_count > 1 ? [['서류 수', `${a.doc_count}개`]] : []),
     ['위조 흔적', (a.tampering_signs || []).length ? a.tampering_signs.join(' / ') : '없음'],
   ];
   return `<div style="margin-top:8px; padding:10px 12px; border-radius:10px; background:var(--paper-dim);">
@@ -4879,7 +4889,7 @@ async function screenAdminCareerVerify(){
   return `${statusbar()}
   <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('mypage')">${I.back}</div><div class="page-title" style="font-size:19.5px;">경력 검증 (AI 심사)</div></div></div>
   <div class="content">
-    <div class="page-sub" style="margin-bottom:10px; line-height:1.6;">AI가 먼저 심사해 승인·반려하고, 판단이 어려운 서류만 여기로 넘어와요. 확인 필요 <b>${d.pending}</b>건 · AI 검토 중 ${d.reviewing}건. 처리하면 서류 원본은 바로 삭제돼요.</div>
+    <div class="page-sub" style="margin-bottom:10px; line-height:1.6;">AI가 먼저 심사해 승인·반려하고, 경력 기간이 프로필과 다르면 보완 서류를 바로 안내해요. 판단이 어려운 서류만 여기로 넘어와요. 확인 필요 <b>${d.pending}</b>건 · AI 검토 중 ${d.reviewing}건. 처리하면 서류 원본은 바로 삭제돼요.</div>
     ${d.items.length ? d.items.map(v=>`
       <div class="card">
         <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
@@ -4887,15 +4897,16 @@ async function screenAdminCareerVerify(){
             <div class="card-title" style="font-size:14.5px;">${esc(v.name)} ${gradeBadge(v.grade)}</div>
             <div class="page-sub" style="margin-top:3px;">${esc([v.role_title, v.years].filter(Boolean).join(' · ') || '프로필 경력 미입력')}</div>
           </div>
-          <span class="sbadge ${CV_STATUS[v.status]?.[1] || 'pending'}" style="flex:0 0 auto;">${esc(CV_STATUS[v.status]?.[0] || v.status)}${v.reviewed_by === 'ai' && ['approved','rejected'].includes(v.status) ? ' · AI' : ''}</span>
+          <span class="sbadge ${CV_STATUS[v.status]?.[1] || 'pending'}" style="flex:0 0 auto;">${esc(CV_STATUS[v.status]?.[0] || v.status)}${v.reviewed_by === 'ai' && ['approved','rejected','supplement'].includes(v.status) ? ' · AI' : ''}</span>
         </div>
         <div class="para" style="margin-top:8px;">${esc(v.doc_kind)}${v.memo ? ` · ${esc(v.memo)}` : ''}</div>
         <div class="page-sub" style="margin-top:2px;">${fmtDate(v.created_at)} 제출${v.reviewed_at ? ` · ${fmtDate(v.reviewed_at)} 처리` : ''}${v.admin_note ? ` · ${esc(v.admin_note)}` : ''}</div>
         ${careerAiSummary(v.ai)}
-        ${v.doc_url ? `<div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;"><a class="chip" href="${esc(fileUrl(v.doc_url))}" target="_blank" rel="noopener">📄 서류 보기</a></div>` : ''}
+        ${(v.docs || []).length ? `<div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">${v.docs.map((f,i)=>`<a class="chip" href="${esc(fileUrl(f.url))}" target="_blank" rel="noopener">📄 ${v.docs.length > 1 ? `서류 ${i+1}` : '서류 보기'}</a>`).join('')}</div>` : ''}
         ${['pending','needs_review'].includes(v.status) ? `
         <div style="display:flex; gap:8px; margin-top:12px;">
           <button class="btn btn-outline" onclick="decideCareerVerify(${v.id}, 'rejected')">반려</button>
+          <button class="btn btn-outline" onclick="decideCareerVerify(${v.id}, 'supplement')">보완 요청</button>
           <button class="btn btn-primary" onclick="decideCareerVerify(${v.id}, 'approved')">승인</button>
         </div>` : ''}
         ${v.status === 'approved' ? `<button class="btn btn-outline" style="margin-top:10px;" onclick="revokeCareerVerify(${v.id})">검증 취소</button>` : ''}
@@ -4908,8 +4919,12 @@ async function decideCareerVerify(id, decision){
     note = (prompt('반려 사유를 적어주세요 (프리랜서에게 그대로 안내돼요)\n예: 서류의 이름이 프로필과 달라요') || '').trim();
     if(!note){ toast('반려 사유를 적어야 반려할 수 있어요'); return; }
   }
+  if(decision === 'supplement'){
+    note = (prompt('보완 안내 문구 (프리랜서에게 그대로 안내돼요)', '제출해 주신 서류는 확인되었으나, 프로필에 적으신 경력과 서류상 확인되는 경력 기간에 차이가 있습니다. 서류에 없는 기간의 경력을 증빙할 건강보험 자격득실확인서나 경력증명서를 함께 올려주시면 더 빠르게 처리됩니다.') || '').trim();
+    if(!note){ toast('안내 문구를 적어야 보완 요청할 수 있어요'); return; }
+  }
   const go2 = async () => {
-    try{ await apiFetch(`/career-verification/admin/${id}/decide`, {method:'POST', body:{decision, note}}); toast(decision==='approved' ? '승인했어요' : '반려했어요'); render(); }
+    try{ await apiFetch(`/career-verification/admin/${id}/decide`, {method:'POST', body:{decision, note}}); toast({approved:'승인했어요', rejected:'반려했어요', supplement:'보완을 요청했어요'}[decision]); render(); }
     catch(e){ toast(e.message); }
   };
   if(decision === 'approved') showConfirm('경력 검증을 승인할까요?\n프로필에 경력 검증 배지가 붙고, 서류 원본은 삭제돼요.', go2); else go2();

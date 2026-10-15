@@ -243,6 +243,10 @@ app.get('/uploads/:filename', async (req, res) => {
           // 경력 검증 서류(관리자 검토용, 검토가 끝나면 지워짐)
           const careerRow = await get('SELECT doc_data FROM career_verifications WHERE doc_filename = ?', [safeName]);
           if (careerRow && careerRow.doc_data) data = careerRow.doc_data;
+          else {
+            const careerFile = await get('SELECT data FROM career_verification_files WHERE filename = ?', [safeName]);
+            if (careerFile && careerFile.data) data = careerFile.data;
+          }
         }
       }
     }
