@@ -7,6 +7,7 @@ const { addNotification, pushTo } = require('../notify');
 const { signedFileUrl } = require('../fileAccess');
 const ai = require('../ai');
 const { listSecurityEvents } = require('../securityLog');
+const { computePerformance } = require('../performance');
 
 const router = express.Router();
 wrapAllRoutes(router);
@@ -113,6 +114,12 @@ const toKstDate = (v) => {
   const d = v instanceof Date ? v : new Date(String(v).replace(' ', 'T') + (/[zZ]|[+-]\d\d:?\d\d$/.test(String(v)) ? '' : 'Z'));
   return Number.isNaN(d.getTime()) ? null : new Date(d.getTime() + 9 * 3600 * 1000);
 };
+// 성과 지표: 매칭 퍼널·소요 시간·추천 점수별 성사율·재이용률·분야별 성과 (days=7/30/90/365/3650=전체)
+router.get('/performance', requireAuth, requireAdmin, async (req, res) => {
+  const days = [7, 30, 90, 365, 3650].includes(Number(req.query.days)) ? Number(req.query.days) : 90;
+  res.json(await computePerformance(days));
+});
+
 router.get('/signup-stats', requireAuth, requireAdmin, async (req, res) => {
   const days = Math.min(3650, Math.max(1, Number.parseInt(req.query.days, 10) || 30));
   const since = new Date(Date.now() - days * 24 * 3600 * 1000);

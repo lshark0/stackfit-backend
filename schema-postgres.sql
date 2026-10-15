@@ -339,3 +339,21 @@ CREATE TABLE IF NOT EXISTS interviews (
   updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_interviews_upcoming ON interviews(status, reminded, interview_at);
+
+-- 경력 검증: 프리랜서가 올린 경력 증빙 서류를 관리자가 확인해 '경력 검증' 배지를 붙입니다.
+-- 서류 원본(doc_data)은 검토가 끝나면 바로 지우고 결과만 남깁니다.
+CREATE TABLE IF NOT EXISTS career_verifications (
+  id             SERIAL PRIMARY KEY,
+  user_id        INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  doc_kind       TEXT NOT NULL DEFAULT '',
+  doc_filename   TEXT,
+  doc_original_name TEXT,
+  doc_data       BYTEA,
+  memo           TEXT NOT NULL DEFAULT '',
+  status         TEXT NOT NULL DEFAULT 'pending',
+  admin_note     TEXT NOT NULL DEFAULT '',
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  reviewed_at    TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_career_verifications_user ON career_verifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_career_verifications_status ON career_verifications(status);

@@ -4,6 +4,7 @@ const { requireAuth, requireRole } = require('../middleware/requireAuth');
 const { wrapAllRoutes } = require('../middleware/asyncHandler');
 const { addNotification, pushTo } = require('../notify');
 const { contactFields } = require('../contact');
+const { pairScore } = require('../recommend');
 
 const router = express.Router();
 wrapAllRoutes(router);
@@ -22,20 +23,22 @@ router.post('/talents/:userId/propose', requireAuth, requireRole('company'), asy
 
   // 공고를 지정한 경우, 본인 기업의 실제 공고가 맞는지 확인합니다.
   let safeJobId = null;
+  let proposalScore = null;
   if (jobId !== undefined && jobId !== null && jobId !== '') {
     const jid = Number(jobId);
     if (!Number.isInteger(jid)) return res.status(400).json({ error: '올바르지 않은 공고 ID입니다.' });
-    const job = await get('SELECT id FROM jobs WHERE id = ? AND company_id = ?', [jid, req.user.id]);
+    const job = await get('SELECT id, stack_json, duty, grade FROM jobs WHERE id = ? AND company_id = ?', [jid, req.user.id]);
     if (!job) return res.status(404).json({ error: '공고를 찾을 수 없습니다.' });
     safeJobId = jid;
+    proposalScore = pairScore(job, talent);
   }
 
   const existing = await get('SELECT id FROM proposals WHERE company_id=? AND freelancer_id=?', [req.user.id, freelancerId]);
   if (existing) return res.status(409).json({ error: '이미 제안을 보냈습니다.' });
 
   const safeMessage = typeof message === 'string' ? message.trim().slice(0, 1000) : '';
-  await run('INSERT INTO proposals (company_id, freelancer_id, job_id, message) VALUES (?,?,?,?)', [
-    req.user.id, freelancerId, safeJobId, safeMessage,
+  await run('INSERT INTO proposals (company_id, freelancer_id, job_id, message, match_score) VALUES (?,?,?,?,?)', [
+    req.user.id, freelancerId, safeJobId, safeMessage, proposalScore,
   ]);
 
   const company = await get('SELECT name FROM companies WHERE user_id = ?', [req.user.id]);

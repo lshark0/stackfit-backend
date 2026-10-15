@@ -4,6 +4,7 @@ const { requireAuth } = require('../middleware/requireAuth');
 const { wrapAllRoutes } = require('../middleware/asyncHandler');
 const { pushTo } = require('../notify');
 const { getInterview, saveInterview, cancelInterview } = require('../interviews');
+const { maskContacts, isPairConnected } = require('../contactGuard');
 
 const router = express.Router();
 wrapAllRoutes(router);
@@ -126,6 +127,8 @@ router.get('/:id/messages', requireAuth, async (req, res) => {
   res.json({
     messages: msgs,
     interview: await getInterview(conv.id),
+    // 매칭(제안 수락·합격) 전에는 채팅의 연락처가 가려진다는 안내를 화면에 띄우기 위해 알려줍니다.
+    connected: await isPairConnected(conv.company_id, conv.freelancer_id),
     counterpartName: senderRow ? senderRow.name : null,
     jobTitle: job ? job.title : null,
   });
@@ -173,7 +176,15 @@ router.post('/:id/messages', requireAuth, async (req, res) => {
     return res.status(404).json({ error: '대화를 찾을 수 없습니다.' });
   }
 
-  await run('INSERT INTO messages (conversation_id, sender_id, body) VALUES (?,?,?)', [conv.id, req.user.id, body.trim()]);
+  // 직접 거래 방지: 매칭 전에는 전화번호·이메일·메신저 ID를 가려서 저장합니다(원문은 저장하지 않음).
+  let text = body.trim();
+  let masked = null;
+  if (!(await isPairConnected(conv.company_id, conv.freelancer_id))) {
+    const m = maskContacts(text);
+    if (m.masked) { text = m.text; masked = m.types; }
+  }
+  await run('INSERT INTO messages (conversation_id, sender_id, body, meta_json) VALUES (?,?,?,?)',
+    [conv.id, req.user.id, text, masked ? JSON.stringify({ contactMasked: masked }) : null]);
   const counterpartId = req.user.id === conv.company_id ? conv.freelancer_id : conv.company_id;
 
   // 보낸 사람 이름을 알림에 담아 누구에게서 온 메시지인지 바로 알 수 있게 합니다.
@@ -190,11 +201,11 @@ router.post('/:id/messages', requireAuth, async (req, res) => {
   );
   if (existing) {
     await run('UPDATE notifications SET body = ?, created_at = ? WHERE id = ?', [
-      body.trim().slice(0, 40), new Date().toISOString().slice(0, 19).replace('T', ' '), existing.id,
+      text.slice(0, 40), new Date().toISOString().slice(0, 19).replace('T', ' '), existing.id,
     ]);
   } else {
     await run('INSERT INTO notifications (user_id, tag, title, body, link) VALUES (?,?,?,?,?)', [
-      counterpartId, '메시지', `${senderName}님의 새 메시지`, body.trim().slice(0, 40), `chatRoom:${conv.id}`,
+      counterpartId, '메시지', `${senderName}님의 새 메시지`, text.slice(0, 40), `chatRoom:${conv.id}`,
     ]);
   }
 
@@ -203,13 +214,13 @@ router.post('/:id/messages', requireAuth, async (req, res) => {
   pushTo(counterpartId, {
     kind: 'chat',
     title: `💬 ${senderName}님의 메시지`,
-    body: body.trim().slice(0, 100),
+    body: text.slice(0, 100),
     tag: `chat-${conv.id}`,
     link: `chatRoom:${conv.id}`,
   });
 
   const msgs = await all('SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at ASC, id ASC', [conv.id]);
-  res.status(201).json({ messages: msgs });
+  res.status(201).json({ messages: msgs, masked: !!masked });
 });
 
 // 메시지 취소 — 본인이 보낸 메시지는 시간 제한 없이 언제든 삭제할 수 있습니다.

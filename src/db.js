@@ -90,6 +90,9 @@ if (USE_POSTGRES) {
     // 채팅 메시지 종류: 일반 글(text) / 인터뷰 일정 카드(interview). meta_json에 카드 내용을 담습니다.
     await ensureColumnPg('messages', 'kind', "TEXT NOT NULL DEFAULT 'text'");
     await ensureColumnPg('messages', 'meta_json', 'TEXT');
+    // 지원·제안 시점의 추천 점수(0~100). 추천 점수가 높을수록 실제 계약으로 이어지는지 확인하는 데 씁니다.
+    await ensureColumnPg('applications', 'match_score', 'INTEGER');
+    await ensureColumnPg('proposals', 'match_score', 'INTEGER');
     // 프리랜서 연락처 + 제안 받기 설정
     await ensureColumnPg('freelancer_profiles', 'phone', "TEXT NOT NULL DEFAULT ''");
     await ensureColumnPg('freelancer_profiles', 'email', "TEXT NOT NULL DEFAULT ''");
@@ -202,6 +205,8 @@ if (USE_POSTGRES) {
     addCol('notifications', 'link', 'TEXT');
     addCol('messages', 'kind', "TEXT NOT NULL DEFAULT 'text'");
     addCol('messages', 'meta_json', 'TEXT');
+    addCol('applications', 'match_score', 'INTEGER');
+    addCol('proposals', 'match_score', 'INTEGER');
     addCol('freelancer_profiles', 'phone', "TEXT NOT NULL DEFAULT ''");
     addCol('freelancer_profiles', 'email', "TEXT NOT NULL DEFAULT ''");
     addCol('freelancer_profiles', 'accept_proposals', 'INTEGER NOT NULL DEFAULT 1');

@@ -27,6 +27,7 @@ const announcementsRoutes = require('./src/routes/announcements');
 const referralRoutes = require('./src/routes/referral');
 const aiRoutes = require('./src/routes/ai');
 const publicPagesRoutes = require('./src/routes/publicPages');
+const careerVerifyRoutes = require('./src/routes/careerVerify');
 const mfaRoutes = require('./src/routes/mfa');
 const { resetMfaFromEnv } = require('./src/mfa');
 const { verifyToken, verifySessionToken } = require('./src/auth');
@@ -141,6 +142,7 @@ const WRITE_RULES = [
   { name: '채팅 메시지', re: /^\/api\/conversations\/\d+\/messages$/, limit: 200 },
   { name: '대화 시작', re: /^\/api\/conversations\/?$/, limit: 60 },
   { name: '인터뷰 일정', re: /^\/api\/conversations\/\d+\/interview$/, limit: 30 },
+  { name: '경력 검증 서류', re: /^\/api\/career-verification\/?$/, limit: 5 },
   { name: '공고 등록', re: /^\/api\/jobs\/?$|^\/api\/jobs\/\d+\/duplicate$/, limit: 20 },
   { name: '공고 지원', re: /^\/api\/jobs\/\d+\/apply$/, limit: 60 },
   { name: '신고·문의', re: /^\/api\/jobs\/\d+\/report$|^\/api\/support\/inquiries$/, limit: 10 },
@@ -236,6 +238,11 @@ app.get('/uploads/:filename', async (req, res) => {
           [safeName]
         );
         if (inquiryRow && inquiryRow.attachment_data) data = inquiryRow.attachment_data;
+        else {
+          // 경력 검증 서류(관리자 검토용, 검토가 끝나면 지워짐)
+          const careerRow = await get('SELECT doc_data FROM career_verifications WHERE doc_filename = ?', [safeName]);
+          if (careerRow && careerRow.doc_data) data = careerRow.doc_data;
+        }
       }
     }
   }
@@ -291,6 +298,7 @@ app.use('/api/support', supportRoutes);
 app.use('/api/announcements', announcementsRoutes);
 app.use('/api/referral', referralRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/career-verification', careerVerifyRoutes);
 app.use(publicPagesRoutes); // /jobs, /jobs/:id, /sitemap.xml, /robots.txt (로그인 없이 보는 공개 페이지)
 
 app.use((req, res) => res.status(404).json({ error: 'Not found' }));

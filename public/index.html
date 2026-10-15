@@ -301,6 +301,17 @@
   .iv-card .bubble-time{padding:0 14px 10px;}
   .iv-mode{display:flex; gap:8px;}
   .iv-mode .chip{flex:1; text-align:center; padding:11px 0; font-family:var(--sans);}
+  .pf-row{display:flex; align-items:center; gap:10px; padding:6px 0; font-size:13px;}
+  .pf-l{flex:0 0 96px; color:var(--slate); font-weight:700;}
+  .pf-bar{flex:1; height:10px; background:var(--paper-dim); border-radius:99px; overflow:hidden;}
+  .pf-bar i{display:block; height:100%; border-radius:99px; background:linear-gradient(135deg, var(--purple) 0%, var(--blue) 100%);}
+  .pf-v{flex:0 0 34px; text-align:right; font-family:var(--mono);}
+  .pf-grid{display:grid; grid-template-columns:1fr; gap:8px;}
+  .pf-tile{margin:0;}
+  .pf-big{font-family:var(--mono); font-size:22px; font-weight:800; color:var(--ink);}
+  .pf-cap{font-size:13px; font-weight:800; color:var(--ink); margin:4px 0 2px;}
+  .chat-guard{display:flex; gap:9px; align-items:flex-start; margin:8px 0 6px; padding:10px 12px; border-radius:12px; background:var(--cyan-soft); color:#0E5F56; font-size:12.5px; line-height:1.55;}
+  .chat-guard svg{flex:0 0 auto; width:16px; height:16px; margin-top:2px;}
   .chat-input-bar{display:flex; gap:8px; padding:10px 20px 16px; border-top:1px solid var(--line); background:var(--paper); flex:0 0 auto;}
   .chat-input{flex:1; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:11px 14px; font-size:14.5px; color:var(--ink); font-family:var(--sans); outline:none;}
   .send-btn{width:42px; height:42px; border-radius:12px; background:linear-gradient(135deg, var(--purple) 0%, var(--blue) 100%); color:#fff; display:flex; align-items:center; justify-content:center; flex:0 0 auto; cursor:pointer; border:none;}
@@ -727,10 +738,10 @@ function talentDetailBack(){ goBackFrom(talentDetailReturn, 'talent'); }
 // 화면 안의 뒤로가기 화살표가 항상 마이페이지로 돌아가는 화면들.
 // 이 화면들은 드로어 메뉴 등 여러 곳에서 열릴 수 있어서, 휴대폰의 '뒤로가기'
 // 제스처도 그 화살표와 똑같이 항상 마이페이지로 보내도록 popstate에서 함께 처리합니다.
-const MYPAGE_CHILD_SCREENS = ['proposalSettings','changePassword','deleteAccount','savedJobs','followedCompanies','adminReports','adminSignupStats','adminAiUsage','adminSecurity','mfaSetup','profileViews','companyProfileEdit','profileEdit','notices','events','faq','supportInquiry'];
+const MYPAGE_CHILD_SCREENS = ['proposalSettings','changePassword','deleteAccount','savedJobs','followedCompanies','adminReports','adminPerformance','adminCareerVerify','careerVerify','adminSignupStats','adminAiUsage','adminSecurity','mfaSetup','profileViews','companyProfileEdit','profileEdit','notices','events','faq','supportInquiry'];
 
 // 회원 유형별로만 열 수 있는 화면. 다른 유형의 화면이 열리려 하면(뒤로가기 기록, 예전 알림 등) 홈으로 보냅니다.
-const FREELANCER_ONLY = ['receivedProposals','myApplications','portfolios','portfolioEdit','savedJobs','followedCompanies','profileViews','profileEdit','proposalSettings','reportJob'];
+const FREELANCER_ONLY = ['careerVerify','receivedProposals','myApplications','portfolios','portfolioEdit','savedJobs','followedCompanies','profileViews','profileEdit','proposalSettings','reportJob'];
 const COMPANY_ONLY = ['talent','talentDetail','applicants','allApplicants','jobPost','companyProfileEdit','proposeForm','sentProposals','savedTalents'];
 function screenAllowed(screen){
   if(state.role==='company' && FREELANCER_ONLY.includes(screen)) return false;
@@ -740,7 +751,7 @@ function screenAllowed(screen){
 
 // 알림/푸시에 담긴 링크('screen' 또는 'screen:param')로 해당 화면을 엽니다.
 const LINKABLE_SCREENS = ['home','jobs','jobDetail','myApplications','receivedProposals','sentProposals','savedTalents',
-  'applicants','projects','chatList','chatRoom','profileViews','alerts','mypage','talentDetail','savedJobs','invite'];
+  'applicants','projects','chatList','chatRoom','profileViews','alerts','mypage','talentDetail','savedJobs','invite','careerVerify'];
 function openLink(link){
   if(!link) return false;
   const [screen, rawParam] = String(link).split(':');
@@ -1282,7 +1293,7 @@ function talentCard(t){
           <div class="card-title">${esc(t.name)} ${gradeBadge(t.grade)}</div>
           <div style="margin-top:5px; display:flex; flex-wrap:wrap; gap:5px; align-items:center;">
             ${dutyBadge(t.role_title)}
-            ${t.verified?`<span class="sbadge verified">${I.verified}인증됨</span>`:''}
+            ${t.verified?`<span class="sbadge verified" title="관리자가 경력 증빙 서류를 확인했어요">${I.verified}경력 검증</span>`:''}
             ${t.proposed?`<span class="sbadge proposed">${I.sent}제안완료</span>`
               : t.accept_proposals===0?`<span class="sbadge fail">제안 받지 않음</span>`:''}
           </div>
@@ -1992,7 +2003,7 @@ async function markAlertRead(id, tag, link){
   const isCompany = state.role === 'company';
   const fallback = {
     '제안': isCompany ? 'sentProposals' : 'receivedProposals',
-    '메시지': 'chatList', '인터뷰': 'chatList',
+    '메시지': 'chatList', '인터뷰': 'chatList', '경력검증': isCompany ? null : 'careerVerify',
     '지원': isCompany ? 'jobs' : 'myApplications',
     '합격': 'projects', '지원결과': 'myApplications',
     '계약': 'projects', '완료': 'projects', '리뷰': 'projects',
@@ -2259,6 +2270,7 @@ async function sendMessage(convId){
   try{
     const data = await apiFetch(`/conversations/${convId}/messages`, {method:'POST', body:{body:text}});
     input.value = '';
+    if(data.masked) toast('매칭 전이라 연락처는 가려서 보냈어요');
     const wrap = document.querySelector('#chatScroll .bubble-wrap');
     if(wrap){
       wrap.innerHTML = chatBubblesHtml(data.messages);
@@ -3302,7 +3314,7 @@ async function screenTalentDetail(){
         <h2 style="font-size:18px;">${esc(t.name)}</h2>
         <div style="margin-top:7px; display:flex; flex-wrap:wrap; gap:5px; align-items:center;">
           ${gradeBadge(t.grade)}
-          ${t.verified?`<span class="sbadge verified">${I.verified}인증됨</span>`:''}
+          ${t.verified?`<span class="sbadge verified" title="관리자가 경력 증빙 서류를 확인했어요">${I.verified}경력 검증</span>`:''}
           ${t.proposed?`<span class="sbadge proposed">${I.sent}제안완료</span>`
             : !t.accept_proposals?`<span class="sbadge fail">제안 받지 않음</span>`:''}
         </div>
@@ -4147,7 +4159,7 @@ async function screenApplicants(){
               <div class="card-title">${esc(a.name)} ${gradeBadge(a.grade)}</div>
               <div style="margin-top:5px; display:flex; flex-wrap:wrap; gap:5px; align-items:center;">
                 ${dutyBadge(a.role_title)}
-                ${a.verified?`<span class="sbadge verified">${I.verified}인증됨</span>`:''}
+                ${a.verified?`<span class="sbadge verified" title="관리자가 경력 증빙 서류를 확인했어요">${I.verified}경력 검증</span>`:''}
               </div>
             </div>
           </div>
@@ -4210,6 +4222,7 @@ async function screenChatRoom(){
     <div style="min-width:0;"><div class="page-title" style="font-size:16px;">${esc(data.counterpartName || '대화')}</div>${data.jobTitle ? `<div class="page-sub" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${esc(data.jobTitle)}</div>` : ''}</div></div></div>
   <div class="iv-bar" id="ivBar">${interviewBarHtml(data.interview, state.param)}</div>
   <div class="content" id="chatScroll">
+    ${data.connected ? '' : `<div class="chat-guard">${I.verified}<div><b>매칭 전에는 연락처가 가려져요.</b> 전화번호·이메일·메신저 ID는 제안 수락이나 합격 후에 공개돼요. IT Free 안에서 계약하면 계약서·진행 단계·상호 평가가 기록으로 남아요.</div></div>`}
     <div class="bubble-wrap">${chatBubblesHtml(data.messages)}</div>
   </div>
   <div class="chat-input-bar">
@@ -4246,6 +4259,9 @@ async function screenMypage(){
     ${!isCompany?`
     <div class="list-item" onclick="go('proposalSettings')"><div class="li-l"><div class="li-icon">${I.gear}</div>
       <div><div class="li-tt">제안 설정</div><div class="page-sub" style="margin-top:2px;">${Number(profile.accept_proposals ?? 1)===1 ? '제안 받는 중' : '제안 받지 않음'}</div></div></div>${I.back}</div>` : ''}
+    ${!isCompany?`
+    <div class="list-item" onclick="go('careerVerify')"><div class="li-l"><div class="li-icon">${I.verified}</div>
+      <div><div class="li-tt">경력 검증</div><div class="page-sub" style="margin-top:2px;">${Number(profile.verified)===1 ? '검증 완료 · 배지 표시 중' : '증빙 서류로 경력 검증 배지 받기'}</div></div></div>${I.back}</div>` : ''}
     ${me.user.hasPassword ? `<div class="list-item" onclick="go('changePassword')"><div class="li-l"><div class="li-icon">${I.gear}</div><div class="li-tt">비밀번호 변경</div></div>${I.back}</div>` : ''}
     ${state.isAdmin && !me.user.mfaVerified ? `
     <div class="section-label with-ic">${I.gear}관리자</div>
@@ -4254,6 +4270,8 @@ async function screenMypage(){
     ${state.isAdmin && me.user.mfaVerified ? `
     <div class="section-label with-ic">${I.gear}관리자</div>
     <div class="list-item" onclick="go('mfaSetup')"><div class="li-l"><div class="li-icon">${I.verified}</div><div class="li-tt">2단계 인증 <span class="page-sub">사용 중</span></div></div>${I.back}</div>
+    <div class="list-item" onclick="go('adminPerformance')"><div class="li-l"><div class="li-icon">${I.layers}</div><div class="li-tt">성과 지표</div></div>${I.back}</div>
+    <div class="list-item" onclick="go('adminCareerVerify')"><div class="li-l"><div class="li-icon">${I.verified}</div><div class="li-tt">경력 검증 심사</div></div>${I.back}</div>
     <div class="list-item" onclick="go('adminSignupStats')"><div class="li-l"><div class="li-icon">${I.talent}</div><div class="li-tt">가입 경로 통계</div></div>${I.back}</div>
     <div class="list-item" onclick="go('adminAiUsage')"><div class="li-l"><div class="li-icon">${I.sparkle}</div><div class="li-tt">AI 사용량 통계</div></div>${I.back}</div>
     <div class="list-item" onclick="go('adminSecurity')"><div class="li-l"><div class="li-icon">${I.verified}</div><div class="li-tt">보안 로그</div></div>${I.back}</div>
@@ -4754,6 +4772,209 @@ async function screenAdminSignupStats(){
       <div id="lb-result" class="page-sub" style="margin-top:8px; word-break:break-all; font-family:var(--mono);"></div>
     </div>
   </div>`;
+}
+
+
+/* ---------------- 경력 검증 (프리랜서) ---------------- */
+// 경력 증빙 서류를 올리면 관리자가 확인해 '경력 검증' 배지를 붙여줍니다. 서류는 검토가 끝나면 바로 지워집니다.
+const CV_STATUS = { pending: ['검토 중', 'pending'], approved: ['검증 완료', 'pass'], rejected: ['반려', 'fail'] };
+async function screenCareerVerify(){
+  const d = await apiFetch('/career-verification/me');
+  const latest = d.latest;
+  const pending = latest && latest.status === 'pending';
+  return `${statusbar()}
+  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('mypage')">${I.back}</div><div class="page-title" style="font-size:19.5px;">경력 검증</div></div></div>
+  <div class="content">
+    <div class="banner light" style="cursor:default;">
+      <div class="banner-eyebrow">Career Check</div>
+      <div class="banner-title" style="display:flex; align-items:center; gap:8px;">${d.verified ? `<span class="sbadge verified">${I.verified}경력 검증</span> 배지가 붙어 있어요` : '경력을 검증받고 배지를 받으세요'}</div>
+      <div class="banner-sub" style="color:var(--slate);">관리자가 증빙 서류로 프로필의 경력을 확인하면, 기업이 인재를 볼 때 <b>경력 검증</b> 배지가 함께 보여요.</div>
+    </div>
+    ${latest ? `
+    <div class="card" style="margin-top:12px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+        <div class="card-title" style="font-size:14px;">최근 제출 · ${esc(latest.doc_kind)}</div>
+        <span class="sbadge ${CV_STATUS[latest.status]?.[1] || 'pending'}">${esc(CV_STATUS[latest.status]?.[0] || latest.status)}</span>
+      </div>
+      <div class="page-sub" style="margin-top:4px;">${fmtDate(latest.created_at)} 제출${latest.reviewed_at ? ` · ${fmtDate(latest.reviewed_at)} 처리` : ''}</div>
+      ${latest.status === 'rejected' && latest.admin_note ? `<div class="para" style="margin-top:8px;">반려 사유: ${esc(latest.admin_note)}</div>` : ''}
+      ${pending ? `<div class="page-sub" style="margin-top:8px;">보통 영업일 기준 1~2일 안에 확인해요. 결과는 알림으로 알려드려요.</div>
+        <button class="btn btn-outline" style="margin-top:10px;" onclick="cancelCareerVerify()">제출 취소</button>` : ''}
+    </div>` : ''}
+    ${pending ? '' : `
+    <div class="section-label">${d.verified ? '서류 다시 올리기' : '증빙 서류 올리기'}</div>
+    <div class="form-field"><label class="form-label">서류 종류</label>
+      <select id="cv-kind" class="form-input">${d.docKinds.map(k=>`<option>${esc(k)}</option>`).join('')}</select></div>
+    <div class="form-field"><label class="form-label">파일 <span style="font-weight:400; color:var(--slate-light);">(PDF·JPG·PNG, 10MB 이하)</span></label>
+      <input id="cv-file" type="file" class="form-input" accept=".pdf,.jpg,.jpeg,.png"></div>
+    <div class="form-field"><label class="form-label">설명 <span style="font-weight:400; color:var(--slate-light);">(선택)</span></label>
+      <input id="cv-memo" class="form-input" maxlength="300" placeholder="예: 2019~2024 ㅇㅇ정보 SI 개발 경력"></div>
+    <button class="btn btn-primary" onclick="submitCareerVerify()">제출하기</button>`}
+    <div class="page-sub" style="margin-top:16px; line-height:1.65;">
+      · 인정 서류: 건강보험 자격득실확인서, 경력증명서, SW기술자 경력확인서(KOSA), 재직·퇴직증명서<br>
+      · <b>주민등록번호 뒷자리는 가리고</b> 올려주세요.<br>
+      · 올린 서류는 관리자만 볼 수 있고, <b>검토가 끝나면 바로 삭제</b>돼요(결과만 남아요).
+    </div>
+  </div>`;
+}
+async function submitCareerVerify(){
+  const file = document.getElementById('cv-file').files[0];
+  if(!file){ toast('증빙 서류 파일을 선택해주세요'); return; }
+  const ext = (file.name.split('.').pop() || '').toLowerCase();
+  if(!['pdf','jpg','jpeg','png'].includes(ext)){ toast('PDF, JPG, PNG 파일만 올릴 수 있어요'); return; }
+  if(file.size > 10 * 1024 * 1024){ toast('10MB 이하 파일만 올릴 수 있어요'); return; }
+  const fd = new FormData();
+  fd.append('doc_kind', document.getElementById('cv-kind').value);
+  fd.append('memo', document.getElementById('cv-memo').value.trim());
+  fd.append('doc', file);
+  try{
+    toast('올리는 중...');
+    const res = await fetch(API_BASE + '/career-verification', { method:'POST', headers: state.token ? {Authorization:'Bearer '+state.token} : {}, body: fd });
+    const data = await res.json().catch(()=>({}));
+    if(!res.ok) throw new Error(data.error || '제출하지 못했어요');
+    toast('제출했어요. 검토가 끝나면 알려드릴게요');
+    render();
+  }catch(e){ toast(e.message); }
+}
+function cancelCareerVerify(){
+  showConfirm('제출을 취소할까요?\n올린 서류도 함께 삭제돼요.', async () => {
+    try{ await apiFetch('/career-verification/me', {method:'DELETE'}); toast('제출을 취소했어요'); render(); }
+    catch(e){ toast(e.message); }
+  });
+}
+
+/* ---------------- 관리자: 경력 검증 심사 ---------------- */
+async function screenAdminCareerVerify(){
+  if(!state.isAdmin){ go('mypage'); return ''; }
+  const d = await apiFetch('/career-verification/admin');
+  return `${statusbar()}
+  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('mypage')">${I.back}</div><div class="page-title" style="font-size:19.5px;">경력 검증 심사</div></div></div>
+  <div class="content">
+    <div class="page-sub" style="margin-bottom:10px;">검토 대기 ${d.pending}건 · 서류의 이름·기간·회사가 프로필 경력과 맞는지 확인해주세요. 처리하면 서류 원본은 바로 삭제돼요.</div>
+    ${d.items.length ? d.items.map(v=>`
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
+          <div style="min-width:0;">
+            <div class="card-title" style="font-size:14.5px;">${esc(v.name)} ${gradeBadge(v.grade)}</div>
+            <div class="page-sub" style="margin-top:3px;">${esc([v.role_title, v.years].filter(Boolean).join(' · ') || '프로필 경력 미입력')}</div>
+          </div>
+          <span class="sbadge ${CV_STATUS[v.status]?.[1] || 'pending'}" style="flex:0 0 auto;">${esc(CV_STATUS[v.status]?.[0] || v.status)}</span>
+        </div>
+        <div class="para" style="margin-top:8px;">${esc(v.doc_kind)}${v.memo ? ` · ${esc(v.memo)}` : ''}</div>
+        <div class="page-sub" style="margin-top:2px;">${fmtDate(v.created_at)} 제출${v.reviewed_at ? ` · ${fmtDate(v.reviewed_at)} 처리` : ''}${v.admin_note ? ` · ${esc(v.admin_note)}` : ''}</div>
+        <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">
+          ${v.doc_url ? `<a class="chip" href="${esc(fileUrl(v.doc_url))}" target="_blank" rel="noopener">📄 서류 보기</a>` : ''}
+        </div>
+        ${v.status === 'pending' ? `
+        <div style="display:flex; gap:8px; margin-top:12px;">
+          <button class="btn btn-outline" onclick="decideCareerVerify(${v.id}, 'rejected')">반려</button>
+          <button class="btn btn-primary" onclick="decideCareerVerify(${v.id}, 'approved')">승인</button>
+        </div>` : ''}
+      </div>`).join('') : `<div class="reco-empty">아직 제출된 서류가 없어요.</div>`}
+  </div>`;
+}
+async function decideCareerVerify(id, decision){
+  let note = '';
+  if(decision === 'rejected'){
+    note = (prompt('반려 사유를 적어주세요 (프리랜서에게 그대로 안내돼요)\n예: 서류의 이름이 프로필과 달라요') || '').trim();
+    if(!note){ toast('반려 사유를 적어야 반려할 수 있어요'); return; }
+  }
+  const go2 = async () => {
+    try{ await apiFetch(`/career-verification/admin/${id}/decide`, {method:'POST', body:{decision, note}}); toast(decision==='approved' ? '승인했어요' : '반려했어요'); render(); }
+    catch(e){ toast(e.message); }
+  };
+  if(decision === 'approved') showConfirm('경력 검증을 승인할까요?\n프로필에 경력 검증 배지가 붙고, 서류 원본은 삭제돼요.', go2); else go2();
+}
+
+/* ---------------- 관리자: 성과 지표 ---------------- */
+// 창업지원단 심사 의견("기능 구현과 실제 거래 성과는 구분해야")에 맞춰, 실제 매칭·계약이 얼마나 일어나는지 숫자로 봅니다.
+let perfDays = 90;
+let lastPerf = null;
+function setPerfDays(d){ perfDays = d; render(); }
+const fmtPct = (v) => v === null || v === undefined ? '-' : `${v}%`;
+function fmtDur(d){
+  if(!d || !d.n) return { main: '-', sub: '아직 데이터 없음' };
+  const human = (days) => days < 1 ? (days * 24 < 1 ? '1시간 미만' : `${Math.round(days * 24 * 10) / 10}시간`) : `${days}일`;
+  return { main: human(d.medianDays), sub: `중간값 · ${d.n}건 · 평균 ${human(d.avgDays)}` };
+}
+async function screenAdminPerformance(){
+  if(!state.isAdmin){ go('mypage'); return ''; }
+  const p = await apiFetch('/admin/performance?days=' + perfDays);
+  lastPerf = p;
+  const periods = [[30,'30일'],[90,'90일'],[365,'1년'],[3650,'전체']];
+  const f = p.funnel;
+  const steps = [['공고 등록', f.jobs], ['지원', f.applications], ['기업 제안', f.proposals], ['인터뷰 일정', f.interviews], ['매칭(합격·수락)', f.matched], ['계약 체결', f.contracted], ['프로젝트 완료', f.completed]];
+  const max = Math.max(1, ...steps.map(s => s[1]));
+  const d1 = fmtDur(p.durations.jobToFirstResponse), d2 = fmtDur(p.durations.contactToContract), d3 = fmtDur(p.durations.proposalResponse);
+  const bandLabel = { '90-100':'90~100점', '70-89':'70~89점', '50-69':'50~69점', '0-49':'49점 이하' };
+  const anyEstimated = p.scoreBands.some(b => b.estimated > 0);
+  return `${statusbar()}
+  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('mypage')">${I.back}</div><div class="page-title" style="font-size:19.5px;">성과 지표</div></div></div>
+  <div class="content">
+    <div class="chip-row">${periods.map(([d,l])=>`<div class="chip ${d===perfDays?'active':''}" onclick="setPerfDays(${d})">${l}</div>`).join('')}</div>
+    <div class="hero-stat" style="margin-top:10px;">
+      <div class="hs"><div class="hs-num">${f.contracted}</div><div class="hs-lbl">계약 체결</div></div>
+      <div class="hs"><div class="hs-num">${fmtPct(p.rates.contactToContract)}</div><div class="hs-lbl">지원·제안 → 계약</div></div>
+      <div class="hs"><div class="hs-num">${d2.main}</div><div class="hs-lbl">첫 접촉 → 계약</div></div>
+    </div>
+
+    <div class="section-label with-ic">${I.layers}매칭 퍼널</div>
+    <div class="card">
+      ${steps.map(([l,v])=>`<div class="pf-row"><span class="pf-l">${l}</span><span class="pf-bar"><i style="width:${Math.max(v ? 3 : 0, Math.round(v / max * 100))}%"></i></span><b class="pf-v">${v}</b></div>`).join('')}
+      <div class="page-sub" style="margin-top:8px; line-height:1.6;">지원 합격률 <b>${fmtPct(p.rates.applicationAccept)}</b> · 제안 수락률 <b>${fmtPct(p.rates.proposalAccept)}</b> · 제안 응답률 ${fmtPct(p.rates.proposalResponded)} · 매칭 → 계약 체결 <b>${fmtPct(p.rates.matchToContract)}</b></div>
+    </div>
+
+    <div class="section-label with-ic">${I.clockSm}소요 시간</div>
+    <div class="pf-grid">
+      <div class="card pf-tile"><div class="pf-big">${d1.main}</div><div class="pf-cap">공고 등록 → 첫 지원·제안</div><div class="page-sub">${d1.sub}</div></div>
+      <div class="card pf-tile"><div class="pf-big">${d3.main}</div><div class="pf-cap">제안 → 프리랜서 응답</div><div class="page-sub">${d3.sub}</div></div>
+      <div class="card pf-tile"><div class="pf-big">${d2.main}</div><div class="pf-cap">첫 접촉 → 계약 체결</div><div class="page-sub">${d2.sub}</div></div>
+    </div>
+
+    <div class="section-label with-ic">${I.sparkle}추천 점수별 성사율 (매칭 정확도)</div>
+    <table class="stat-table"><thead><tr><th>추천 점수</th><th class="num">건수</th><th class="num">매칭률</th><th class="num">계약률</th></tr></thead>
+      <tbody>${p.scoreBands.map(b=>`<tr><td>${bandLabel[b.key]}</td><td class="num">${b.n}</td><td class="num"><b>${fmtPct(b.matchRate)}</b></td><td class="num">${fmtPct(b.contractRate)}</td></tr>`).join('')}</tbody></table>
+    <div class="page-sub" style="margin-top:6px; line-height:1.6;">추천 점수가 높은 구간의 매칭률·계약률이 더 높으면, 추천이 실제 성사에 도움이 된다는 근거가 돼요.${anyEstimated ? ' 이번 업데이트 전의 지원·제안은 지금 프로필로 다시 계산한 추정값이 섞여 있어요.' : ''}</div>
+
+    <div class="section-label with-ic">${I.checklist}재이용률 (전체 기간)</div>
+    <div class="hero-stat">
+      <div class="hs"><div class="hs-num">${fmtPct(p.reuse.companies.rate)}</div><div class="hs-lbl">기업 재계약 (${p.reuse.companies.repeat}/${p.reuse.companies.total})</div></div>
+      <div class="hs"><div class="hs-num">${fmtPct(p.reuse.freelancers.rate)}</div><div class="hs-lbl">프리랜서 재계약 (${p.reuse.freelancers.repeat}/${p.reuse.freelancers.total})</div></div>
+    </div>
+
+    <div class="section-label with-ic">${I.jobs}분야별 성과</div>
+    ${p.byCategory.length ? `<table class="stat-table"><thead><tr><th>분야</th><th class="num">공고</th><th class="num">지원·제안</th><th class="num">계약</th><th class="num">계약률</th></tr></thead>
+      <tbody>${p.byCategory.map(c=>`<tr><td>${esc(c.category)}</td><td class="num">${c.jobs}</td><td class="num">${c.contacts}</td><td class="num"><b>${c.contracted}</b></td><td class="num">${fmtPct(c.contractRate)}</td></tr>`).join('')}</tbody></table>
+      <div class="page-sub" style="margin-top:6px;">계약이 나오는 분야에 홍보·영업을 먼저 집중하면 첫 계약 사례를 빨리 만들 수 있어요.</div>`
+      : `<div class="reco-empty">이 기간에 등록된 공고가 없어요.</div>`}
+
+    <div class="section-label with-ic">${I.verified}신뢰 · 직접 거래 방지</div>
+    <div class="hero-stat">
+      <div class="hs"><div class="hs-num">${p.trust.verifiedFreelancers}/${p.trust.totalFreelancers}</div><div class="hs-lbl">경력 검증 프리랜서</div></div>
+      <div class="hs" onclick="go('adminCareerVerify')" style="cursor:pointer;"><div class="hs-num">${p.trust.verificationPending}</div><div class="hs-lbl">검증 대기 ›</div></div>
+      <div class="hs"><div class="hs-num">${p.trust.maskedMessages}</div><div class="hs-lbl">매칭 전 연락처 공유 시도</div></div>
+    </div>
+    <div class="page-sub" style="margin-top:6px;">연락처 공유 시도는 매칭 전 채팅에서 전화번호·이메일·메신저 ID를 가린 횟수예요 (대화 ${p.trust.maskedConversations}곳).</div>
+
+    <button class="btn btn-outline" style="margin-top:16px;" onclick="copyPerfSummary()">사업계획서용 요약 복사</button>
+    <div style="height:20px;"></div>
+  </div>`;
+}
+function copyPerfSummary(){
+  const p = lastPerf; if(!p) return;
+  const period = p.days >= 3650 ? '서비스 시작 이후' : `최근 ${p.days}일`;
+  const dur = (d) => d && d.n ? `${d.medianDays}일(중간값, ${d.n}건)` : '데이터 없음';
+  const lines = [
+    `[IT Free 운영 성과 · ${period} · ${new Date().toLocaleDateString('ko-KR')} 기준]`,
+    `- 매칭 퍼널: 공고 ${p.funnel.jobs}건 → 지원 ${p.funnel.applications}건·제안 ${p.funnel.proposals}건 → 인터뷰 ${p.funnel.interviews}건 → 매칭 ${p.funnel.matched}건 → 계약 체결 ${p.funnel.contracted}건 → 완료 ${p.funnel.completed}건`,
+    `- 전환율: 지원 합격률 ${fmtPct(p.rates.applicationAccept)}, 제안 수락률 ${fmtPct(p.rates.proposalAccept)}, 매칭 후 계약 체결률 ${fmtPct(p.rates.matchToContract)}`,
+    `- 소요 시간: 공고 등록→첫 지원·제안 ${dur(p.durations.jobToFirstResponse)}, 첫 접촉→계약 체결 ${dur(p.durations.contactToContract)}`,
+    `- 추천 점수별 계약률: ` + p.scoreBands.map(b => `${b.key}점 ${fmtPct(b.contractRate)}(${b.n}건)`).join(', '),
+    `- 재이용률: 기업 ${fmtPct(p.reuse.companies.rate)}(${p.reuse.companies.repeat}/${p.reuse.companies.total}), 프리랜서 ${fmtPct(p.reuse.freelancers.rate)}(${p.reuse.freelancers.repeat}/${p.reuse.freelancers.total})`,
+    `- 경력 검증 프리랜서: ${p.trust.verifiedFreelancers}명 / 전체 ${p.trust.totalFreelancers}명`,
+    `- 매칭 전 연락처 공유 차단: ${p.trust.maskedMessages}회`,
+  ];
+  copyText(lines.join('\n'), '성과 요약을 복사했어요');
 }
 
 // 관리자 전용: 보안 로그 (로그인 실패·잠금, 관리자 작업, 권한 없는 관리자 접근 시도)
@@ -5270,7 +5491,7 @@ async function render(){
       proposeForm: screenProposeForm, pickerScreen: screenPicker,
       reviewForm: screenReviewForm,
       adminReports: screenAdminReports, reportJob: screenReportJob,
-      invite: screenInvite, adminSignupStats: screenAdminSignupStats, adminAiUsage: screenAdminAiUsage, adminSecurity: screenAdminSecurity, mfaVerify: screenMfaVerify, mfaSetup: screenMfaSetup,
+      invite: screenInvite, careerVerify: screenCareerVerify, adminCareerVerify: screenAdminCareerVerify, adminPerformance: screenAdminPerformance, adminSignupStats: screenAdminSignupStats, adminAiUsage: screenAdminAiUsage, adminSecurity: screenAdminSecurity, mfaVerify: screenMfaVerify, mfaSetup: screenMfaSetup,
       notices: screenNotices, events: screenEvents, faq: screenFaq, aiChat: screenAiChat, supportInquiry: screenSupportInquiry,
       announcementForm: screenAnnouncementForm,
     };
