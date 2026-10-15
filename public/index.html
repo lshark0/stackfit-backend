@@ -2405,6 +2405,45 @@ async function runProjectAction(key, url, successMsg){
   finally{ busyActions.delete(key); }
 }
 
+// 계약 체결 후 30초 설문: 기존 방식과 비교할 기준값(이전 경로·걸리던 기간)과 재이용 의향을 받습니다.
+const SURVEY_CHANNEL_OPTS = [['referral','지인·인맥 소개'],['agency','에이전시·파견업체'],['jobboard','다른 구인 사이트'],['community','커뮤니티·오픈채팅'],['first','이번이 처음이에요']];
+const SURVEY_DAY_OPTS = [[2,'1~2일'],[4,'3~5일'],[7,'1주 정도'],[14,'2주 정도'],[30,'한 달 이상'],['','잘 모르겠어요']];
+function contractSurveyHtml(p, isCompany){
+  const what = isCompany ? '이런 인력을 구할 때' : '이런 프로젝트를 찾을 때';
+  return `<div class="reco-empty" style="margin-top:10px; text-align:left;" id="survey-${p.id}">
+    <b style="color:var(--ink);">30초 설문 · 기존 방식과 비교해 주세요</b>
+    <div class="page-sub" style="margin-top:4px;">답변은 서비스 개선과 통계에만 쓰이고 상대방에게 보이지 않아요.</div>
+    <label class="form-label" style="margin-top:10px;">${what} 이전에는 주로 어떻게 했나요?</label>
+    <select class="form-input" id="sv-ch-${p.id}" onchange="document.getElementById('sv-dwrap-${p.id}').style.display = this.value==='first' ? 'none' : ''">
+      <option value="">선택해주세요</option>${SURVEY_CHANNEL_OPTS.map(([v,l])=>`<option value="${v}">${l}</option>`).join('')}
+    </select>
+    <div id="sv-dwrap-${p.id}">
+      <label class="form-label" style="margin-top:10px;">그 방법으로는 보통 얼마나 걸렸나요?</label>
+      <select class="form-input" id="sv-days-${p.id}"><option value="x">선택해주세요</option>${SURVEY_DAY_OPTS.map(([v,l])=>`<option value="${v}">${l}</option>`).join('')}</select>
+    </div>
+    <label class="form-label" style="margin-top:10px;">다음에도 IT Free로 ${isCompany ? '인력을 구할' : '프로젝트를 찾을'} 생각이 있나요? (0~10)</label>
+    <select class="form-input" id="sv-int-${p.id}"><option value="">선택해주세요</option>${[10,9,8,7,6,5,4,3,2,1,0].map(n=>`<option value="${n}">${n}${n===10?' (꼭 다시 쓸게요)':n===0?' (전혀 아니에요)':''}</option>`).join('')}</select>
+    <button class="btn btn-primary" style="margin-top:10px;" onclick="submitContractSurvey(${p.id})">제출하기</button>
+  </div>`;
+}
+async function submitContractSurvey(id){
+  const ch = document.getElementById(`sv-ch-${id}`).value;
+  const daysSel = document.getElementById(`sv-days-${id}`).value;
+  const intent = document.getElementById(`sv-int-${id}`).value;
+  if(!ch){ toast('이전에 주로 쓰던 방법을 골라주세요'); return; }
+  if(ch !== 'first' && daysSel === 'x'){ toast('걸리던 기간을 골라주세요'); return; }
+  if(intent === ''){ toast('다시 이용할 의향을 골라주세요'); return; }
+  if(busyActions.has(`survey-${id}`)) return;
+  busyActions.add(`survey-${id}`);
+  try{
+    await apiFetch(`/projects/${id}/survey`, {method:'POST', body:{
+      prevChannel: ch, prevDays: ch === 'first' || daysSel === '' ? null : Number(daysSel), reuseIntent: Number(intent),
+    }});
+    toast('답변 감사합니다');
+    const el = document.getElementById(`survey-${id}`); if(el) el.remove();
+  }catch(e){ toast(e.message); }
+  finally{ busyActions.delete(`survey-${id}`); }
+}
 async function agreeContract(id){
   showConfirm('계약 조건에 동의할까요?\n양측이 모두 동의하면 프로젝트가 시작돼요.',
     () => runProjectAction(`agree-${id}`, `/projects/${id}/agree`, '계약에 동의했어요'));
@@ -3486,6 +3525,7 @@ async function screenProjects(){
           </div>` : ''}
         ${stepsGraphic(p.status==='완료' ? 4 : p.stage, steps)}
         ${projectActionHtml(p, isCompany)}
+        ${p.contracted_at && !p.mySurveyDone ? contractSurveyHtml(p, isCompany) : ''}
         ${p.receivedReview? `
           <div style="margin-top:10px; padding:12px; background:var(--card); border:1px solid var(--line); border-radius:12px;">
             <div style="font-size:11.5px; font-weight:700; color:var(--slate); margin-bottom:4px;">상대방이 남긴 평가</div>
@@ -5070,6 +5110,24 @@ async function screenAdminPerformance(){
       <tbody>${p.scoreBands.map(b=>`<tr><td>${bandLabel[b.key]}</td><td class="num">${b.n}</td><td class="num"><b>${fmtPct(b.matchRate)}</b></td><td class="num">${fmtPct(b.contractRate)}</td></tr>`).join('')}</tbody></table>
     <div class="page-sub" style="margin-top:6px; line-height:1.6;">추천 점수가 높은 구간의 매칭률·계약률이 더 높으면, 추천이 실제 성사에 도움이 된다는 근거가 돼요.${anyEstimated ? ' 이번 업데이트 전의 지원·제안은 지금 프로필로 다시 계산한 추정값이 섞여 있어요.' : ''}</div>
 
+    <div class="section-label with-ic">${I.clockSm}기존 방식과 비교 (계약 후 설문)</div>
+    ${(() => {
+      const b = p.baseline, c = b.compare, r = b.reuseIntent;
+      const dd = (v) => v === null || v === undefined ? '-' : `${v}일`;
+      const chLabel = Object.fromEntries(SURVEY_CHANNEL_OPTS);
+      return `<div class="hero-stat">
+        <div class="hs"><div class="hs-num">${dd(c.platformMedianDays)}</div><div class="hs-lbl">IT Free 첫 접촉 → 계약</div></div>
+        <div class="hs"><div class="hs-num">${dd(c.prevMedianDays)}</div><div class="hs-lbl">기존 방식 (응답자 기준)</div></div>
+        <div class="hs"><div class="hs-num">${fmtPct(c.fasterRate)}</div><div class="hs-lbl">기존보다 빨랐던 계약</div></div>
+      </div>
+      <div class="page-sub" style="margin-top:6px; line-height:1.6;">같은 계약 ${c.n}건 기준 중간값이에요 (기업 ${b.compareCompany.n}건 · 프리랜서 ${b.compareFreelancer.n}건). 설문 응답 ${b.responses}건, 응답률 ${fmtPct(b.responseRate)}.</div>
+      <div class="hero-stat" style="margin-top:8px;">
+        <div class="hs"><div class="hs-num">${r.nps === null ? '-' : r.nps}</div><div class="hs-lbl">순추천지수(NPS)</div></div>
+        <div class="hs"><div class="hs-num">${r.avg === null ? '-' : r.avg}</div><div class="hs-lbl">재이용 의향 평균 (0~10)</div></div>
+      </div>
+      ${b.responses ? `<div class="page-sub" style="margin-top:6px;">이전 경로: ${Object.entries(b.channels).sort((x,y)=>y[1]-x[1]).map(([k,v])=>`${esc(chLabel[k] || k)} ${v}`).join(' · ')}</div>` : `<div class="page-sub" style="margin-top:6px;">계약이 체결되면 양쪽에 30초 설문이 표시돼요.</div>`}`;
+    })()}
+
     <div class="section-label with-ic">${I.checklist}재이용률 (전체 기간)</div>
     <div class="hero-stat">
       <div class="hs"><div class="hs-num">${fmtPct(p.reuse.companies.rate)}</div><div class="hs-lbl">기업 재계약 (${p.reuse.companies.repeat}/${p.reuse.companies.total})</div></div>
@@ -5118,6 +5176,8 @@ function copyPerfSummary(){
     `- 전환율: 지원 합격률 ${fmtPct(p.rates.applicationAccept)}, 제안 수락률 ${fmtPct(p.rates.proposalAccept)}, 매칭 후 계약 체결률 ${fmtPct(p.rates.matchToContract)}`,
     `- 소요 시간: 공고 등록→첫 지원·제안 ${dur(p.durations.jobToFirstResponse)}, 첫 접촉→계약 체결 ${dur(p.durations.contactToContract)}`,
     `- 추천 점수별 계약률: ` + p.scoreBands.map(b => `${b.key}점 ${fmtPct(b.contractRate)}(${b.n}건)`).join(', '),
+    `- 기존 방식 대비(계약 후 설문, ${p.baseline.compare.n}건): IT Free 첫 접촉→계약 ${p.baseline.compare.platformMedianDays ?? '-'}일 vs 기존 방식 ${p.baseline.compare.prevMedianDays ?? '-'}일(중간값), 기존보다 빨랐던 계약 ${fmtPct(p.baseline.compare.fasterRate)}`,
+    `- 재이용 의향: NPS ${p.baseline.reuseIntent.nps ?? '-'}, 평균 ${p.baseline.reuseIntent.avg ?? '-'}/10 (응답 ${p.baseline.reuseIntent.n}건)`,
     `- 재이용률: 기업 ${fmtPct(p.reuse.companies.rate)}(${p.reuse.companies.repeat}/${p.reuse.companies.total}), 프리랜서 ${fmtPct(p.reuse.freelancers.rate)}(${p.reuse.freelancers.repeat}/${p.reuse.freelancers.total})`,
     `- 경력 검증 프리랜서: ${p.trust.verifiedFreelancers}명 / 전체 ${p.trust.totalFreelancers}명`,
     `- 매칭 전 연락처 공유 차단: ${p.trust.maskedMessages}회`,

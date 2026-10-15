@@ -9,6 +9,7 @@ const { CATEGORIES, matchesCategory } = require('./stackCatalog');
 //  - 재이용률: 두 번 이상 계약한 기업·프리랜서 비율
 //  - 분야별 성과: 어느 기술 분야에서 계약이 나오는지(집중할 분야 찾기)
 //  - 신뢰·직접 거래 방지: 경력 검증 현황, 매칭 전 연락처 공유 시도
+//  - 기존 방식과 비교: 계약 후 설문의 '기존 방식으로 걸리던 기간'과 같은 계약의 실제 소요 기간, 재이용 의향(NPS)
 // 데이터 양이 크지 않아 DB(SQLite·PostgreSQL) 차이를 피하려고 행을 읽어 와 서버에서 계산합니다.
 
 const ROW_LIMIT = 50000;
@@ -49,7 +50,7 @@ async function computePerformance(days) {
   const since = days >= 3650 ? 0 : now - days * DAY;
   const inWin = (v) => { const t = toMs(v); return t !== null && t >= since; };
 
-  const [jobs, apps, props, projects, interviews, profiles, masked, cvPending] = await Promise.all([
+  const [jobs, apps, props, projects, interviews, profiles, masked, cvPending, surveys] = await Promise.all([
     all(`SELECT id, company_id, category, stack_json, duty, grade, status, created_at FROM jobs ORDER BY id DESC LIMIT ${ROW_LIMIT}`),
     all(`SELECT id, job_id, freelancer_id, status, created_at, match_score FROM applications ORDER BY id DESC LIMIT ${ROW_LIMIT}`),
     all(`SELECT id, company_id, freelancer_id, job_id, status, created_at, responded_at, match_score FROM proposals ORDER BY id DESC LIMIT ${ROW_LIMIT}`),
@@ -58,6 +59,7 @@ async function computePerformance(days) {
     all('SELECT user_id, stack_json, role_title, grade, verified FROM freelancer_profiles'),
     all(`SELECT conversation_id, created_at FROM messages WHERE meta_json LIKE ? ORDER BY id DESC LIMIT ${ROW_LIMIT}`, ['%contactMasked%']),
     get("SELECT COUNT(*) AS c FROM career_verifications WHERE status IN ('pending','needs_review')"),
+    all(`SELECT project_id, role, prev_channel, prev_days, reuse_intent, created_at FROM contract_surveys ORDER BY id DESC LIMIT ${ROW_LIMIT}`),
   ]);
   const jobById = new Map(jobs.map((j) => [j.id, j]));
   const profileById = new Map(profiles.map((p) => [p.user_id, p]));
@@ -189,7 +191,49 @@ async function computePerformance(days) {
     maskedConversations: new Set(maskedW.map((m) => m.conversation_id)).size,
   };
 
-  return { days, funnel, rates, durations, scoreBands, reuse, byCategory, trust };
+  // ----- 기존 방식과 비교 (계약 체결 후 설문) -----
+  // 같은 계약에서 'IT Free 첫 접촉 → 계약'에 걸린 일수와 응답자가 기존 방식으로 걸리던 일수를 나란히 놓고 비교합니다.
+  const projectById = new Map(projects.map((p) => [p.id, p]));
+  const surveysW = surveys.filter((x) => inWin(x.created_at));
+  const paired = [];
+  for (const x of surveysW) {
+    if (x.prev_days === null || x.prev_days === undefined) continue;
+    const pr = projectById.get(x.project_id);
+    if (!pr || !pr.contracted_at) continue;
+    const first = firstContactByPair.get(`${pr.company_id}:${pr.freelancer_id}`);
+    if (first === undefined) continue;
+    const platformDays = (toMs(pr.contracted_at) - first) / DAY;
+    if (!Number.isFinite(platformDays) || platformDays < 0) continue;
+    paired.push({ role: x.role, platformDays, prevDays: Number(x.prev_days) });
+  }
+  const r1 = (v) => (v === null ? null : Math.round(v * 10) / 10);
+  const compareOf = (rows) => ({
+    n: rows.length,
+    platformMedianDays: r1(median(rows.map((r) => r.platformDays))),
+    prevMedianDays: r1(median(rows.map((r) => r.prevDays))),
+    fasterRate: pct(rows.filter((r) => r.platformDays < r.prevDays).length, rows.length),
+  });
+  // 재이용 의향(0~10): 9~10 추천, 0~6 비추천 → 순추천지수(NPS) = 추천 비율 - 비추천 비율
+  const npsOf = (rows) => {
+    if (!rows.length) return { n: 0, nps: null, avg: null };
+    const promoters = rows.filter((r) => r.reuse_intent >= 9).length;
+    const detractors = rows.filter((r) => r.reuse_intent <= 6).length;
+    const avg = rows.reduce((s2, r) => s2 + Number(r.reuse_intent), 0) / rows.length;
+    return { n: rows.length, nps: Math.round(((promoters - detractors) / rows.length) * 100), avg: Math.round(avg * 10) / 10 };
+  };
+  const channels = {};
+  for (const x of surveysW) channels[x.prev_channel] = (channels[x.prev_channel] || 0) + 1;
+  const baseline = {
+    responses: surveysW.length,
+    responseRate: pct(surveysW.length, contractedW.length * 2), // 계약 1건당 기업·프리랜서 2명
+    compare: compareOf(paired),
+    compareCompany: compareOf(paired.filter((r) => r.role === 'company')),
+    compareFreelancer: compareOf(paired.filter((r) => r.role === 'freelancer')),
+    reuseIntent: npsOf(surveysW),
+    channels,
+  };
+
+  return { days, funnel, rates, durations, scoreBands, reuse, byCategory, trust, baseline };
 }
 
 module.exports = { computePerformance };

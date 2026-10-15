@@ -17,10 +17,13 @@ wrapAllRoutes(router);
 async function attachReviews(rows, userId) {
   const projectIds = rows.map((p) => p.id);
   let allReviews = [];
+  let mySurveys = [];
   if (projectIds.length) {
     const placeholders = projectIds.map(() => '?').join(',');
     allReviews = await all(`SELECT * FROM reviews WHERE project_id IN (${placeholders})`, projectIds);
+    mySurveys = await all(`SELECT project_id FROM contract_surveys WHERE user_id = ? AND project_id IN (${placeholders})`, [userId, ...projectIds]);
   }
+  const surveyed = new Set(mySurveys.map((s) => s.project_id));
   return rows.map((p) => {
     const mine = allReviews.find((r) => r.project_id === p.id && r.reviewer_id === userId);
     const received = allReviews.find((r) => r.project_id === p.id && r.reviewee_id === userId);
@@ -30,6 +33,7 @@ async function attachReviews(rows, userId) {
       contract_url: signedFileUrl(p.contract_filename),
       myReview: mine ? { rating: mine.rating } : null,
       receivedReview: received ? { rating: received.rating, comment: received.comment } : null,
+      mySurveyDone: surveyed.has(p.id),
     };
   });
 }
@@ -217,6 +221,32 @@ router.post('/:id/agree', requireAuth, async (req, res) => {
     await notify(counterpartId, '계약', '계약 동의 요청', `"${project.title}" 계약 조건에 상대방이 동의했어요. 확인해주세요.`);
   }
   res.json(await get('SELECT * FROM projects WHERE id = ?', [project.id]));
+});
+
+// 계약 체결 후 이용 경험 설문(기업·프리랜서 각 1회): 이전에 쓰던 방식과 걸리던 기간, 재이용 의향.
+// 관리자 성과 지표에서 'IT Free에서 걸린 기간'과 '기존 방식으로 걸리던 기간'을 같은 계약 기준으로 비교합니다.
+const SURVEY_CHANNELS = ['referral', 'agency', 'jobboard', 'community', 'first'];
+const SURVEY_DAYS = [2, 4, 7, 14, 30];
+router.post('/:id/survey', requireAuth, async (req, res) => {
+  const project = await loadMyProject(req, res);
+  if (!project) return;
+  if (!project.contracted_at) return res.status(400).json({ error: '계약이 체결된 뒤에 답할 수 있어요.' });
+  const b = req.body || {};
+  const channel = String(b.prevChannel || '');
+  if (!SURVEY_CHANNELS.includes(channel)) return res.status(400).json({ error: '이전에 주로 쓰던 방법을 골라주세요.' });
+  // 처음인 경우·모르는 경우는 비교 기준이 없으므로 기간을 비워 둡니다.
+  const days = channel === 'first' || b.prevDays === null || b.prevDays === '' || b.prevDays === undefined ? null : Number(b.prevDays);
+  if (days !== null && !SURVEY_DAYS.includes(days)) return res.status(400).json({ error: '걸리던 기간을 골라주세요.' });
+  const intent = Number(b.reuseIntent);
+  if (!Number.isInteger(intent) || intent < 0 || intent > 10) return res.status(400).json({ error: '다시 이용할 의향을 0~10 중에서 골라주세요.' });
+  if (await get('SELECT id FROM contract_surveys WHERE project_id = ? AND user_id = ?', [project.id, req.user.id])) {
+    return res.json({ ok: true }); // 이미 답함 (중복 클릭)
+  }
+  await run(
+    'INSERT INTO contract_surveys (project_id, user_id, role, prev_channel, prev_days, reuse_intent) VALUES (?,?,?,?,?,?)',
+    [project.id, req.user.id, req.user.role, channel, days, intent]
+  );
+  res.status(201).json({ ok: true });
 });
 
 // [2단계] 프로젝트 완료 요청 — 실제로 일한 프리랜서가 먼저 완료를 알립니다.

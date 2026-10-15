@@ -379,3 +379,16 @@ CREATE TABLE IF NOT EXISTS plan_interests (
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   UNIQUE (user_id, plan_id)
 );
+
+-- 계약 체결 후 이용 경험 설문: '기존 방식보다 나아졌는가'를 비교하기 위한 기준값(이전 경로·이전 소요 일수)과 재이용 의향
+CREATE TABLE IF NOT EXISTS contract_surveys (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  project_id   INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  role         TEXT NOT NULL,
+  prev_channel TEXT NOT NULL,          -- referral / agency / jobboard / community / first
+  prev_days    INTEGER,                -- 이전 방식으로 걸리던 일수(모르면 NULL)
+  reuse_intent INTEGER NOT NULL,       -- 다음에도 IT Free로 구할 의향 0~10
+  created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (project_id, user_id)
+);
