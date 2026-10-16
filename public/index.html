@@ -5392,6 +5392,7 @@ async function screenPlans(){
   const isCompany = state.role === 'company';
   const won = (n) => n.toLocaleString('ko-KR') + '원';
   const mine = new Set(d.myInterests || []);
+  const terms = PLAN_TERMS.filter(t => t.role === state.role);
   return `${statusbar()}
   <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('mypage')">${I.back}</div><div class="page-title" style="font-size:19.5px;">${isCompany ? '기업 구독' : '프리랜서 프리미엄'}</div></div></div>
   <div class="content">
@@ -5411,17 +5412,49 @@ async function screenPlans(){
         </div>
         <div style="margin-top:10px;"><span style="font-size:22px; font-weight:800;">${p.period} ${won(p.price)}</span>
           <span class="page-sub"> · 부가세 ${p.vatIncluded ? '포함' : '별도'} · 예정 가격</span></div>
-        <ul style="margin:10px 0 0; padding-left:18px; line-height:1.75; font-size:13.5px;">${p.features.map(f => `<li>${esc(f)}</li>`).join('')}</ul>
+        <ul style="margin:10px 0 0; padding-left:18px; line-height:1.75; font-size:13.5px;">${p.features.map(f => `<li>${esc(f)}${planTermLinks(f, terms)}</li>`).join('')}</ul>
         ${mine.has(p.id)
           ? `<button class="btn btn-outline" style="margin-top:12px;" onclick="togglePlanInterest('${p.id}', false)">사전 신청 취소</button>`
           : `<button class="btn btn-primary" style="margin-top:12px;" onclick="togglePlanInterest('${p.id}', true)">사전 신청 · 출시 알림 받기</button>`}
       </div>`).join('')}
+    ${terms.length ? `<div class="section-label" style="margin-top:18px;">용어 설명</div>
+    <div class="card" style="padding:4px 14px;">${terms.map((t, i) => `
+      <details id="plan-term-${t.key}" style="padding:10px 0; ${i ? 'border-top:1px solid var(--line);' : ''}">
+        <summary style="cursor:pointer; font-weight:700; font-size:14px;">${esc(t.title)}</summary>
+        <div class="page-sub" style="margin-top:6px; line-height:1.7;">${esc(t.body)}</div>
+      </details>`).join('')}</div>` : ''}
     <div class="page-sub" style="margin-top:14px; line-height:1.65;">
       · 정식 출시 전이라 <b>지금은 결제되지 않아요.</b> 사전 신청하면 출시될 때 가장 먼저 알려드려요.<br>
       · 가격과 구성은 출시 때 바뀔 수 있어요.<br>
       · 친구 초대로 적립한 1개월 이용권으로 출시 후 ${isCompany ? '스타터를' : '프리미엄을'} 1개월씩 무료로 쓸 수 있어요. <a style="text-decoration:underline; cursor:pointer;" onclick="go('invite')">친구 초대</a>
     </div>
   </div>`;
+}
+// 요금제 구성에 나오는 용어 설명. match가 구성 문구에 들어 있으면 그 줄 옆에 '설명' 링크를 붙입니다.
+const PLAN_TERMS = [
+  { key: 'premium', role: 'company', match: '프리미엄 등록', short: '프리미엄 등록', title: '프리미엄 등록',
+    body: '공고를 14일 동안 추천 목록 상단에 고정하고 "급구" 배지를 붙여요. 기술이 맞는 프리랜서에게 먼저 보여서 지원을 더 빨리 받을 수 있어요.' },
+  { key: 'proposal', role: 'company', match: '제안권', short: '제안권', title: '성과형 제안권',
+    body: '인재 검색에서 원하는 프리랜서에게 먼저 프로젝트를 제안할 때 쓰는 이용권이에요. 제안을 보낼 때가 아니라 프리랜서가 제안을 수락했을 때만 1회 차감돼요. 거절되거나 답이 없으면 차감되지 않아요.' },
+  { key: 'ai-report', role: 'company', match: 'AI 매칭 리포트', short: 'AI 리포트', title: 'AI 매칭 리포트',
+    body: '공고 하나에 대해 AI가 추천 상위 후보를 비교·분석한 보고서예요. 후보마다 맞는 점과 부족한 점, 그 기술을 가진 인재가 얼마나 있는지, 조건을 어떻게 바꾸면 후보가 늘어나는지 정리해 드려요. 내부 보고 자료로 그대로 쓸 수 있어요.' },
+  { key: 'hire-stats', role: 'company', match: '채용 통계 리포트', short: '설명', title: '채용 통계 리포트',
+    body: '공고별로 지원·제안·인터뷰·계약이 몇 건인지, 공고를 올리고 계약까지 며칠 걸렸는지 한눈에 보여줘요.' },
+  { key: 'highlight', role: 'freelancer', match: '지원서 강조', short: '설명', title: '지원서 강조 표시',
+    body: '기업이 보는 지원자 목록에서 내 지원서가 위쪽에 강조 표시돼요.' },
+  { key: 'competitiveness', role: 'freelancer', match: '프로필 경쟁력 리포트', short: '설명', title: '프로필 경쟁력 리포트',
+    body: '내 기술을 찾는 공고가 얼마나 있는지, 내 추천 점수가 어느 정도인지 분석하고 어떤 기술·자격을 보완하면 추천이 늘어나는지 알려줘요.' },
+];
+// 한 줄에 용어가 하나면 '설명', 여러 개면 용어 이름으로 링크를 붙입니다.
+function planTermLinks(feature, terms){
+  const hits = terms.filter(t => feature.includes(t.match));
+  return hits.map(t => ` <a class="plan-term-link" style="font-size:12px; color:var(--amber-deep); text-decoration:underline; cursor:pointer; white-space:nowrap;" onclick="openPlanTerm('${t.key}')">${hits.length > 1 ? esc(t.short) : '설명'}</a>`).join('');
+}
+function openPlanTerm(key){
+  const el = document.getElementById('plan-term-' + key);
+  if(!el) return;
+  el.open = true;
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 async function togglePlanInterest(planId, on){
   try{
