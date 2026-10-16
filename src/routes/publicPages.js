@@ -184,7 +184,19 @@ router.get('/jobs/:id', async (req, res, next) => {
     ['기간', j.period], ['단가', j.rate], ['근무 형태', j.work_type], ['근무지', j.location],
     ['마감', j.deadline ? `${j.deadline} (${dDayLabel(j.deadline)})` : '상시 채용'],
   ].filter(([, v]) => v && String(v).trim());
-  const applyUrl = `/?go=jobDetail&p=${j.id}&utm_source=jobpage&utm_medium=organic&utm_campaign=job_${j.id}`;
+  // 커뮤니티 등에 공유된 공고 링크(/jobs/12?utm_source=okky)로 들어오면 그 채널을 가입 경로로 이어서 넘깁니다.
+  // 채널 표시가 없으면(검색으로 들어온 경우 등) '공개 공고 페이지'로 기록합니다.
+  const tag = (v) => String(v || '').trim().toLowerCase().replace(/[^a-z0-9_.-]/g, '').slice(0, 40);
+  const src = tag(req.query.utm_source);
+  const track = new URLSearchParams({
+    go: 'jobDetail', p: String(j.id),
+    utm_source: src || 'jobpage',
+    utm_medium: src ? (tag(req.query.utm_medium) || 'social') : 'organic',
+    utm_campaign: tag(req.query.utm_campaign) || `job_${j.id}`,
+  });
+  const ref = String(req.query.ref || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12);
+  if (ref) track.set('ref', ref);
+  const applyUrl = `/?${track.toString()}`;
   const summary = [stack.slice(0, 5).join(', '), j.duty, j.grade, j.location, j.period].filter((v) => v && v !== '협의').join(' · ');
   const description = `${org} · ${summary || 'IT 프로젝트'} — IT Free에서 내 기술스택과 몇 % 맞는지 확인하고 바로 지원하세요.`.slice(0, 200);
 
