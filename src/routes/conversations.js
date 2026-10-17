@@ -9,6 +9,22 @@ const { maskContacts, isPairConnected } = require('../contactGuard');
 const router = express.Router();
 wrapAllRoutes(router);
 
+// 메시지 수정은 보낸 뒤 24시간 안에만 할 수 있습니다(지난 대화 기록이 바뀌어 분쟁이 생기지 않도록).
+const EDIT_WINDOW_MS = 24 * 60 * 60 * 1000;
+const toMs = (v) => {
+  if (!v) return null;
+  if (v instanceof Date) return v.getTime();
+  const t = Date.parse(String(v).includes('T') ? v : String(v).replace(' ', 'T') + 'Z');
+  return Number.isNaN(t) ? null : t;
+};
+const nowStr = () => new Date().toISOString().slice(0, 19).replace('T', ' ');
+// 화면에 내보낼 메시지: 삭제된 메시지는 내용 없이 '삭제됨'만 표시합니다.
+const publicMessage = (m) => (m && m.deleted_at ? { ...m, body: '', meta_json: null, deleted: true } : m);
+async function listMessages(convId) {
+  const msgs = await all('SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at ASC, id ASC', [convId]);
+  return msgs.map(publicMessage);
+}
+
 router.get('/', requireAuth, async (req, res) => {
   const col = req.user.role === 'freelancer' ? 'freelancer_id' : 'company_id';
   const convs = await all(`SELECT * FROM conversations WHERE ${col} = ? ORDER BY created_at DESC, id DESC`, [req.user.id]);
@@ -52,7 +68,7 @@ router.get('/', requireAuth, async (req, res) => {
       ...c,
       name: nameById[counterpartId] || (req.user.role === 'freelancer' ? '기업' : '프리랜서'),
       jobTitle: c.job_id ? (jobTitleById[c.job_id] || null) : null,
-      lastMessage: last,
+      lastMessage: publicMessage(last),
       unread,
     };
   });
@@ -102,7 +118,7 @@ router.get('/:id/messages', requireAuth, async (req, res) => {
   if (!conv || (conv.company_id !== req.user.id && conv.freelancer_id !== req.user.id)) {
     return res.status(404).json({ error: '대화를 찾을 수 없습니다.' });
   }
-  const msgs = await all('SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at ASC, id ASC', [req.params.id]);
+  const msgs = await listMessages(req.params.id);
 
   // 대화방을 열었으니 '여기까지 읽음'으로 표시합니다 → 안 읽은 개수가 실제로 줄어듭니다.
   const lastId = msgs.length ? msgs[msgs.length - 1].id : 0;
@@ -153,7 +169,7 @@ router.post('/:id/interview', requireAuth, async (req, res) => {
   if (!conv) return res.status(404).json({ error: '대화를 찾을 수 없습니다.' });
   const result = await saveInterview(conv, req.user.id, req.body || {});
   if (result.error) return res.status(400).json({ error: result.error });
-  const msgs = await all('SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at ASC, id ASC', [conv.id]);
+  const msgs = await listMessages(conv.id);
   res.json({ interview: result.interview, unchanged: !!result.unchanged, messages: msgs });
 });
 
@@ -162,7 +178,7 @@ router.delete('/:id/interview', requireAuth, async (req, res) => {
   if (!conv) return res.status(404).json({ error: '대화를 찾을 수 없습니다.' });
   const result = await cancelInterview(conv, req.user.id);
   if (result.error) return res.status(400).json({ error: result.error });
-  const msgs = await all('SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at ASC, id ASC', [conv.id]);
+  const msgs = await listMessages(conv.id);
   res.json({ interview: result.interview, messages: msgs });
 });
 
@@ -219,57 +235,85 @@ router.post('/:id/messages', requireAuth, async (req, res) => {
     link: `chatRoom:${conv.id}`,
   });
 
-  const msgs = await all('SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at ASC, id ASC', [conv.id]);
+  const msgs = await listMessages(conv.id);
   res.status(201).json({ messages: msgs, masked: !!masked });
 });
 
-// 메시지 취소 — 본인이 보낸 메시지는 시간 제한 없이 언제든 삭제할 수 있습니다.
-router.delete('/:id/messages/:messageId', requireAuth, async (req, res) => {
-  const conv = await get('SELECT * FROM conversations WHERE id = ?', [req.params.id]);
-  if (!conv || (conv.company_id !== req.user.id && conv.freelancer_id !== req.user.id)) {
-    return res.status(404).json({ error: '대화를 찾을 수 없습니다.' });
-  }
-
-  const msgId = Number(req.params.messageId);
-  if (!Number.isInteger(msgId)) return res.status(400).json({ error: '올바르지 않은 메시지 ID입니다.' });
-
-  const msg = await get('SELECT * FROM messages WHERE id = ? AND conversation_id = ?', [msgId, conv.id]);
-  if (!msg) return res.status(404).json({ error: '메시지를 찾을 수 없습니다.' });
-  if (msg.sender_id !== req.user.id) {
-    return res.status(403).json({ error: '본인이 보낸 메시지만 취소할 수 있어요.' });
-  }
-  // 인터뷰 일정 카드는 기록으로 남깁니다(일정은 '인터뷰 취소'로 취소).
-  if (msg.kind && msg.kind !== 'text') {
-    return res.status(400).json({ error: '인터뷰 일정 기록은 지울 수 없어요. 일정을 취소하려면 인터뷰 취소를 눌러주세요.' });
-  }
-
-  await run('DELETE FROM messages WHERE id = ?', [msgId]);
-
-  // 상대에게 이 메시지로 보낸 알림이 아직 안 읽힌 상태라면, 최신 메시지 내용으로 되돌립니다.
-  const counterpartId = req.user.id === conv.company_id ? conv.freelancer_id : conv.company_id;
-  const senderRow = req.user.id === conv.company_id
-    ? await get('SELECT name FROM companies WHERE user_id = ?', [req.user.id])
-    : await get('SELECT name FROM freelancer_profiles WHERE user_id = ?', [req.user.id]);
+// 상대에게 아직 안 읽힌 '새 메시지' 알림을 내가 보낸 최신 메시지 내용으로 맞춥니다(수정·삭제 후).
+async function refreshUnreadNotification(conv, userId) {
+  const counterpartId = userId === conv.company_id ? conv.freelancer_id : conv.company_id;
+  const senderRow = userId === conv.company_id
+    ? await get('SELECT name FROM companies WHERE user_id = ?', [userId])
+    : await get('SELECT name FROM freelancer_profiles WHERE user_id = ?', [userId]);
   const senderName = senderRow ? senderRow.name : '상대방';
   const notif = await get(
     "SELECT id FROM notifications WHERE user_id = ? AND tag = '메시지' AND is_read = 0 AND title = ? ORDER BY id DESC LIMIT 1",
     [counterpartId, `${senderName}님의 새 메시지`]
   );
-  if (notif) {
-    const latestMine = await get(
-      "SELECT body FROM messages WHERE conversation_id = ? AND sender_id = ? AND kind = 'text' ORDER BY id DESC LIMIT 1",
-      [conv.id, req.user.id]
-    );
-    if (latestMine) {
-      await run('UPDATE notifications SET body = ? WHERE id = ?', [latestMine.body.slice(0, 40), notif.id]);
-    } else {
-      // 내가 보낸 메시지가 하나도 안 남았으면 알림 자체를 없앱니다.
-      await run('DELETE FROM notifications WHERE id = ?', [notif.id]);
-    }
-  }
+  if (!notif) return;
+  const latestMine = await get(
+    "SELECT body FROM messages WHERE conversation_id = ? AND sender_id = ? AND kind = 'text' AND deleted_at IS NULL ORDER BY id DESC LIMIT 1",
+    [conv.id, userId]
+  );
+  if (latestMine) await run('UPDATE notifications SET body = ? WHERE id = ?', [latestMine.body.slice(0, 40), notif.id]);
+  else await run('DELETE FROM notifications WHERE id = ?', [notif.id]); // 내가 보낸 메시지가 하나도 안 남았으면 알림도 없앱니다.
+}
 
-  const msgs = await all('SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at ASC, id ASC', [conv.id]);
-  res.json({ messages: msgs });
+// 내가 보낸 일반 메시지만 수정·삭제할 수 있습니다(인터뷰 일정 카드는 기록으로 남김).
+async function myTextMessage(req, res, conv) {
+  const msgId = Number(req.params.messageId);
+  if (!Number.isInteger(msgId)) { res.status(400).json({ error: '올바르지 않은 메시지 ID입니다.' }); return null; }
+  const msg = await get('SELECT * FROM messages WHERE id = ? AND conversation_id = ?', [msgId, conv.id]);
+  if (!msg || msg.deleted_at) { res.status(404).json({ error: '메시지를 찾을 수 없어요.' }); return null; }
+  if (msg.sender_id !== req.user.id) { res.status(403).json({ error: '본인이 보낸 메시지만 수정·삭제할 수 있어요.' }); return null; }
+  if (msg.kind && msg.kind !== 'text') {
+    res.status(400).json({ error: '인터뷰 일정 기록은 수정·삭제할 수 없어요. 일정은 인터뷰 변경·취소를 이용해주세요.' });
+    return null;
+  }
+  return msg;
+}
+
+// 메시지 수정 — 보낸 뒤 24시간 안에만. 매칭 전이면 연락처를 다시 가립니다.
+router.put('/:id/messages/:messageId', requireAuth, async (req, res) => {
+  const conv = await myConversation(req);
+  if (!conv) return res.status(404).json({ error: '대화를 찾을 수 없습니다.' });
+  const msg = await myTextMessage(req, res, conv);
+  if (!msg) return;
+  const { body } = req.body || {};
+  if (!body || typeof body !== 'string' || !body.trim()) return res.status(400).json({ error: '메시지 내용을 입력해주세요.' });
+  if (body.trim().length > 2000) return res.status(400).json({ error: '메시지가 너무 길어요 (2000자 이내).' });
+  const sentAt = toMs(msg.created_at);
+  if (sentAt !== null && Date.now() - sentAt > EDIT_WINDOW_MS) {
+    return res.status(400).json({ error: '보낸 지 24시간이 지난 메시지는 수정할 수 없어요. 삭제는 할 수 있어요.' });
+  }
+  let text = body.trim();
+  let masked = null;
+  if (!(await isPairConnected(conv.company_id, conv.freelancer_id))) {
+    const m = maskContacts(text);
+    if (m.masked) { text = m.text; masked = m.types; }
+  }
+  // 예전에 가려진 기록(직접 거래 방지 지표)은 그대로 두고, 이번 수정에서 가린 항목을 더합니다.
+  let meta = {};
+  try { meta = msg.meta_json ? JSON.parse(msg.meta_json) : {}; } catch (e) { meta = {}; }
+  if (masked) meta.contactMasked = [...new Set([...(meta.contactMasked || []), ...masked])];
+  if (text !== msg.body) {
+    await run('UPDATE messages SET body = ?, meta_json = ?, edited_at = ? WHERE id = ?',
+      [text, Object.keys(meta).length ? JSON.stringify(meta) : null, nowStr(), msg.id]);
+    await refreshUnreadNotification(conv, req.user.id);
+  }
+  res.json({ messages: await listMessages(conv.id), masked: !!masked });
+});
+
+// 메시지 삭제 — 본인이 보낸 메시지는 시간 제한 없이 삭제할 수 있습니다.
+// 대화 흐름이 끊기지 않도록 자리는 남기고 '삭제된 메시지'로 표시하며, 내용은 지웁니다.
+router.delete('/:id/messages/:messageId', requireAuth, async (req, res) => {
+  const conv = await myConversation(req);
+  if (!conv) return res.status(404).json({ error: '대화를 찾을 수 없습니다.' });
+  const msg = await myTextMessage(req, res, conv);
+  if (!msg) return;
+  await run("UPDATE messages SET body = '', deleted_at = ? WHERE id = ?", [nowStr(), msg.id]);
+  await refreshUnreadNotification(conv, req.user.id);
+  res.json({ messages: await listMessages(conv.id) });
 });
 
 module.exports = router;

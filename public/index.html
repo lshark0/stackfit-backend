@@ -245,6 +245,13 @@
   .bubble-line.them{justify-content:flex-start; align-self:flex-start;}
   .bubble-cancel{background:none; border:none; padding:4px; cursor:pointer; color:var(--slate-light); opacity:.55; flex:0 0 auto; line-height:0; -webkit-tap-highlight-color:transparent;}
   .bubble-cancel:active{opacity:1; color:var(--danger);}
+  .bubble-more{background:none; border:none; padding:2px 4px; cursor:pointer; color:var(--slate-light); font-size:18px; line-height:1; letter-spacing:1px; flex:0 0 auto; -webkit-tap-highlight-color:transparent;}
+  .bubble-more:active{color:var(--ink);}
+  .bubble.deleted{background:transparent !important; color:var(--slate) !important; border:1px dashed var(--line); font-style:italic; white-space:nowrap; max-width:none;}
+  .bubble.editing{outline:2px solid var(--amber); outline-offset:2px;}
+  .chat-edit-bar{display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 16px; background:var(--amber-soft); color:var(--ink); font-size:12.5px; font-weight:700;}
+  .chat-edit-bar svg{width:14px; height:14px; vertical-align:-2px;}
+  .chat-edit-bar button{background:none; border:none; font-weight:800; color:var(--ink); text-decoration:underline; cursor:pointer;}
   /* 켜기/끄기 토글 스위치 */
   .switch{position:relative; display:inline-block; width:44px; height:25px; flex:0 0 auto;}
   .switch input{opacity:0; width:0; height:0;}
@@ -2033,27 +2040,95 @@ function parseServerTime(s){
   const d = new Date(String(s).includes('T') ? s : String(s).replace(' ', 'T') + 'Z');
   return isNaN(d.getTime()) ? null : d;
 }
+// 내 메시지 수정은 보낸 뒤 24시간 안에만 가능합니다(서버와 같은 기준).
+const MSG_EDIT_WINDOW_MS = 24 * 60 * 60 * 1000;
+let chatMessagesCache = [];
+let chatEditId = null; // 수정 중인 메시지 id
 function chatBubblesHtml(messages){
+  chatMessagesCache = messages;
   return messages.map(m=>{
     const t = parseServerTime(m.created_at);
     const mine = m.sender_id === state.userId;
     if(m.kind === 'interview') return interviewCardHtml(m, mine, t);
+    const time = t ? t.toLocaleString('ko-KR',{hour:'numeric',minute:'2-digit'}) : '';
+    if(m.deleted) return `
+      <div class="bubble-line ${mine?'me':'them'}">
+        <div class="bubble ${mine?'me':'them'} deleted">삭제된 메시지예요<div class="bubble-time">${time}</div></div>
+      </div>`;
     return `
       <div class="bubble-line ${mine?'me':'them'}">
-        ${mine?`<button class="bubble-cancel" onclick="cancelMessage(${m.id})" title="메시지 취소">${I.xCircle}</button>`:''}
-        <div class="bubble ${mine?'me':'them'}">${esc(m.body)}<div class="bubble-time">${t? t.toLocaleString('ko-KR',{hour:'numeric',minute:'2-digit'}) : ''}</div></div>
+        ${mine?`<button class="bubble-more" onclick="openMessageMenu(${m.id})" title="수정·삭제" aria-label="메시지 수정·삭제">⋯</button>`:''}
+        <div class="bubble ${mine?'me':'them'}${chatEditId===m.id?' editing':''}">${esc(m.body)}<div class="bubble-time">${time}${m.edited_at?' · 수정됨':''}</div></div>
       </div>`;
   }).join('') || `<div class="empty"><div class="ic">${I.chat}</div><div class="tt">첫 메시지를 보내보세요</div></div>`;
 }
-async function cancelMessage(msgId){
+function refreshChatBubbles(messages){
+  const wrap = document.querySelector('#chatScroll .bubble-wrap');
+  if(wrap) wrap.innerHTML = chatBubblesHtml(messages);
+  else go('chatRoom', state.param);
+}
+// 내 메시지의 ⋯ 버튼 → 수정 / 삭제 선택
+function openMessageMenu(msgId){
+  const m = chatMessagesCache.find(x => x.id === msgId);
+  if(!m) return;
+  const t = parseServerTime(m.created_at);
+  const canEdit = !t || (Date.now() - t.getTime() <= MSG_EDIT_WINDOW_MS);
+  document.getElementById('confirmMsg').innerHTML = `
+    <div style="font-weight:800; margin-bottom:10px;">내 메시지</div>
+    <div class="page-sub" style="margin-bottom:14px; max-height:80px; overflow:hidden; text-align:left;">${esc(m.body.slice(0,120))}</div>
+    <div style="display:flex; flex-direction:column; gap:8px;">
+      ${canEdit ? `<button class="btn btn-outline" onclick="closeConfirm(); startEditMessage(${m.id})">수정</button>` : `<div class="page-sub">보낸 지 24시간이 지나 수정할 수 없어요.</div>`}
+      <button class="btn btn-outline" style="color:var(--danger); border-color:#F3D6D2;" onclick="closeConfirm(); deleteMessage(${m.id})">삭제</button>
+    </div>`;
+  document.getElementById('confirmOkBtn').style.display = 'none';
+  document.getElementById('confirmOverlay').classList.add('open');
+}
+function startEditMessage(msgId){
+  const m = chatMessagesCache.find(x => x.id === msgId);
+  const input = document.getElementById('chatInputEl');
+  if(!m || !input) return;
+  chatEditId = msgId;
+  input.value = m.body;
+  const bar = document.getElementById('chatEditBar');
+  if(bar) bar.style.display = 'flex';
+  const send = document.getElementById('chatSendBtn');
+  if(send) send.innerHTML = '<span style="font-size:19px; font-weight:800; color:#fff; line-height:1;">✓</span>';
+  refreshChatBubbles(chatMessagesCache);
+  input.focus();
+}
+function cancelEditMessage(){
+  chatEditId = null;
+  const input = document.getElementById('chatInputEl');
+  if(input) input.value = '';
+  const bar = document.getElementById('chatEditBar');
+  if(bar) bar.style.display = 'none';
+  const send = document.getElementById('chatSendBtn');
+  if(send) send.innerHTML = I.send;
+  refreshChatBubbles(chatMessagesCache);
+}
+async function submitEditMessage(convId){
+  const input = document.getElementById('chatInputEl');
+  const text = (input?.value || '').trim();
+  if(!text){ toast('메시지 내용을 입력해주세요'); return; }
+  const msgId = chatEditId;
+  input.disabled = true;
+  try{
+    const data = await apiFetch(`/conversations/${convId}/messages/${msgId}`, {method:'PUT', body:{body:text}});
+    if(data.masked) toast('매칭 전이라 연락처는 가려서 수정했어요'); else toast('메시지를 수정했어요');
+    chatEditId = null;
+    cancelEditMessage();
+    refreshChatBubbles(data.messages);
+  }catch(e){ toast(e.message); }
+  finally{ input.disabled = false; }
+}
+function deleteMessage(msgId){
   const convId = state.param;
-  showConfirm('이 메시지를 취소할까요?', async () => {
+  showConfirm('이 메시지를 삭제할까요?\n상대방 화면에도 \'삭제된 메시지\'로 표시돼요.', async () => {
     try{
       const data = await apiFetch(`/conversations/${convId}/messages/${msgId}`, {method:'DELETE'});
-      toast('메시지를 취소했어요');
-      const wrap = document.querySelector('#chatScroll .bubble-wrap');
-      if(wrap) wrap.innerHTML = chatBubblesHtml(data.messages);
-      else go('chatRoom', convId);
+      if(chatEditId === msgId) cancelEditMessage();
+      toast('메시지를 삭제했어요');
+      refreshChatBubbles(data.messages);
     }catch(e){ toast(e.message); }
   });
 }
@@ -2269,6 +2344,7 @@ function cancelInterviewConfirm(convId){
 }
 
 async function sendMessage(convId){
+  if(chatEditId){ submitEditMessage(convId); return; }
   const input = document.getElementById('chatInputEl');
   if(!input) return;
   const text = input.value.trim();
@@ -2290,7 +2366,10 @@ async function sendMessage(convId){
   catch(e){ toast(e.message); }
   finally{ input.disabled=false; input.focus(); }
 }
-function chatKeydown(ev, convId){ if(ev.key==='Enter'){ ev.preventDefault(); sendMessage(convId); } }
+function chatKeydown(ev, convId){
+  if(ev.key==='Enter'){ ev.preventDefault(); sendMessage(convId); }
+  else if(ev.key==='Escape' && chatEditId){ ev.preventDefault(); cancelEditMessage(); }
+}
 
 async function decideApplicant(jobId, applicationId, status){
   try{
@@ -4286,13 +4365,14 @@ async function screenChatList(){
       <div class="chat-row ${c.unread?'is-unread':''}" onclick="go('chatRoom', ${c.id})">
         ${autoAvatar(c.name)}
         <div class="chat-body"><div class="chat-name">${esc(c.name)}${c.jobTitle?` <span style="font-family:var(--mono); font-weight:400; font-size:11px; color:var(--slate);">· ${esc(c.jobTitle)}</span>`:''}<span class="chat-time">${c.lastMessage? (parseServerTime(c.lastMessage.created_at)||new Date()).toLocaleString('ko-KR',{hour:'numeric',minute:'2-digit'}) : ''}</span></div>
-        <div class="chat-preview">${c.lastMessage? esc(c.lastMessage.body) : '대화를 시작해보세요'}</div></div>
+        <div class="chat-preview">${c.lastMessage? (c.lastMessage.deleted ? '삭제된 메시지예요' : esc(c.lastMessage.body)) : '대화를 시작해보세요'}</div></div>
         ${c.unread? `<div class="unread">${c.unread}</div>`:''}
       </div>`).join('') || emptyArt(ART.noChat, '아직 채팅이 없어요', '공고나 인재 상세에서 대화를 시작할 수 있어요.')}
   </div>${tabbar('chatList', totalUnread)}`;
 }
 
 async function screenChatRoom(){
+  chatEditId = null;
   const data = await apiFetch('/conversations/' + state.param + '/messages');
   chatRoomInfo = { convId: state.param, counterpartName: data.counterpartName || '', jobTitle: data.jobTitle || '' };
   return `${statusbar()}
@@ -4303,9 +4383,10 @@ async function screenChatRoom(){
     ${data.connected ? '' : `<div class="chat-guard">${I.verified}<div><b>매칭 전에는 연락처가 가려져요.</b> 전화번호·이메일·메신저 ID는 제안 수락이나 합격 후에 공개돼요. IT Free 안에서 계약하면 계약서·진행 단계·상호 평가가 기록으로 남아요.</div></div>`}
     <div class="bubble-wrap">${chatBubblesHtml(data.messages)}</div>
   </div>
+  <div class="chat-edit-bar" id="chatEditBar" style="display:none;"><span>${I.edit || '✎'} 메시지 수정 중</span><button onclick="cancelEditMessage()">취소</button></div>
   <div class="chat-input-bar">
     <input id="chatInputEl" class="chat-input" placeholder="메시지를 입력하세요" onkeydown="chatKeydown(event, ${state.param})">
-    <button class="send-btn" onclick="sendMessage(${state.param})">${I.send}</button>
+    <button class="send-btn" id="chatSendBtn" onclick="sendMessage(${state.param})">${I.send}</button>
   </div>`;
 }
 

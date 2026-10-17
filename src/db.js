@@ -101,6 +101,9 @@ if (USE_POSTGRES) {
     await ensureColumnPg('freelancer_profiles', 'job_alerts', 'INTEGER NOT NULL DEFAULT 1');
     // 관리자 공고 대리 등록: 등록한 관리자, 대신 만든 기업 계정의 '계정 연결 전' 상태
     await ensureColumnPg('jobs', 'proxy_by', 'INTEGER');
+    // 채팅 메시지 수정·삭제 시각(삭제된 메시지는 내용을 지우고 자리만 남김)
+    await ensureColumnPg('messages', 'edited_at', 'TEXT');
+    await ensureColumnPg('messages', 'deleted_at', 'TEXT');
     await ensureColumnPg('users', 'claim_pending', 'INTEGER NOT NULL DEFAULT 0');
     await ensureColumnPg('users', 'claim_nonce', 'TEXT');
     await ensureColumnPg('users', 'proxy_created_by', 'INTEGER');
@@ -223,6 +226,8 @@ if (USE_POSTGRES) {
     addCol('career_verification_files', 'doc_kind', "TEXT NOT NULL DEFAULT ''");
     addCol('freelancer_profiles', 'job_alerts', 'INTEGER NOT NULL DEFAULT 1');
     addCol('jobs', 'proxy_by', 'INTEGER');
+    addCol('messages', 'edited_at', 'TEXT');
+    addCol('messages', 'deleted_at', 'TEXT');
     addCol('users', 'claim_pending', 'INTEGER NOT NULL DEFAULT 0');
     addCol('users', 'claim_nonce', 'TEXT');
     addCol('users', 'proxy_created_by', 'INTEGER');
