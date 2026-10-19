@@ -5720,6 +5720,15 @@ async function screenPlans(){
         ? '공고 등록·인재 검색·추천 %는 지금처럼 <b>무료</b>예요. 구독하면 프리미엄 등록·제안권·인재풀 분석 리포트를 매달 묶음으로 더 싸게 쓸 수 있어요. 채용·계약이 성사돼도 <b>수수료는 받지 않아요.</b>'
         : '지원·제안 받기·채팅·계약 관리 같은 기본 기능은 계속 <b>무료</b>예요. 프리미엄은 더 많은 기업에게 먼저 보이도록 도와줘요.'}</div>
     </div>
+    ${isCompany ? `<div class="card" style="margin-top:12px;">
+      <div class="card-title" style="font-size:15px;">어떤 요금제가 맞을까요?</div>
+      <div style="margin-top:8px; font-size:13.5px; line-height:1.8;">
+        <div>· 한 달에 공고 <b>1~2건</b>, 제안 10회 이내 → <b>스타터</b></div>
+        <div>· 한 달에 공고 <b>3~10건</b>, 여러 직무 동시 모집 → <b>프로</b></div>
+        <div>· 공고 <b>10건 이상</b>, 상시 채용·회사 홍보까지 → <b>비즈니스</b></div>
+      </div>
+      <div class="page-sub" style="margin-top:6px;">구독하지 않아도 공고 등록·인재 검색·추천 %는 무료예요.</div>
+    </div>` : ''}
     ${d.plans.map(p => `
       <div class="card" style="margin-top:12px; ${p.recommended ? 'border:1.5px solid var(--amber, #F5A623);' : ''}">
         <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
@@ -5730,6 +5739,7 @@ async function screenPlans(){
         <div style="margin-top:10px;"><span style="font-size:22px; font-weight:800;">${p.period} ${won(p.price)}</span>
           <span class="page-sub"> · 부가세 ${p.vatIncluded ? '포함' : '별도'} · 예정 가격</span></div>
         <ul style="margin:10px 0 0; padding-left:18px; line-height:1.75; font-size:13.5px;">${p.features.map(f => `<li>${esc(f)}${planTermLinks(f, terms)}</li>`).join('')}</ul>
+        ${planExampleHtml(p)}
         ${mine.has(p.id)
           ? `<button class="btn btn-outline" style="margin-top:12px;" onclick="togglePlanInterest('${p.id}', false)">사전 신청 취소</button>`
           : `<button class="btn btn-primary" style="margin-top:12px;" onclick="togglePlanInterest('${p.id}', true)">사전 신청 · 출시 알림 받기</button>`}
@@ -5746,6 +5756,17 @@ async function screenPlans(){
       · IT Free는 구인·구직 정보를 제공하는 서비스예요. 채용·계약이 성사돼도 <b>수수료를 받지 않아요.</b><br>
       · 친구 초대로 적립한 1개월 이용권으로 출시 후 ${isCompany ? '스타터를' : '프리미엄을'} 1개월씩 무료로 쓸 수 있어요. <a style="text-decoration:underline; cursor:pointer;" onclick="go('invite')">친구 초대</a>
     </div>
+  </div>`;
+}
+// 요금제 카드 안 '이렇게 쓰면 좋아요' 예시: 어떤 상황에서 구성품을 어떻게 쓰는지 숫자로 보여줍니다.
+function planExampleHtml(p){
+  const ex = p.example;
+  if(!ex) return '';
+  return `<div style="margin-top:12px; padding:12px; border-radius:12px; background:var(--paper);">
+    <div style="font-size:12px; font-weight:700; color:var(--amber-deep); letter-spacing:.02em;">이렇게 쓰면 좋아요</div>
+    <div style="margin-top:4px; font-weight:700; font-size:13.5px;">${esc(ex.who)}</div>
+    <ol style="margin:8px 0 0; padding-left:18px; font-size:13px; line-height:1.7;">${ex.steps.map(t => `<li>${esc(t)}</li>`).join('')}</ol>
+    ${ex.point ? `<div style="margin-top:8px; font-size:13px; line-height:1.6;"><b>${esc(ex.point)}</b></div>` : ''}
   </div>`;
 }
 // 요금제 구성에 나오는 용어 설명. match가 구성 문구에 들어 있으면 그 줄 옆에 '설명' 링크를 붙입니다.
