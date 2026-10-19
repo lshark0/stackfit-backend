@@ -6,6 +6,7 @@ const { initDb, get, USE_POSTGRES } = require('./src/db');
 const { checkDeadlineAlerts, closeExpiredJobs } = require('./src/deadlineAlerts');
 const { sendInterviewReminders } = require('./src/interviews');
 const { resumePendingReviews } = require('./src/careerReview');
+const { seedNotices } = require('./src/seedNotices');
 
 const authRoutes = require('./src/routes/auth');
 const profileRoutes = require('./src/routes/profile');
@@ -322,6 +323,7 @@ const PORT = process.env.PORT || 4000;
 
 async function main() {
   await initDb(); // 스키마 준비 + (필요 시) 데모 데이터 시드까지 끝난 뒤에 요청을 받기 시작
+  await seedNotices(); // 운영 공지사항을 한 번만 등록 (이미 등록했으면 건너뜀)
   await initPush(); // 푸시 인증키 준비 (실패해도 서버는 정상 동작)
   await resetMfaFromEnv(securityLog.logEvent); // 비상시 관리자 2단계 인증 초기화 (MFA_RESET_EMAILS)
   await dedupeAllPortfolios(); // 예전에 AI 자동 채우기로 중복 등록된 수행 프로젝트를 한 번 정리
