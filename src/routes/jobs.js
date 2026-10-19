@@ -323,7 +323,7 @@ async function bizVerified(companyId) {
 
 router.post('/', requireAuth, requireRole('company'), async (req, res) => {
   if (!(await bizVerified(req.user.id))) {
-    return res.status(400).json({ error: '공고를 등록하려면 먼저 사업자등록 확인을 해주세요.', code: 'BIZ_REQUIRED' });
+    return res.status(400).json({ error: '공고를 등록하려면 먼저 사업자등록 확인을 해주세요. (마이페이지 > 사업자등록 확인)', code: 'BIZ_REQUIRED' });
   }
   const job = await createJob(req.user.id, req.body);
   if (!job) return res.status(400).json({ error: '공고 제목은 필수입니다.' });
@@ -388,7 +388,7 @@ router.post('/:id/duplicate', requireAuth, requireRole('company'), async (req, r
   const job = await get('SELECT * FROM jobs WHERE id = ? AND company_id = ?', [jobId, req.user.id]);
   if (!job) return res.status(404).json({ error: '공고를 찾을 수 없거나 복사 권한이 없어요.' });
   if (!(await bizVerified(req.user.id))) {
-    return res.status(400).json({ error: '공고를 등록하려면 먼저 사업자등록 확인을 해주세요.', code: 'BIZ_REQUIRED' });
+    return res.status(400).json({ error: '공고를 등록하려면 먼저 사업자등록 확인을 해주세요. (마이페이지 > 사업자등록 확인)', code: 'BIZ_REQUIRED' });
   }
 
   const r = await run(
