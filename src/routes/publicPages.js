@@ -61,7 +61,7 @@ async function openJobs() {
 const STYLE = `
   :root{--ink:#14171C; --slate:#4B5563; --line:#E1DED6; --paper:#F7F6F2; --amber:#F5A623; --amber-deep:#D9800E;}
   *{box-sizing:border-box;}
-  body{margin:0; font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif; background:var(--paper); color:var(--ink); line-height:1.65;}
+  body{margin:0; font-family:'Pretendard Variable','Pretendard',-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Malgun Gothic',sans-serif; background:var(--paper); color:var(--ink); line-height:1.65;}
   a{color:inherit;}
   .wrap{max-width:760px; margin:0 auto; padding:20px 16px 64px;}
   .top{display:flex; align-items:center; justify-content:space-between; gap:12px; padding:4px 0 18px;}
@@ -110,6 +110,7 @@ ${noindex ? '<meta name="robots" content="noindex">' : `<link rel="canonical" hr
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
 <meta name="theme-color" content="#0A1633">
+<link rel="stylesheet" href="/fonts/pretendard/pretendard.css">
 <style>${STYLE}</style>
 ${jsonLd ? `<script type="application/ld+json">${JSON.stringify(jsonLd).replace(/</g, '\\u003c')}</script>` : ''}
 </head>

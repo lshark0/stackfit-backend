@@ -29,8 +29,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="IT Free">
 <meta name="mobile-web-app-capable" content="yes">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!-- 글꼴: Pretendard (OKKY Jobs 등 국내 서비스에서 많이 쓰는 한글 글꼴, SIL OFL 1.1). 필요한 글자 조각만 내려받도록 서버에 직접 둡니다. -->
+<link rel="stylesheet" href="/fonts/pretendard/pretendard.css">
 <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" rel="stylesheet">
 <style>
   :root{
@@ -44,8 +44,8 @@
     --pink:#EC4899; --pink-deep:#C22C74; --pink-soft:#FBDCEC;
     --slate:#4B5563; --slate-light:#707886; --line:#E1DED6; --danger:#E2604F;
     --radius-lg:22px; --radius-md:14px;
-    --mono:'JetBrains Mono',monospace;
-    --sans:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif;
+    --sans:'Pretendard Variable','Pretendard',-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;
+    --mono:var(--sans); /* 예전 고정폭 글꼴 자리도 모두 Pretendard로 통일 */
   }
   *{box-sizing:border-box; margin:0; padding:0;}
   html,body{height:100%;}
@@ -512,6 +512,13 @@
   .note-strip{font-family:var(--mono); font-size:11.5px; color:var(--slate-light); max-width:420px; text-align:center; line-height:1.6;}
   svg{display:block;}
   button{font-family:inherit;}
+
+  /* Pretendard로 통일하면서, 고정폭 글꼴에 맞춰 넓혀 둔 자간을 한글에 맞게 줄입니다. */
+  .section-label, .kv-lbl, .gauge-label{letter-spacing:0;}
+  .banner-eyebrow, .brand-tag, .role-chip, .detail-hero .org{letter-spacing:.04em;}
+  .page-sub, .chip, .tag, .chat-time, .bubble-time, .server-line, .splash-tag{letter-spacing:-.005em;}
+  input, textarea, select, button{font-family:inherit;}
+  body{-webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;}
 </style>
 <script src="https://cdn.portone.io/v2/browser-sdk.js" defer></script>
 </head>
