@@ -213,7 +213,7 @@ async function applyDecision(job, application, status) {
   // 거절을 취소해 '검토중'으로 되돌린 경우에는 지원자에게 결과 알림을 보내지 않습니다.
   if (status === 'submitted') return;
 
-  const resultTitle = status === 'accepted' ? '지원이 수락됐어요!' : '지원 결과가 도착했어요';
+  const resultTitle = status === 'accepted' ? '합격했어요!' : '지원 결과가 도착했어요';
   const resultBody = status === 'accepted'
     ? `"${job.title}" 공고에 합격하셨습니다. 프로젝트가 생성됐어요.`
     : `"${job.title}" 공고에는 아쉽게도 채용이 어려워요.`;
@@ -226,7 +226,7 @@ async function applyDecision(job, application, status) {
   });
   pushTo(application.freelancer_id, {
     kind: 'result',
-    title: status === 'accepted' ? '🎉 지원이 수락됐어요' : '📢 지원 결과 도착',
+    title: status === 'accepted' ? '🎉 합격 소식이 도착했어요' : '📢 지원 결과 도착',
     body: resultBody,
     tag: `result-${job.id}`,
     link: resultLink,
@@ -294,14 +294,14 @@ router.patch('/jobs/:jobId/applicants/:applicationId', requireAuth, requireRole(
   // 되돌릴 때 만들어졌던 프로젝트도 함께 정리합니다. 이미 계약이 진행 중이면 프로젝트 관리에서 다뤄야 합니다.
   if (application.status === 'accepted') {
     if (status !== 'submitted') {
-      return res.status(400).json({ error: '수락을 취소한 뒤에 다시 시도해주세요.' });
+      return res.status(400).json({ error: '합격을 취소한 뒤에 다시 시도해주세요.' });
     }
     const project = await get(
       "SELECT * FROM projects WHERE job_id=? AND freelancer_id=? AND status != '완료' ORDER BY id DESC LIMIT 1",
       [job.id, application.freelancer_id]
     );
     if (project && (project.stage !== 1 || project.company_agreed || project.freelancer_agreed)) {
-      return res.status(400).json({ error: '이미 계약이 진행되고 있어 수락을 취소할 수 없어요.' });
+      return res.status(400).json({ error: '이미 계약이 진행되고 있어 합격을 취소할 수 없어요.' });
     }
     if (project) {
       await run('DELETE FROM projects WHERE id = ?', [project.id]);

@@ -321,6 +321,15 @@
   .pf-cap{font-size:13px; font-weight:800; color:var(--ink); margin:4px 0 2px;}
   .chat-guard{display:flex; gap:9px; align-items:flex-start; margin:8px 0 6px; padding:10px 12px; border-radius:12px; background:var(--cyan-soft); color:#0E5F56; font-size:12.5px; line-height:1.55;}
   .chat-guard svg{flex:0 0 auto; width:16px; height:16px; margin-top:2px;}
+  .qchat-overlay{position:absolute; inset:0; z-index:57; background:rgba(20,23,28,.45); display:flex; align-items:flex-end;}
+  .qchat-sheet{width:100%; height:80%; background:var(--paper); border-radius:18px 18px 0 0; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 -6px 24px rgba(0,0,0,.15);}
+  .qchat-head{display:flex; align-items:center; gap:10px; padding:14px 16px 12px; border-bottom:1px solid var(--line);}
+  .qchat-head .tt{flex:1; min-width:0;}
+  .qchat-head .nm{font-weight:800; font-size:16px; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .qchat-head button{flex:0 0 auto; background:none; border:1px solid var(--line); border-radius:10px; padding:6px 10px; font:inherit; font-size:12.5px; font-weight:700; color:var(--slate); cursor:pointer;}
+  .qchat-body{flex:1; overflow-y:auto; padding:12px 16px;}
+  .qchat-body .bubble-more{display:none;}
+  .qchat-open svg{width:17px; height:17px;}
   .chat-input-bar{display:flex; gap:8px; padding:10px 20px 16px; border-top:1px solid var(--line); background:var(--paper); flex:0 0 auto;}
   .chat-input{flex:1; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:11px 14px; font-size:14.5px; color:var(--ink); font-family:var(--sans); outline:none;}
   .send-btn{width:42px; height:42px; border-radius:12px; background:linear-gradient(135deg, var(--purple) 0%, var(--blue) 100%); color:#fff; display:flex; align-items:center; justify-content:center; flex:0 0 auto; cursor:pointer; border:none;}
@@ -735,6 +744,7 @@ function contactSourceFor(screen, id){
   return detailSource && detailSource.screen === screen && Number(detailSource.id) === Number(id) ? detailSource.src : 'other';
 }
 function go(screen, param){
+  if(typeof closeQuickChat === 'function') closeQuickChat();
   if(screen === 'jobDetail' || screen === 'talentDetail'){
     const same = detailSource && detailSource.screen === screen && Number(detailSource.id) === Number(param);
     if(pendingDetailSource || !same) detailSource = { screen, id: param, src: pendingDetailSource || 'other' };
@@ -2391,6 +2401,72 @@ async function sendMessage(convId){
   catch(e){ toast(e.message); }
   finally{ input.disabled=false; input.focus(); }
 }
+// 지원자 관리에서 화면을 떠나지 않고 바로 대화하는 채팅창(아래에서 올라오는 시트).
+let quickChat = null; // {convId, timer}
+async function openQuickChat(freelancerId, jobId, name){
+  closeQuickChat();
+  let conv;
+  try{ conv = await apiFetch('/conversations', {method:'POST', body:{freelancerId, jobId: jobId || null}}); }
+  catch(e){ toast(e.message); return; }
+  const host = document.getElementById('confirmOverlay').parentElement;
+  const el = document.createElement('div');
+  el.className = 'qchat-overlay'; el.id = 'qchatOverlay';
+  el.onclick = (ev) => { if(ev.target === el) closeQuickChat(); };
+  el.innerHTML = `<div class="qchat-sheet" role="dialog" aria-label="${esc(name)}님과 채팅">
+    <div class="qchat-head"><div class="tt"><div class="nm">${esc(name)}</div><div class="page-sub">지원자와 채팅</div></div>
+      <button onclick="openQuickChatFull()">크게 보기</button><button onclick="closeQuickChat()" aria-label="닫기">닫기</button></div>
+    <div class="qchat-body" id="qchatBody"><div class="page-sub">불러오는 중…</div></div>
+    <div class="chat-input-bar">
+      <input id="qchatInput" class="chat-input" placeholder="메시지를 입력하세요" onkeydown="if(event.key==='Enter'){event.preventDefault(); sendQuickChat();}">
+      <button class="send-btn" onclick="sendQuickChat()">${I.send}</button>
+    </div>
+  </div>`;
+  host.appendChild(el);
+  quickChat = { convId: conv.id, timer: null };
+  await loadQuickChat(true);
+  if(quickChat) quickChat.timer = setInterval(() => loadQuickChat(false), 4000);
+  const input = document.getElementById('qchatInput'); if(input) input.focus();
+}
+function renderQuickChat(messages, forceBottom){
+  const body = document.getElementById('qchatBody');
+  if(!body) return;
+  const nearBottom = body.scrollHeight - body.scrollTop - body.clientHeight < 60;
+  body.innerHTML = `<div class="bubble-wrap">${chatBubblesHtml(messages)}</div>`;
+  if(forceBottom || nearBottom) body.scrollTop = body.scrollHeight;
+}
+async function loadQuickChat(first){
+  if(!quickChat) return;
+  try{
+    const data = await apiFetch(`/conversations/${quickChat.convId}/messages`);
+    renderQuickChat(data.messages, first);
+  }catch(e){ if(first) toast(e.message); }
+}
+async function sendQuickChat(){
+  const input = document.getElementById('qchatInput');
+  if(!input || !quickChat) return;
+  const text = input.value.trim();
+  if(!text) return;
+  input.disabled = true;
+  try{
+    const data = await apiFetch(`/conversations/${quickChat.convId}/messages`, {method:'POST', body:{body:text}});
+    input.value = '';
+    if(data.contactShared) toast('연락처를 보냈어요. 선입금 요구 등 사기에 주의하세요');
+    renderQuickChat(data.messages, true);
+  }catch(e){ toast(e.message); }
+  finally{ input.disabled = false; input.focus(); }
+}
+function openQuickChatFull(){
+  if(!quickChat) return;
+  const id = quickChat.convId;
+  closeQuickChat();
+  go('chatRoom', id);
+}
+function closeQuickChat(){
+  if(quickChat && quickChat.timer) clearInterval(quickChat.timer);
+  quickChat = null;
+  const el = document.getElementById('qchatOverlay');
+  if(el) el.remove();
+}
 function chatKeydown(ev, convId){
   if(ev.key==='Enter'){ ev.preventDefault(); sendMessage(convId); }
   else if(ev.key==='Escape' && chatEditId){ ev.preventDefault(); cancelEditMessage(); }
@@ -2401,20 +2477,20 @@ async function decideApplicant(jobId, applicationId, status){
     await apiFetch(`/jobs/${jobId}/applicants/${applicationId}`, {method:'PATCH', body:{status}});
     if(status==='accepted'){
       // 수락하면 프로젝트가 바로 생성되므로, 프로젝트 관리 화면으로 이동해 계약을 이어서 진행할 수 있게 합니다.
-      toast('수락했어요! 프로젝트 관리로 이동할게요');
+      toast('합격 처리했어요! 프로젝트 관리로 이동할게요');
       go('projects');
       return;
     }
-    toast(status==='submitted' ? '거절을 취소했어요. 다시 검토중 상태예요' : '지원자를 거절했어요');
+    toast(status==='submitted' ? '불합격을 취소했어요. 다시 검토중 상태예요' : '불합격 처리했어요');
     go('applicants', jobId);
   }catch(e){ toast(e.message); }
 }
-// 수락 취소 — 계약이 아직 시작되지 않았을 때(계약서 동의 전)만 가능하며, 만들어졌던 프로젝트도 함께 정리됩니다.
+// 합격 취소 — 계약이 아직 시작되지 않았을 때(계약서 동의 전)만 가능하며, 만들어졌던 프로젝트도 함께 정리됩니다.
 async function cancelAcceptance(jobId, applicationId){
-  showConfirm('수락을 취소할까요?\n계약이 아직 시작되지 않았을 때만 취소할 수 있고, 만들어졌던 프로젝트도 함께 정리돼요. 지원자에게도 알림이 가요.', async () => {
+  showConfirm('합격을 취소할까요?\n계약이 아직 시작되지 않았을 때만 취소할 수 있고, 만들어졌던 프로젝트도 함께 정리돼요. 지원자에게도 알림이 가요.', async () => {
     try{
       await apiFetch(`/jobs/${jobId}/applicants/${applicationId}`, {method:'PATCH', body:{status:'submitted'}});
-      toast('수락을 취소했어요. 다시 검토중 상태예요');
+      toast('합격을 취소했어요. 다시 검토중 상태예요');
       go('applicants', jobId);
     }catch(e){ toast(e.message); }
   });
@@ -4382,10 +4458,10 @@ async function screenAllApplicants(){
   const data = await apiFetch('/company/applicants');
   const badge = {
     submitted: `<span class="sbadge pending">${I.clockSm}검토중</span>`,
-    accepted: `<span class="sbadge pass">${I.trophy}수락됨</span>`,
-    rejected: `<span class="sbadge fail">${I.xCircle}거절됨</span>`,
+    accepted: `<span class="sbadge pass">${I.trophy}합격</span>`,
+    rejected: `<span class="sbadge fail">${I.xCircle}불합격</span>`,
   };
-  // 공고별로 묶어서 보여주고, 수락·거절은 공고별 지원자 관리 화면에서 하도록 연결합니다.
+  // 공고별로 묶어서 보여주고, 합격·불합격 처리는 공고별 지원자 관리 화면에서 하도록 연결합니다.
   const groups = [];
   const byJob = {};
   for(const a of data.applicants){
@@ -4426,8 +4502,8 @@ async function screenApplicants(){
   selectedApplicantIds = new Set();
   const badge = {
     submitted: `<span class="sbadge pending">${I.clockSm}검토중</span>`,
-    accepted: `<span class="sbadge pass">${I.trophy}수락됨</span>`,
-    rejected: `<span class="sbadge fail">${I.xCircle}거절됨</span>`,
+    accepted: `<span class="sbadge pass">${I.trophy}합격</span>`,
+    rejected: `<span class="sbadge fail">${I.xCircle}불합격</span>`,
   };
   return `${statusbar()}
   <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('jobDetail', ${state.param})">${I.back}</div>
@@ -4455,31 +4531,32 @@ async function screenApplicants(){
           <span class="rate">${esc(a.rate)}</span>
           ${a.resume_url? `<span style="display:flex; align-items:center; gap:8px;"><a href="${viewerUrl(a.resume_url)}" target="_blank" style="color:var(--ink); font-weight:600;">📄 경력기술서 보기</a><span onclick="downloadResume('${jsAttrStr(a.resume_url)}', '${jsAttrStr(a.resume_original_name||'경력기술서')}')" style="color:var(--slate); font-weight:600; cursor:pointer;">⬇ 다운로드</span></span>` : `<span style="color:var(--slate-light);">경력기술서 미첨부</span>`}
         </div>
+        <button class="btn btn-outline qchat-open" style="margin-top:10px; display:flex; align-items:center; justify-content:center; gap:6px;" onclick="openQuickChat(${a.user_id}, ${state.param}, '${jsAttrStr(a.name)}')">${I.chat}채팅하기</button>
         ${a.status==='submitted'? `
           <div style="display:flex; gap:8px; margin-top:12px;">
-            <button class="btn btn-outline" onclick="decideApplicant(${state.param}, ${a.application_id}, 'rejected')">거절</button>
-            <button class="btn btn-primary" onclick="decideApplicant(${state.param}, ${a.application_id}, 'accepted')">수락</button>
+            <button class="btn btn-outline" onclick="decideApplicant(${state.param}, ${a.application_id}, 'rejected')">불합격</button>
+            <button class="btn btn-primary" onclick="decideApplicant(${state.param}, ${a.application_id}, 'accepted')">합격</button>
           </div>` : ''}
         ${a.status==='rejected'? `
           <div style="display:flex; gap:8px; margin-top:12px;">
-            <button class="btn btn-outline" onclick="decideApplicant(${state.param}, ${a.application_id}, 'submitted')">거절 취소</button>
-            <button class="btn btn-primary" onclick="decideApplicant(${state.param}, ${a.application_id}, 'accepted')">수락으로 변경</button>
+            <button class="btn btn-outline" onclick="decideApplicant(${state.param}, ${a.application_id}, 'submitted')">불합격 취소</button>
+            <button class="btn btn-primary" onclick="decideApplicant(${state.param}, ${a.application_id}, 'accepted')">합격으로 변경</button>
           </div>
-          <div class="page-sub" style="margin-top:6px;">잘못 거절했다면 되돌릴 수 있어요.</div>` : ''}
+          <div class="page-sub" style="margin-top:6px;">잘못 불합격 처리했다면 되돌릴 수 있어요.</div>` : ''}
         ${a.status==='accepted' ? (a.canCancelAcceptance ? `
           <div style="display:flex; gap:8px; margin-top:12px;">
-            <button class="btn btn-outline" onclick="cancelAcceptance(${state.param}, ${a.application_id})">수락 취소</button>
+            <button class="btn btn-outline" onclick="cancelAcceptance(${state.param}, ${a.application_id})">합격 취소</button>
           </div>
-          <div class="page-sub" style="margin-top:6px;">계약서에 서로 동의하기 전까지는 수락을 취소할 수 있어요.</div>` : `
+          <div class="page-sub" style="margin-top:6px;">계약서에 서로 동의하기 전까지는 합격을 취소할 수 있어요.</div>` : `
           <button class="btn btn-primary" style="margin-top:12px;" onclick="go('projects')">프로젝트 관리에서 계약 진행하기</button>
-          <div class="page-sub" style="margin-top:6px;">이미 계약이 진행 중이라 수락을 취소할 수 없어요.</div>`) : ''}
+          <div class="page-sub" style="margin-top:6px;">이미 계약이 진행 중이라 합격을 취소할 수 없어요.</div>`) : ''}
       </div>`).join('') || emptyArt(ART.noTalents, '아직 지원자가 없어요', '인재풀에서 직접 포지션을 제안해볼 수도 있어요.')}
     <div style="height:70px;"></div>
   </div>
   <div id="bulkActionBar" hidden style="position:absolute; left:0; right:0; bottom:0; padding:14px 20px 22px; background:var(--paper); border-top:1px solid var(--line); display:flex; align-items:center; gap:10px;">
     <span id="bulkCount" style="font-family:var(--mono); font-size:12px; color:var(--slate); flex:1;">0명 선택됨</span>
-    <button class="btn btn-outline" style="flex:0 0 auto; width:auto; padding:11px 16px;" onclick="bulkDecideApplicants('rejected')">일괄 거절</button>
-    <button class="btn btn-primary" style="flex:0 0 auto; width:auto; padding:11px 16px;" onclick="bulkDecideApplicants('accepted')">일괄 수락</button>
+    <button class="btn btn-outline" style="flex:0 0 auto; width:auto; padding:11px 16px;" onclick="bulkDecideApplicants('rejected')">일괄 불합격</button>
+    <button class="btn btn-primary" style="flex:0 0 auto; width:auto; padding:11px 16px;" onclick="bulkDecideApplicants('accepted')">일괄 합격</button>
   </div>`;
 }
 
