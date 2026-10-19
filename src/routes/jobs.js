@@ -59,9 +59,10 @@ function baseJob(job, companyName, rating) {
 }
 
 async function withCompanyAndStack(job) {
-  const company = await get('SELECT name FROM companies WHERE user_id = ?', [job.company_id]);
+  const company = await get('SELECT name, biz_verified_at FROM companies WHERE user_id = ?', [job.company_id]);
   const rating = await getRatingSummary(job.company_id);
-  return baseJob(job, company ? company.name : null, rating);
+  // 공고 상세에 '사업자 확인 기업' 표시를 위해 확인 여부만 내려줍니다.
+  return { ...baseJob(job, company ? company.name : null, rating), bizVerified: !!(company && company.biz_verified_at) };
 }
 
 // 마감일 문자열('YYYY-MM-DD')을 D-day 라벨로 변환 (잡코리아 스타일)
@@ -314,7 +315,16 @@ async function createJob(companyId, body, { proxyBy = null } = {}) {
   return job;
 }
 
+// 공고를 올리기 전에 구인 기업의 사업자등록을 확인했는지 봅니다(직업안정법상 구인자 사업자등록 확인 의무).
+async function bizVerified(companyId) {
+  const c = await get('SELECT biz_verified_at FROM companies WHERE user_id = ?', [companyId]);
+  return !!(c && c.biz_verified_at);
+}
+
 router.post('/', requireAuth, requireRole('company'), async (req, res) => {
+  if (!(await bizVerified(req.user.id))) {
+    return res.status(400).json({ error: '공고를 등록하려면 먼저 사업자등록 확인을 해주세요.', code: 'BIZ_REQUIRED' });
+  }
   const job = await createJob(req.user.id, req.body);
   if (!job) return res.status(400).json({ error: '공고 제목은 필수입니다.' });
   res.status(201).json(await withCompanyAndStack(job));
@@ -377,6 +387,9 @@ router.post('/:id/duplicate', requireAuth, requireRole('company'), async (req, r
 
   const job = await get('SELECT * FROM jobs WHERE id = ? AND company_id = ?', [jobId, req.user.id]);
   if (!job) return res.status(404).json({ error: '공고를 찾을 수 없거나 복사 권한이 없어요.' });
+  if (!(await bizVerified(req.user.id))) {
+    return res.status(400).json({ error: '공고를 등록하려면 먼저 사업자등록 확인을 해주세요.', code: 'BIZ_REQUIRED' });
+  }
 
   const r = await run(
     `INSERT INTO jobs (company_id, title, stack_json, certs_json, period, rate, work_type, location, category, description, deadline, duty, grade)
@@ -481,3 +494,4 @@ router.delete('/:id', requireAuth, requireRole('company'), async (req, res) => {
 module.exports = router;
 module.exports.createJob = createJob;
 module.exports.withCompanyAndStack = withCompanyAndStack;
+module.exports.bizVerified = bizVerified;

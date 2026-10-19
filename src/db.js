@@ -103,6 +103,11 @@ if (USE_POSTGRES) {
     await ensureColumnPg('jobs', 'proxy_by', 'INTEGER');
     // 채팅 메시지 수정·삭제 시각(삭제된 메시지는 내용을 지우고 자리만 남김)
     await ensureColumnPg('messages', 'edited_at', 'TEXT');
+    // 구인 기업 사업자등록 확인(형식 확인 'format' / 국세청 진위확인 'nts')
+    await ensureColumnPg('companies', 'biz_start_dt', 'TEXT');
+    await ensureColumnPg('companies', 'biz_check', 'TEXT');
+    await ensureColumnPg('companies', 'biz_status', 'TEXT');
+    await ensureColumnPg('companies', 'biz_verified_at', 'TEXT');
     await ensureColumnPg('messages', 'deleted_at', 'TEXT');
     await ensureColumnPg('users', 'claim_pending', 'INTEGER NOT NULL DEFAULT 0');
     await ensureColumnPg('users', 'claim_nonce', 'TEXT');
@@ -227,6 +232,10 @@ if (USE_POSTGRES) {
     addCol('freelancer_profiles', 'job_alerts', 'INTEGER NOT NULL DEFAULT 1');
     addCol('jobs', 'proxy_by', 'INTEGER');
     addCol('messages', 'edited_at', 'TEXT');
+    addCol('companies', 'biz_start_dt', 'TEXT');
+    addCol('companies', 'biz_check', 'TEXT');
+    addCol('companies', 'biz_status', 'TEXT');
+    addCol('companies', 'biz_verified_at', 'TEXT');
     addCol('messages', 'deleted_at', 'TEXT');
     addCol('users', 'claim_pending', 'INTEGER NOT NULL DEFAULT 0');
     addCol('users', 'claim_nonce', 'TEXT');

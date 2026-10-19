@@ -8,6 +8,7 @@ const { wrapAllRoutes } = require('../middleware/asyncHandler');
 const { normalizeMobile, normalizePhone, normalizeEmail, normalizeBirthDate } = require('../contact');
 const { freelancerMissingFields, FREELANCER_REQUIRED_COUNT } = require('../profileCheck');
 const { grantReferralRewardLater } = require('../referralReward');
+const { verifyBusiness, saveBusiness, businessInfo } = require('../bizCheck');
 
 const router = express.Router();
 wrapAllRoutes(router);
@@ -152,6 +153,17 @@ router.put('/proposal-settings', requireAuth, requireRole('freelancer'), async (
     [next.accept_proposals, next.share_phone, next.share_email, next.job_alerts, req.user.id]
   );
   res.json(next);
+});
+
+// [기업] 사업자등록 확인 — 공고를 등록하려면 먼저 확인해야 합니다(직업안정법상 구인자 사업자등록 확인).
+router.get('/business', requireAuth, requireRole('company'), async (req, res) => {
+  res.json(businessInfo(await get('SELECT * FROM companies WHERE user_id = ?', [req.user.id])));
+});
+router.put('/business', requireAuth, requireRole('company'), async (req, res) => {
+  const r = await verifyBusiness(req.body || {});
+  if (!r.ok) return res.status(400).json({ error: r.error });
+  await saveBusiness(req.user.id, r);
+  res.json(businessInfo(await get('SELECT * FROM companies WHERE user_id = ?', [req.user.id])));
 });
 
 router.put('/', requireAuth, async (req, res) => {

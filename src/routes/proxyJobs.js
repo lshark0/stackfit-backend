@@ -7,7 +7,8 @@ const { wrapAllRoutes } = require('../middleware/asyncHandler');
 const { hashPassword, signToken } = require('../auth');
 const { normalizeMobile, normalizeEmail } = require('../contact');
 const { addNotification, pushTo } = require('../notify');
-const { createJob, withCompanyAndStack } = require('./jobs');
+const { createJob, withCompanyAndStack, bizVerified } = require('./jobs');
+const { verifyBusiness, saveBusiness } = require('../bizCheck');
 
 // 관리자 공고 대리 등록: 초기에 공고를 먼저 채우기 위해, 기업 담당자의 동의를 받아 관리자가 공고를 대신 올립니다.
 //  - 이미 가입한 기업: 그 기업 계정으로 공고를 올리고 기업에 알립니다(기업이 직접 수정·마감 가능).
@@ -36,13 +37,13 @@ router.get('/companies', async (req, res) => {
   if (!q) return res.json({ companies: [] });
   const like = `%${q.toLowerCase()}%`;
   const rows = await all(
-    `SELECT u.id, u.email, u.claim_pending, c.name, c.contact_person
+    `SELECT u.id, u.email, u.claim_pending, c.name, c.contact_person, c.biz_verified_at
      FROM users u JOIN companies c ON c.user_id = u.id
      WHERE u.role = 'company' AND (LOWER(c.name) LIKE ? OR LOWER(c.contact_person) LIKE ? OR LOWER(u.email) LIKE ?)
      ORDER BY c.name LIMIT 20`,
     [like, like, like]
   );
-  res.json({ companies: rows.map((r) => ({ id: r.id, name: r.name, contactPerson: r.contact_person, email: r.email, claimPending: Number(r.claim_pending) === 1 })) });
+  res.json({ companies: rows.map((r) => ({ id: r.id, name: r.name, contactPerson: r.contact_person, email: r.email, claimPending: Number(r.claim_pending) === 1, bizVerified: !!r.biz_verified_at })) });
 });
 
 // 가입 전 기업의 계정을 대신 만들기(담당자 동의 필수)
@@ -79,6 +80,16 @@ router.post('/companies/:id/claim-link', async (req, res) => {
   res.json({ claimLink: await newClaimLink(req, id) });
 });
 
+// 대리 등록할 기업의 사업자등록 확인(담당자에게 받은 사업자등록증 정보로)
+router.post('/companies/:id/business', async (req, res) => {
+  const id = Number(req.params.id);
+  if (!(await get("SELECT id FROM users WHERE id = ? AND role = 'company'", [id]))) return res.status(404).json({ error: '기업을 찾을 수 없어요.' });
+  const r = await verifyBusiness(req.body || {});
+  if (!r.ok) return res.status(400).json({ error: r.error });
+  await saveBusiness(id, r);
+  res.json({ ok: true, method: r.method, status: r.status });
+});
+
 // 공고 대리 등록
 router.post('/jobs', async (req, res) => {
   const b = req.body || {};
@@ -89,6 +100,9 @@ router.post('/jobs', async (req, res) => {
     [companyId]
   );
   if (!company) return res.status(404).json({ error: '기업을 찾을 수 없어요.' });
+  if (!(await bizVerified(company.id))) {
+    return res.status(400).json({ error: '이 기업의 사업자등록 확인을 먼저 해주세요.', code: 'BIZ_REQUIRED' });
+  }
   const job = await createJob(company.id, b, { proxyBy: req.user.id });
   if (!job) return res.status(400).json({ error: '공고 제목은 필수입니다.' });
   if (Number(company.claim_pending) !== 1) {
