@@ -47,7 +47,7 @@ const PLANS = [
     },
   },
   {
-    id: 'freelancer_premium', role: 'freelancer', name: '프리랜서 프리미엄', price: 9900, period: '월', vatIncluded: true,
+    id: 'freelancer_premium', role: 'freelancer', name: '프리랜서 프리미엄', price: 29000, period: '월', vatIncluded: true,
     summary: '더 많은 기업에게 먼저 보이고 싶은 프리랜서',
     features: [
       '인재 검색·추천 목록 상단 노출과 프리미엄 표시',
@@ -63,7 +63,7 @@ const PLANS = [
         'Spring·Java 새 공고가 올라오면 바로 알림을 받아 일찍 지원해요',
         '지원하면 기업 지원자 목록 위쪽에 강조돼요. 경쟁력 리포트로 어떤 기술을 보완하면 추천이 늘어나는지 확인해요',
       ],
-      point: '월 단가 600만 원이면 하루 일당이 약 27만 원이에요. 공백을 하루만 줄여도 1년 치 구독료(약 12만 원)보다 커요.',
+      point: '월 단가 600만 원이면 하루 일당이 약 27만 원이에요. 공백을 하루만 줄여도 한 달 구독료(2만 9천 원)의 9배가 넘어요.',
     },
   },
 ];
