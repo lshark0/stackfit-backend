@@ -8,6 +8,7 @@ const { addNotification, pushTo, notifyAdmins } = require('../notify');
 const { publicTalent } = require('../contact');
 const { freelancerMissingFields } = require('../profileCheck');
 const { pairScore } = require('../recommend');
+const { normalizeSource } = require('../contactSource');
 
 const router = express.Router();
 wrapAllRoutes(router);
@@ -42,8 +43,8 @@ router.post('/jobs/:id/apply', requireAuth, requireRole('freelancer'), async (re
     });
   }
 
-  await run('INSERT INTO applications (job_id, freelancer_id, match_score) VALUES (?,?,?)',
-    [jobId, req.user.id, pairScore(job, myProfile)]);
+  await run('INSERT INTO applications (job_id, freelancer_id, match_score, source) VALUES (?,?,?,?)',
+    [jobId, req.user.id, pairScore(job, myProfile), normalizeSource((req.body || {}).source)]);
 
   const profile = await get('SELECT name FROM freelancer_profiles WHERE user_id = ?', [req.user.id]);
   await addNotification(job.company_id, {

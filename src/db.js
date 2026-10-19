@@ -108,6 +108,11 @@ if (USE_POSTGRES) {
     await ensureColumnPg('companies', 'biz_check', 'TEXT');
     await ensureColumnPg('companies', 'biz_status', 'TEXT');
     await ensureColumnPg('companies', 'biz_verified_at', 'TEXT');
+    // 심사 의견 대응: 기존 방식 대비 적합도·접촉 수(계약 후 설문), 지원·제안이 어디서 시작됐는지(추천·검색·알림)
+    await ensureColumnPg('contract_surveys', 'fit_vs_prev', 'INTEGER');
+    await ensureColumnPg('contract_surveys', 'prev_contacts', 'INTEGER');
+    await ensureColumnPg('applications', 'source', 'TEXT');
+    await ensureColumnPg('proposals', 'source', 'TEXT');
     await ensureColumnPg('messages', 'deleted_at', 'TEXT');
     await ensureColumnPg('users', 'claim_pending', 'INTEGER NOT NULL DEFAULT 0');
     await ensureColumnPg('users', 'claim_nonce', 'TEXT');
@@ -236,6 +241,10 @@ if (USE_POSTGRES) {
     addCol('companies', 'biz_check', 'TEXT');
     addCol('companies', 'biz_status', 'TEXT');
     addCol('companies', 'biz_verified_at', 'TEXT');
+    addCol('contract_surveys', 'fit_vs_prev', 'INTEGER');
+    addCol('contract_surveys', 'prev_contacts', 'INTEGER');
+    addCol('applications', 'source', 'TEXT');
+    addCol('proposals', 'source', 'TEXT');
     addCol('messages', 'deleted_at', 'TEXT');
     addCol('users', 'claim_pending', 'INTEGER NOT NULL DEFAULT 0');
     addCol('users', 'claim_nonce', 'TEXT');

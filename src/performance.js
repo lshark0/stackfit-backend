@@ -1,6 +1,7 @@
 const { all, get } = require('./db');
 const { pairScore } = require('./recommend');
 const { CATEGORIES, matchesCategory } = require('./stackCatalog');
+const { CONTACT_SOURCES, SOURCE_LABEL } = require('./contactSource');
 
 // 관리자 성과 지표: '기능이 있다'가 아니라 '실제로 거래가 이뤄지는지'를 숫자로 보여줍니다.
 //  - 매칭 퍼널: 공고 → 지원·제안 → 인터뷰 → 매칭(합격·수락) → 계약 체결 → 완료
@@ -9,7 +10,9 @@ const { CATEGORIES, matchesCategory } = require('./stackCatalog');
 //  - 재이용률: 두 번 이상 계약한 기업·프리랜서 비율
 //  - 분야별 성과: 어느 기술 분야에서 계약이 나오는지(집중할 분야 찾기)
 //  - 신뢰·안전 거래: 경력 검증 현황, 매칭 전 연락처 공유(사기 주의 안내)
-//  - 기존 방식과 비교: 계약 후 설문의 '기존 방식으로 걸리던 기간'과 같은 계약의 실제 소요 기간, 재이용 의향(NPS)
+//  - 기존 방식과 비교: 계약 후 설문의 '기존 방식으로 걸리던 기간'과 같은 계약의 실제 소요 기간, 재이용 의향(NPS),
+//    기존 대비 조건 적합도(매칭 정확도), 계약 1건까지 접촉한 수(성사율)
+//  - 출처별 성과: 추천 목록·검색·알림 중 어디서 시작된 지원·제안이 더 빨리·많이 계약되는지('추천부터 계약까지')
 // 데이터 양이 크지 않아 DB(SQLite·PostgreSQL) 차이를 피하려고 행을 읽어 와 서버에서 계산합니다.
 
 const ROW_LIMIT = 50000;
@@ -52,14 +55,14 @@ async function computePerformance(days) {
 
   const [jobs, apps, props, projects, interviews, profiles, masked, cvPending, surveys] = await Promise.all([
     all(`SELECT id, company_id, category, stack_json, duty, grade, status, created_at FROM jobs ORDER BY id DESC LIMIT ${ROW_LIMIT}`),
-    all(`SELECT id, job_id, freelancer_id, status, created_at, match_score FROM applications ORDER BY id DESC LIMIT ${ROW_LIMIT}`),
-    all(`SELECT id, company_id, freelancer_id, job_id, status, created_at, responded_at, match_score FROM proposals ORDER BY id DESC LIMIT ${ROW_LIMIT}`),
+    all(`SELECT id, job_id, freelancer_id, status, created_at, match_score, source FROM applications ORDER BY id DESC LIMIT ${ROW_LIMIT}`),
+    all(`SELECT id, company_id, freelancer_id, job_id, status, created_at, responded_at, match_score, source FROM proposals ORDER BY id DESC LIMIT ${ROW_LIMIT}`),
     all(`SELECT id, job_id, company_id, freelancer_id, status, contracted_at, completed_at, created_at FROM projects ORDER BY id DESC LIMIT ${ROW_LIMIT}`),
     all(`SELECT i.status, i.created_at, c.company_id, c.freelancer_id FROM interviews i JOIN conversations c ON c.id = i.conversation_id ORDER BY i.id DESC LIMIT ${ROW_LIMIT}`),
     all('SELECT user_id, stack_json, role_title, grade, verified FROM freelancer_profiles'),
     all(`SELECT conversation_id, created_at FROM messages WHERE meta_json LIKE ? ORDER BY id DESC LIMIT ${ROW_LIMIT}`, ['%contact%ed%']),
     get("SELECT COUNT(*) AS c FROM career_verifications WHERE status IN ('pending','needs_review')"),
-    all(`SELECT project_id, role, prev_channel, prev_days, reuse_intent, created_at FROM contract_surveys ORDER BY id DESC LIMIT ${ROW_LIMIT}`),
+    all(`SELECT project_id, role, prev_channel, prev_days, reuse_intent, fit_vs_prev, prev_contacts, created_at FROM contract_surveys ORDER BY id DESC LIMIT ${ROW_LIMIT}`),
   ]);
   const jobById = new Map(jobs.map((j) => [j.id, j]));
   const profileById = new Map(profiles.map((p) => [p.user_id, p]));
@@ -98,15 +101,17 @@ async function computePerformance(days) {
     .map((j) => firstTouchByJob.get(j.id) - toMs(j.created_at));
   // 첫 접촉(같은 기업·프리랜서 사이의 첫 지원 또는 제안) → 계약 체결
   const firstContactByPair = new Map();
+  const firstSourceByPair = new Map(); // 그 첫 접촉이 어디서 시작됐는지(추천·검색·알림)
+  const srcOf = (x) => (CONTACT_SOURCES.includes(x.source) ? x.source : null); // 기록 전(예전) 데이터는 null
   for (const a of apps) {
     const j = jobById.get(a.job_id);
     if (!j) continue;
     const k = `${j.company_id}:${a.freelancer_id}`, t = toMs(a.created_at);
-    if (t !== null && (!firstContactByPair.has(k) || t < firstContactByPair.get(k))) firstContactByPair.set(k, t);
+    if (t !== null && (!firstContactByPair.has(k) || t < firstContactByPair.get(k))) { firstContactByPair.set(k, t); firstSourceByPair.set(k, srcOf(a)); }
   }
   for (const p of props) {
     const k = `${p.company_id}:${p.freelancer_id}`, t = toMs(p.created_at);
-    if (t !== null && (!firstContactByPair.has(k) || t < firstContactByPair.get(k))) firstContactByPair.set(k, t);
+    if (t !== null && (!firstContactByPair.has(k) || t < firstContactByPair.get(k))) { firstContactByPair.set(k, t); firstSourceByPair.set(k, srcOf(p)); }
   }
   const contactToContract = contractedW
     .map((p) => { const f = firstContactByPair.get(`${p.company_id}:${p.freelancer_id}`); return f === undefined ? null : toMs(p.contracted_at) - f; })
@@ -156,6 +161,33 @@ async function computePerformance(days) {
   const byFreelancer = contractsBy('freelancer_id');
   const repeat = (m) => { const total = m.size; const again = [...m.values()].filter((c) => c >= 2).length; return { total, repeat: again, rate: pct(again, total) }; };
   const reuse = { companies: repeat(byCompany), freelancers: repeat(byFreelancer) };
+
+  // ----- 출처별 성과 (기간): 추천 목록에서 시작된 연결이 검색·알림보다 빨리·많이 계약되는지 -----
+  const srcStat = new Map(CONTACT_SOURCES.map((k) => [k, { source: k, label: SOURCE_LABEL[k], n: 0, matched: 0, contracted: 0, days: [] }]));
+  for (const a of appsW) {
+    const src = srcOf(a); if (!src) continue;
+    const j = jobById.get(a.job_id); if (!j) continue;
+    const st = srcStat.get(src); st.n++;
+    if (a.status === 'accepted') st.matched++;
+    if (contractedPairs.has(`${j.company_id}:${a.freelancer_id}`)) st.contracted++;
+  }
+  for (const p of propsW) {
+    const src = srcOf(p); if (!src) continue;
+    const st = srcStat.get(src); st.n++;
+    if (p.status === 'accepted') st.matched++;
+    if (contractedPairs.has(`${p.company_id}:${p.freelancer_id}`)) st.contracted++;
+  }
+  for (const p of contractedW) {
+    const k = `${p.company_id}:${p.freelancer_id}`;
+    const src = firstSourceByPair.get(k), f = firstContactByPair.get(k);
+    if (!src || f === undefined) continue;
+    srcStat.get(src).days.push(toMs(p.contracted_at) - f);
+  }
+  const bySource = [...srcStat.values()].map((x) => ({
+    source: x.source, label: x.label, n: x.n,
+    matchRate: pct(x.matched, x.n), contractRate: pct(x.contracted, x.n),
+    contactToContract: durationSummary(x.days),
+  }));
 
   // ----- 분야별 성과 (기간) -----
   const catOf = (jobId) => (jobById.get(jobId) || {}).category || '미분류';
@@ -223,6 +255,47 @@ async function computePerformance(days) {
   };
   const channels = {};
   for (const x of surveysW) channels[x.prev_channel] = (channels[x.prev_channel] || 0) + 1;
+
+  // 매칭 정확도: 기존 방식으로 만나던 상대와 비교한 이번 상대의 조건 적합도(-2~2)
+  const fitRows = surveysW.filter((x) => x.fit_vs_prev !== null && x.fit_vs_prev !== undefined).map((x) => Number(x.fit_vs_prev));
+  const fit = {
+    n: fitRows.length,
+    betterRate: pct(fitRows.filter((v) => v > 0).length, fitRows.length),
+    sameRate: pct(fitRows.filter((v) => v === 0).length, fitRows.length),
+    worseRate: pct(fitRows.filter((v) => v < 0).length, fitRows.length),
+    avg: fitRows.length ? r1(fitRows.reduce((a, b) => a + b, 0) / fitRows.length) : null,
+  };
+
+  // 계약 성사율: 계약 1건까지 검토·접촉한 수 — IT Free(실제 기록) vs 기존 방식(설문)
+  //  기업: 계약한 공고에 들어온 지원 + 그 공고로 보낸 제안 상대 수
+  //  프리랜서: 계약 전 90일 동안 보낸 지원 + 받은 제안 수
+  const contactsOnJob = new Map();
+  const addJobContact = (jobId, fid) => { if (!jobId) return; if (!contactsOnJob.has(jobId)) contactsOnJob.set(jobId, new Set()); contactsOnJob.get(jobId).add(fid); };
+  for (const a of apps) addJobContact(a.job_id, a.freelancer_id);
+  for (const p of props) addJobContact(p.job_id, p.freelancer_id);
+  const freelancerContactsBefore = (fid, until) => {
+    const from = until - 90 * DAY;
+    const inRange = (v) => { const t = toMs(v); return t !== null && t >= from && t <= until; };
+    return apps.filter((a) => a.freelancer_id === fid && inRange(a.created_at)).length
+      + props.filter((p) => p.freelancer_id === fid && inRange(p.created_at)).length;
+  };
+  const contactPairs = [];
+  for (const x of surveysW) {
+    if (x.prev_contacts === null || x.prev_contacts === undefined) continue;
+    const pr = projectById.get(x.project_id);
+    if (!pr || !pr.contracted_at) continue;
+    let platform = null;
+    if (x.role === 'company') platform = pr.job_id && contactsOnJob.has(pr.job_id) ? contactsOnJob.get(pr.job_id).size : null;
+    else platform = freelancerContactsBefore(pr.freelancer_id, toMs(pr.contracted_at)) || null;
+    if (!platform) continue;
+    contactPairs.push({ role: x.role, platform, prev: Number(x.prev_contacts) });
+  }
+  const contactsOf = (rows) => ({
+    n: rows.length,
+    platformMedian: r1(median(rows.map((r) => r.platform))),
+    prevMedian: r1(median(rows.map((r) => r.prev))),
+    fewerRate: pct(rows.filter((r) => r.platform < r.prev).length, rows.length),
+  });
   const baseline = {
     responses: surveysW.length,
     responseRate: pct(surveysW.length, contractedW.length * 2), // 계약 1건당 기업·프리랜서 2명
@@ -231,9 +304,13 @@ async function computePerformance(days) {
     compareFreelancer: compareOf(paired.filter((r) => r.role === 'freelancer')),
     reuseIntent: npsOf(surveysW),
     channels,
+    fit,
+    contacts: contactsOf(contactPairs),
+    contactsCompany: contactsOf(contactPairs.filter((r) => r.role === 'company')),
+    contactsFreelancer: contactsOf(contactPairs.filter((r) => r.role === 'freelancer')),
   };
 
-  return { days, funnel, rates, durations, scoreBands, reuse, byCategory, trust, baseline };
+  return { days, funnel, rates, durations, scoreBands, bySource, reuse, byCategory, trust, baseline };
 }
 
 module.exports = { computePerformance };

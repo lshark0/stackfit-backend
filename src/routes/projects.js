@@ -225,8 +225,13 @@ router.post('/:id/agree', requireAuth, async (req, res) => {
 
 // 계약 체결 후 이용 경험 설문(기업·프리랜서 각 1회): 이전에 쓰던 방식과 걸리던 기간, 재이용 의향.
 // 관리자 성과 지표에서 'IT Free에서 걸린 기간'과 '기존 방식으로 걸리던 기간'을 같은 계약 기준으로 비교합니다.
+// 심사 의견(매칭 정확도·계약 성사율을 기존 방식과 비교) 대응으로 두 문항을 더 받습니다.
+//  - fitVsPrev: 이번 상대가 기존 방식으로 만나던 상대보다 조건(기술·등급·단가)에 얼마나 맞았나 (-2~2)
+//  - prevContacts: 기존 방식으로는 몇 명(곳)을 검토·접촉해야 1건 계약했나 (대표값)
 const SURVEY_CHANNELS = ['referral', 'agency', 'jobboard', 'community', 'first'];
 const SURVEY_DAYS = [2, 4, 7, 14, 30];
+const SURVEY_FIT = [-2, -1, 0, 1, 2];
+const SURVEY_CONTACTS = [1, 3, 5, 8, 15];
 router.post('/:id/survey', requireAuth, async (req, res) => {
   const project = await loadMyProject(req, res);
   if (!project) return;
@@ -237,14 +242,20 @@ router.post('/:id/survey', requireAuth, async (req, res) => {
   // 처음인 경우·모르는 경우는 비교 기준이 없으므로 기간을 비워 둡니다.
   const days = channel === 'first' || b.prevDays === null || b.prevDays === '' || b.prevDays === undefined ? null : Number(b.prevDays);
   if (days !== null && !SURVEY_DAYS.includes(days)) return res.status(400).json({ error: '걸리던 기간을 골라주세요.' });
+  // 처음 이용·모르는 경우는 비교 기준이 없으므로 비워 둡니다(선택 문항).
+  const pick = (v, allowed) => (v === null || v === undefined || v === '' ? null : (allowed.includes(Number(v)) ? Number(v) : NaN));
+  const fit = channel === 'first' ? null : pick(b.fitVsPrev, SURVEY_FIT);
+  const contacts = channel === 'first' ? null : pick(b.prevContacts, SURVEY_CONTACTS);
+  if (Number.isNaN(fit)) return res.status(400).json({ error: '조건 적합도를 다시 골라주세요.' });
+  if (Number.isNaN(contacts)) return res.status(400).json({ error: '기존에 접촉하던 인원을 다시 골라주세요.' });
   const intent = Number(b.reuseIntent);
   if (!Number.isInteger(intent) || intent < 0 || intent > 10) return res.status(400).json({ error: '다시 이용할 의향을 0~10 중에서 골라주세요.' });
   if (await get('SELECT id FROM contract_surveys WHERE project_id = ? AND user_id = ?', [project.id, req.user.id])) {
     return res.json({ ok: true }); // 이미 답함 (중복 클릭)
   }
   await run(
-    'INSERT INTO contract_surveys (project_id, user_id, role, prev_channel, prev_days, reuse_intent) VALUES (?,?,?,?,?,?)',
-    [project.id, req.user.id, req.user.role, channel, days, intent]
+    'INSERT INTO contract_surveys (project_id, user_id, role, prev_channel, prev_days, reuse_intent, fit_vs_prev, prev_contacts) VALUES (?,?,?,?,?,?,?,?)',
+    [project.id, req.user.id, req.user.role, channel, days, intent, fit, contacts]
   );
   res.status(201).json({ ok: true });
 });

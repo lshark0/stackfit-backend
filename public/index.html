@@ -727,7 +727,19 @@ let talentDetailReturn = null;  // {screen, param}
 const JOB_DETAIL_CHILDREN = ['jobDetail','applicants','jobPost','pickerScreen','profileEdit','portfolioEdit','reportJob'];
 const TALENT_DETAIL_CHILDREN = ['talentDetail','proposeForm'];
 
+// 지원·제안이 어디서 시작됐는지(추천 목록·검색·알림) 기억했다가 지원·제안 때 함께 보냅니다(성과 지표의 출처별 비교).
+let detailSource = null;        // {screen, id, src}
+let pendingDetailSource = null;
+function openDetail(screen, id, src){ pendingDetailSource = src; go(screen, id); }
+function contactSourceFor(screen, id){
+  return detailSource && detailSource.screen === screen && Number(detailSource.id) === Number(id) ? detailSource.src : 'other';
+}
 function go(screen, param){
+  if(screen === 'jobDetail' || screen === 'talentDetail'){
+    const same = detailSource && detailSource.screen === screen && Number(detailSource.id) === Number(param);
+    if(pendingDetailSource || !same) detailSource = { screen, id: param, src: pendingDetailSource || 'other' };
+  }
+  pendingDetailSource = null;
   if(state.screen!=='alerts') state.prevScreen = state.screen;
   if(screen==='jobDetail' && !JOB_DETAIL_CHILDREN.includes(state.screen)){
     jobDetailReturn = { screen: state.screen, param: state.param };
@@ -780,6 +792,7 @@ function openLink(link){
   if(!LINKABLE_SCREENS.includes(screen) || !screenAllowed(screen)) return false;
   const param = rawParam !== undefined && rawParam !== '' ? Number(rawParam) : null;
   if(rawParam && !Number.isInteger(param)) return false;
+  if(screen === 'jobDetail' || screen === 'talentDetail') pendingDetailSource = 'alert';
   go(screen, param);
   return true;
 }
@@ -1216,7 +1229,7 @@ function applicantBadge(count){
     + `지원자 ${c}명 <b style="color:${color}; font-weight:700; font-family:var(--mono);">${label}</b></span>`;
 }
 function jobCard(j){
-  return `<div class="card clickable ${j.applied?'is-applied':''}" onclick="go('jobDetail', ${j.id})">
+  return `<div class="card clickable ${j.applied?'is-applied':''}" onclick="openDetail('jobDetail', ${j.id}, 'search')">
     <div class="card-top">
       <div style="min-width:0;">
         <div class="card-title">${esc(j.title)} ${dutyBadge(j.duty)} ${gradeBadge(j.grade)}</div>
@@ -1240,7 +1253,7 @@ function jobCard(j){
 }
 // 잡코리아 스타일: 최근 본 공고 / 비슷한 공고에 쓰는 가로 스크롤용 축약 카드
 function miniJobCard(j){
-  return `<div class="mini-card" onclick="go('jobDetail', ${j.id})">
+  return `<div class="mini-card" onclick="openDetail('jobDetail', ${j.id}, 'search')">
     <div class="mc-title">${esc(j.title)}</div>
     <div class="mc-org">${esc(j.org)}</div>
     <div class="mc-meta">${ddayBadge(j.status==='closed' ? '마감' : j.d_day)}${state.role==='freelancer' ? gaugeSm(j.match) : ''}</div>
@@ -1248,7 +1261,7 @@ function miniJobCard(j){
 }
 // 잡코리아 스타일: 최근 본 인재 가로 스크롤용 축약 카드
 function miniTalentCard(t){
-  return `<div class="mini-card" onclick="go('talentDetail', ${t.user_id})">
+  return `<div class="mini-card" onclick="openDetail('talentDetail', ${t.user_id}, 'search')">
     <div class="mc-title">${esc(t.name)}</div>
     <div class="mc-org">${esc(t.role_title || '')}</div>
     <div class="mc-meta">${gradeBadge(t.grade)}</div>
@@ -1275,7 +1288,7 @@ function recoReasons(reasons, ratingLabel){
   }).join('')}</div>`;
 }
 function recoJobCard(j){
-  return `<div class="card clickable" onclick="go('jobDetail', ${j.id})">
+  return `<div class="card clickable" onclick="openDetail('jobDetail', ${j.id}, 'reco')">
     <div class="card-top">
       <div><div class="card-title">${esc(j.title)}</div><div class="card-org">${esc(j.org)}</div></div>
       <span class="reco-badge">추천 ${j.score}%</span>
@@ -1288,7 +1301,7 @@ function recoJobCard(j){
   </div>`;
 }
 function recoTalentCard(t){
-  return `<div class="card clickable" onclick="go('talentDetail', ${t.user_id})">
+  return `<div class="card clickable" onclick="openDetail('talentDetail', ${t.user_id}, 'reco')">
     <div class="card-top">
       <div style="display:flex; gap:12px; align-items:center;">
         ${autoAvatar(t.name)}
@@ -1306,7 +1319,7 @@ function recoTalentCard(t){
   </div>`;
 }
 function talentCard(t){
-  return `<div class="card clickable ${t.proposed?'is-proposed':''}" onclick="go('talentDetail', ${t.user_id})">
+  return `<div class="card clickable ${t.proposed?'is-proposed':''}" onclick="openDetail('talentDetail', ${t.user_id}, 'search')">
     <div class="card-top">
       <div style="display:flex; gap:12px; align-items:center; min-width:0;">
         ${autoAvatar(t.name)}
@@ -1836,7 +1849,7 @@ function saveServerUrl(){
 
 async function applyToJob(id){
   try{
-    await apiFetch(`/jobs/${id}/apply`, {method:'POST'});
+    await apiFetch(`/jobs/${id}/apply`, {method:'POST', body:{ source: contactSourceFor('jobDetail', id) }});
     toast('지원이 완료됐어요');
     go('jobDetail', id);
   }catch(e){
@@ -2005,7 +2018,7 @@ async function sendProposal(userId){
   const jobId = jobSel ? Number(jobSel) : null;
   const message = document.getElementById('pp-message').value.trim();
   try{
-    await apiFetch(`/talents/${userId}/propose`, {method:'POST', body:{ jobId, message }});
+    await apiFetch(`/talents/${userId}/propose`, {method:'POST', body:{ jobId, message, source: contactSourceFor('talentDetail', userId) }});
     toast('제안을 보냈어요');
     go('talentDetail', userId);
   }catch(e){ toast(e.message); }
@@ -2496,9 +2509,11 @@ async function runProjectAction(key, url, successMsg){
   finally{ busyActions.delete(key); }
 }
 
-// 계약 체결 후 30초 설문: 기존 방식과 비교할 기준값(이전 경로·걸리던 기간)과 재이용 의향을 받습니다.
+// 계약 체결 후 30초 설문: 기존 방식과 비교할 기준값(이전 경로·걸리던 기간·조건 적합도·계약까지 접촉 수)과 재이용 의향을 받습니다.
 const SURVEY_CHANNEL_OPTS = [['referral','지인·인맥 소개'],['agency','에이전시·파견업체'],['jobboard','다른 구인 사이트'],['community','커뮤니티·오픈채팅'],['first','이번이 처음이에요']];
 const SURVEY_DAY_OPTS = [[2,'1~2일'],[4,'3~5일'],[7,'1주 정도'],[14,'2주 정도'],[30,'한 달 이상'],['','잘 모르겠어요']];
+const SURVEY_FIT_OPTS = [[2,'훨씬 잘 맞았어요'],[1,'조금 더 잘 맞았어요'],[0,'비슷했어요'],[-1,'조금 덜 맞았어요'],[-2,'훨씬 덜 맞았어요'],['','잘 모르겠어요']];
+const SURVEY_CONTACT_OPTS = [[1,'1'],[3,'2~3'],[5,'4~6'],[8,'7~10'],[15,'11 이상'],['','잘 모르겠어요']];
 function contractSurveyHtml(p, isCompany){
   const what = isCompany ? '이런 인력을 구할 때' : '이런 프로젝트를 찾을 때';
   return `<div class="reco-empty" style="margin-top:10px; text-align:left;" id="survey-${p.id}">
@@ -2511,6 +2526,10 @@ function contractSurveyHtml(p, isCompany){
     <div id="sv-dwrap-${p.id}">
       <label class="form-label" style="margin-top:10px;">그 방법으로는 보통 얼마나 걸렸나요?</label>
       <select class="form-input" id="sv-days-${p.id}"><option value="x">선택해주세요</option>${SURVEY_DAY_OPTS.map(([v,l])=>`<option value="${v}">${l}</option>`).join('')}</select>
+      <label class="form-label" style="margin-top:10px;">그 방법으로 만나던 ${isCompany ? '인력' : '프로젝트'}과 비교하면, 이번 상대는 조건(기술·등급·단가)에 얼마나 맞았나요?</label>
+      <select class="form-input" id="sv-fit-${p.id}"><option value="x">선택해주세요</option>${SURVEY_FIT_OPTS.map(([v,l])=>`<option value="${v}">${l}</option>`).join('')}</select>
+      <label class="form-label" style="margin-top:10px;">그 방법으로는 보통 ${isCompany ? '몇 명을 검토·연락해야 1명과' : '몇 곳에 지원·연락해야 1건'} 계약했나요?</label>
+      <select class="form-input" id="sv-cnt-${p.id}"><option value="x">선택해주세요</option>${SURVEY_CONTACT_OPTS.map(([v,l])=>`<option value="${v}">${l}${v===''?'':(isCompany?'명':'곳')}</option>`).join('')}</select>
     </div>
     <label class="form-label" style="margin-top:10px;">다음에도 IT Free로 ${isCompany ? '인력을 구할' : '프로젝트를 찾을'} 생각이 있나요? (0~10)</label>
     <select class="form-input" id="sv-int-${p.id}"><option value="">선택해주세요</option>${[10,9,8,7,6,5,4,3,2,1,0].map(n=>`<option value="${n}">${n}${n===10?' (꼭 다시 쓸게요)':n===0?' (전혀 아니에요)':''}</option>`).join('')}</select>
@@ -2523,12 +2542,17 @@ async function submitContractSurvey(id){
   const intent = document.getElementById(`sv-int-${id}`).value;
   if(!ch){ toast('이전에 주로 쓰던 방법을 골라주세요'); return; }
   if(ch !== 'first' && daysSel === 'x'){ toast('걸리던 기간을 골라주세요'); return; }
+  const fitSel = document.getElementById(`sv-fit-${id}`).value, cntSel = document.getElementById(`sv-cnt-${id}`).value;
+  if(ch !== 'first' && fitSel === 'x'){ toast('조건에 얼마나 맞았는지 골라주세요'); return; }
+  if(ch !== 'first' && cntSel === 'x'){ toast('몇 명(곳)을 접촉했는지 골라주세요'); return; }
   if(intent === ''){ toast('다시 이용할 의향을 골라주세요'); return; }
   if(busyActions.has(`survey-${id}`)) return;
   busyActions.add(`survey-${id}`);
   try{
     await apiFetch(`/projects/${id}/survey`, {method:'POST', body:{
       prevChannel: ch, prevDays: ch === 'first' || daysSel === '' ? null : Number(daysSel), reuseIntent: Number(intent),
+      fitVsPrev: ch === 'first' || fitSel === '' || fitSel === 'x' ? null : Number(fitSel),
+      prevContacts: ch === 'first' || cntSel === '' || cntSel === 'x' ? null : Number(cntSel),
     }});
     toast('답변 감사합니다');
     const el = document.getElementById(`survey-${id}`); if(el) el.remove();
@@ -5298,6 +5322,11 @@ async function screenAdminPerformance(){
       <tbody>${p.scoreBands.map(b=>`<tr><td>${bandLabel[b.key]}</td><td class="num">${b.n}</td><td class="num"><b>${fmtPct(b.matchRate)}</b></td><td class="num">${fmtPct(b.contractRate)}</td></tr>`).join('')}</tbody></table>
     <div class="page-sub" style="margin-top:6px; line-height:1.6;">추천 점수가 높은 구간의 매칭률·계약률이 더 높으면, 추천이 실제 성사에 도움이 된다는 근거가 돼요.${anyEstimated ? ' 이번 업데이트 전의 지원·제안은 지금 프로필로 다시 계산한 추정값이 섞여 있어요.' : ''}</div>
 
+    <div class="section-label with-ic">${I.sparkle}출처별 성과 (추천부터 계약까지)</div>
+    <table class="stat-table"><thead><tr><th>시작된 곳</th><th class="num">지원·제안</th><th class="num">매칭률</th><th class="num">계약률</th><th class="num">첫 접촉→계약</th></tr></thead>
+      <tbody>${(p.bySource||[]).map(x=>`<tr><td>${esc(x.label)}</td><td class="num">${x.n}</td><td class="num"><b>${fmtPct(x.matchRate)}</b></td><td class="num">${fmtPct(x.contractRate)}</td><td class="num">${x.contactToContract.medianDays === null ? '-' : x.contactToContract.medianDays + '일'}</td></tr>`).join('')}</tbody></table>
+    <div class="page-sub" style="margin-top:6px; line-height:1.6;">지원·제안이 추천 목록·검색·알림 중 어디서 시작됐는지 기록해요. 추천 목록에서 시작한 연결이 더 빨리·더 많이 계약되면 추천의 효과를 보여주는 근거가 돼요. (기록을 시작하기 전의 지원·제안은 빠져요)</div>
+
     <div class="section-label with-ic">${I.clockSm}기존 방식과 비교 (계약 후 설문)</div>
     ${(() => {
       const b = p.baseline, c = b.compare, r = b.reuseIntent;
@@ -5313,6 +5342,19 @@ async function screenAdminPerformance(){
         <div class="hs"><div class="hs-num">${r.nps === null ? '-' : r.nps}</div><div class="hs-lbl">순추천지수(NPS)</div></div>
         <div class="hs"><div class="hs-num">${r.avg === null ? '-' : r.avg}</div><div class="hs-lbl">재이용 의향 평균 (0~10)</div></div>
       </div>
+      ${(() => {
+        const f = b.fit || {n:0}, k = b.contacts || {n:0}, n1 = (v) => v === null || v === undefined ? '-' : `${v}명`;
+        return `<div class="hero-stat" style="margin-top:8px;">
+          <div class="hs"><div class="hs-num">${fmtPct(f.betterRate)}</div><div class="hs-lbl">기존보다 조건에 더 맞음 (${f.n}건)</div></div>
+          <div class="hs"><div class="hs-num">${fmtPct(f.worseRate)}</div><div class="hs-lbl">기존보다 덜 맞음</div></div>
+        </div>
+        <div class="hero-stat" style="margin-top:8px;">
+          <div class="hs"><div class="hs-num">${n1(k.platformMedian)}</div><div class="hs-lbl">IT Free 계약 1건까지 접촉</div></div>
+          <div class="hs"><div class="hs-num">${n1(k.prevMedian)}</div><div class="hs-lbl">기존 방식 (응답자 기준)</div></div>
+          <div class="hs"><div class="hs-num">${fmtPct(k.fewerRate)}</div><div class="hs-lbl">기존보다 적게 접촉한 계약</div></div>
+        </div>
+        <div class="page-sub" style="margin-top:6px; line-height:1.6;">매칭 정확도는 '이번 상대가 기존 방식으로 만나던 상대보다 조건에 맞았나'로, 계약 성사율은 '계약 1건까지 몇 명(곳)을 접촉했나'로 기존 방식과 비교해요. 기업은 계약한 공고의 지원·제안 상대 수, 프리랜서는 계약 전 90일의 지원·받은 제안 수예요 (${k.n}건).</div>`;
+      })()}
       ${b.responses ? `<div class="page-sub" style="margin-top:6px;">이전 경로: ${Object.entries(b.channels).sort((x,y)=>y[1]-x[1]).map(([k,v])=>`${esc(chLabel[k] || k)} ${v}`).join(' · ')}</div>` : `<div class="page-sub" style="margin-top:6px;">계약이 체결되면 양쪽에 30초 설문이 표시돼요.</div>`}`;
     })()}
 
@@ -5366,6 +5408,9 @@ function copyPerfSummary(){
     `- 추천 점수별 계약률: ` + p.scoreBands.map(b => `${b.key}점 ${fmtPct(b.contractRate)}(${b.n}건)`).join(', '),
     `- 기존 방식 대비(계약 후 설문, ${p.baseline.compare.n}건): IT Free 첫 접촉→계약 ${p.baseline.compare.platformMedianDays ?? '-'}일 vs 기존 방식 ${p.baseline.compare.prevMedianDays ?? '-'}일(중간값), 기존보다 빨랐던 계약 ${fmtPct(p.baseline.compare.fasterRate)}`,
     `- 재이용 의향: NPS ${p.baseline.reuseIntent.nps ?? '-'}, 평균 ${p.baseline.reuseIntent.avg ?? '-'}/10 (응답 ${p.baseline.reuseIntent.n}건)`,
+    `- 기존 대비 조건 적합도(설문 ${p.baseline.fit ? p.baseline.fit.n : 0}건): 더 맞음 ${fmtPct(p.baseline.fit && p.baseline.fit.betterRate)}, 덜 맞음 ${fmtPct(p.baseline.fit && p.baseline.fit.worseRate)}`,
+    `- 계약 1건까지 접촉 수(${p.baseline.contacts ? p.baseline.contacts.n : 0}건): IT Free ${p.baseline.contacts && p.baseline.contacts.platformMedian !== null ? p.baseline.contacts.platformMedian : '-'}명 vs 기존 방식 ${p.baseline.contacts && p.baseline.contacts.prevMedian !== null ? p.baseline.contacts.prevMedian : '-'}명(중간값)`,
+    `- 출처별 계약률: ` + (p.bySource||[]).map(x => `${x.label} ${fmtPct(x.contractRate)}(${x.n}건)`).join(', '),
     `- 재이용률: 기업 ${fmtPct(p.reuse.companies.rate)}(${p.reuse.companies.repeat}/${p.reuse.companies.total}), 프리랜서 ${fmtPct(p.reuse.freelancers.rate)}(${p.reuse.freelancers.repeat}/${p.reuse.freelancers.total})`,
     `- 경력 검증 프리랜서: ${p.trust.verifiedFreelancers}명 / 전체 ${p.trust.totalFreelancers}명`,
     `- 매칭 전 연락처 공유(사기 주의 안내): ${p.trust.maskedMessages}회`,
