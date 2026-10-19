@@ -122,7 +122,7 @@ ${jsonLd ? `<script type="application/ld+json">${JSON.stringify(jsonLd).replace(
   ${body}
   <div class="foot">
     <a href="/jobs">전체 공고</a><a href="/company.html">사업자 정보</a><a href="/terms.html">이용약관</a><a href="/privacy.html">개인정보처리방침</a>
-    <p>IT Free는 기술스택으로 IT 프리랜서와 기업을 연결하는 매칭 서비스입니다. © 마켓리어</p>
+    <p>IT Free는 기술스택 기반으로 IT 프리랜서와 기업의 구인·구직 정보를 제공하는 서비스입니다. © 마켓리어</p>
   </div>
 </div></body>
 </html>`;

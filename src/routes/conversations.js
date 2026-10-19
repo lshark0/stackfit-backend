@@ -4,7 +4,7 @@ const { requireAuth } = require('../middleware/requireAuth');
 const { wrapAllRoutes } = require('../middleware/asyncHandler');
 const { pushTo } = require('../notify');
 const { getInterview, saveInterview, cancelInterview } = require('../interviews');
-const { maskContacts, isPairConnected } = require('../contactGuard');
+const { detectContacts, isPairConnected } = require('../contactGuard');
 
 const router = express.Router();
 wrapAllRoutes(router);
@@ -143,7 +143,7 @@ router.get('/:id/messages', requireAuth, async (req, res) => {
   res.json({
     messages: msgs,
     interview: await getInterview(conv.id),
-    // 매칭(제안 수락·합격) 전에는 채팅의 연락처가 가려진다는 안내를 화면에 띄우기 위해 알려줍니다.
+    // 매칭(제안 수락·합격) 전 대화에는 사기 주의 안내를 화면에 띄우기 위해 알려줍니다.
     connected: await isPairConnected(conv.company_id, conv.freelancer_id),
     counterpartName: senderRow ? senderRow.name : null,
     jobTitle: job ? job.title : null,
@@ -192,15 +192,15 @@ router.post('/:id/messages', requireAuth, async (req, res) => {
     return res.status(404).json({ error: '대화를 찾을 수 없습니다.' });
   }
 
-  // 직접 거래 방지: 매칭 전에는 전화번호·이메일·메신저 ID를 가려서 저장합니다(원문은 저장하지 않음).
-  let text = body.trim();
-  let masked = null;
+  // 연락처는 가리지 않습니다. 매칭 전에 연락처가 오가면 사기 주의 안내를 띄우고, 지표용으로 종류만 기록합니다.
+  const text = body.trim();
+  let shared = null;
   if (!(await isPairConnected(conv.company_id, conv.freelancer_id))) {
-    const m = maskContacts(text);
-    if (m.masked) { text = m.text; masked = m.types; }
+    const types = detectContacts(text);
+    if (types.length) shared = types;
   }
   await run('INSERT INTO messages (conversation_id, sender_id, body, meta_json) VALUES (?,?,?,?)',
-    [conv.id, req.user.id, text, masked ? JSON.stringify({ contactMasked: masked }) : null]);
+    [conv.id, req.user.id, text, shared ? JSON.stringify({ contactShared: shared }) : null]);
   const counterpartId = req.user.id === conv.company_id ? conv.freelancer_id : conv.company_id;
 
   // 보낸 사람 이름을 알림에 담아 누구에게서 온 메시지인지 바로 알 수 있게 합니다.
@@ -236,7 +236,7 @@ router.post('/:id/messages', requireAuth, async (req, res) => {
   });
 
   const msgs = await listMessages(conv.id);
-  res.status(201).json({ messages: msgs, masked: !!masked });
+  res.status(201).json({ messages: msgs, contactShared: !!shared });
 });
 
 // 상대에게 아직 안 읽힌 '새 메시지' 알림을 내가 보낸 최신 메시지 내용으로 맞춥니다(수정·삭제 후).
@@ -286,22 +286,22 @@ router.put('/:id/messages/:messageId', requireAuth, async (req, res) => {
   if (sentAt !== null && Date.now() - sentAt > EDIT_WINDOW_MS) {
     return res.status(400).json({ error: '보낸 지 24시간이 지난 메시지는 수정할 수 없어요. 삭제는 할 수 있어요.' });
   }
-  let text = body.trim();
-  let masked = null;
+  const text = body.trim();
+  let shared = null;
   if (!(await isPairConnected(conv.company_id, conv.freelancer_id))) {
-    const m = maskContacts(text);
-    if (m.masked) { text = m.text; masked = m.types; }
+    const types = detectContacts(text);
+    if (types.length) shared = types;
   }
-  // 예전에 가려진 기록(직접 거래 방지 지표)은 그대로 두고, 이번 수정에서 가린 항목을 더합니다.
+  // 예전 기록(연락처 공유 지표)은 그대로 두고, 이번 수정에서 감지된 항목을 더합니다.
   let meta = {};
   try { meta = msg.meta_json ? JSON.parse(msg.meta_json) : {}; } catch (e) { meta = {}; }
-  if (masked) meta.contactMasked = [...new Set([...(meta.contactMasked || []), ...masked])];
+  if (shared) meta.contactShared = [...new Set([...(meta.contactShared || []), ...shared])];
   if (text !== msg.body) {
     await run('UPDATE messages SET body = ?, meta_json = ?, edited_at = ? WHERE id = ?',
       [text, Object.keys(meta).length ? JSON.stringify(meta) : null, nowStr(), msg.id]);
     await refreshUnreadNotification(conv, req.user.id);
   }
-  res.json({ messages: await listMessages(conv.id), masked: !!masked });
+  res.json({ messages: await listMessages(conv.id), contactShared: !!shared });
 });
 
 // 메시지 삭제 — 본인이 보낸 메시지는 시간 제한 없이 삭제할 수 있습니다.

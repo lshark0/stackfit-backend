@@ -1,6 +1,5 @@
 const { run, get, all } = require('./db');
 const { addNotification, pushTo } = require('./notify');
-const { maskContacts, isPairConnected } = require('./contactGuard');
 
 // 채팅 중 잡는 인터뷰 일정. 시각은 한국시간 기준 'YYYY-MM-DD HH:MM' 문자열로 저장하고 비교합니다.
 const MODES = { offline: '대면', online: '화상', phone: '전화' };
@@ -103,15 +102,9 @@ async function saveInterview(conv, userId, input) {
   const mode = MODES[input.mode] ? input.mode : 'offline';
   const placeRaw = String(input.place || '').replace(/\s+/g, ' ').trim().slice(0, 120);
   let link = String(input.link || '').trim();
-  let note = String(input.note || '').trim().slice(0, 300);
-  // 매칭 전에는 메모·장소에 적은 연락처도 채팅과 똑같이 가립니다(직접 거래 방지).
-  const connected = await isPairConnected(conv.company_id, conv.freelancer_id);
-  if (!connected) note = maskContacts(note).text;
-  const place = connected ? placeRaw : maskContacts(placeRaw).text;
+  const note = String(input.note || '').trim().slice(0, 300);
+  const place = placeRaw;
   if (mode === 'offline' && !place) return { error: '인터뷰 장소를 입력해주세요.' };
-  if (mode === 'online' && link && !connected && maskContacts(link).masked) {
-    return { error: '메신저 링크는 제안 수락·합격 후에 공유할 수 있어요. 화상 회의 링크(Google Meet·Zoom 등)를 넣어주세요.' };
-  }
   if (mode === 'online' && link) {
     // 화상 회의 링크는 https 주소만 받습니다(다른 형식의 링크로 앱 밖 실행을 유도하는 것 방지).
     let ok = false;

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>IT Free — 최적의 IT 매칭 솔루션</title>
-<meta name="description" content="기술스택으로 정확하게 연결하는 IT 프리랜서 매칭 플랫폼. 자동 매칭 추천, 포트폴리오, 실시간 채팅, 상호 평가까지.">
+<meta name="description" content="IT 프리랜서·기업 구인구직 정보 플랫폼. 기술스택 기반 추천, 포트폴리오, 실시간 채팅, 상호 평가까지.">
 
 <!-- 카카오톡·문자·SNS로 링크를 공유할 때 표시되는 미리보기 카드 -->
 <meta property="og:type" content="website">
@@ -2126,7 +2126,7 @@ async function submitEditMessage(convId){
   input.disabled = true;
   try{
     const data = await apiFetch(`/conversations/${convId}/messages/${msgId}`, {method:'PUT', body:{body:text}});
-    if(data.masked) toast('매칭 전이라 연락처는 가려서 수정했어요'); else toast('메시지를 수정했어요');
+    if(data.contactShared) toast('수정했어요. 선입금·개인정보 요구는 사기일 수 있어요'); else toast('메시지를 수정했어요');
     chatEditId = null;
     cancelEditMessage();
     refreshChatBubbles(data.messages);
@@ -2365,7 +2365,7 @@ async function sendMessage(convId){
   try{
     const data = await apiFetch(`/conversations/${convId}/messages`, {method:'POST', body:{body:text}});
     input.value = '';
-    if(data.masked) toast('매칭 전이라 연락처는 가려서 보냈어요');
+    if(data.contactShared) toast('연락처를 보냈어요. 선입금 요구 등 사기에 주의하세요');
     const wrap = document.querySelector('#chatScroll .bubble-wrap');
     if(wrap){
       wrap.innerHTML = chatBubblesHtml(data.messages);
@@ -4480,7 +4480,7 @@ async function screenChatRoom(){
     <div style="min-width:0;"><div class="page-title" style="font-size:16px;">${esc(data.counterpartName || '대화')}</div>${data.jobTitle ? `<div class="page-sub" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${esc(data.jobTitle)}</div>` : ''}</div></div></div>
   <div class="iv-bar" id="ivBar">${interviewBarHtml(data.interview, state.param)}</div>
   <div class="content" id="chatScroll">
-    ${data.connected ? '' : `<div class="chat-guard">${I.verified}<div><b>매칭 전에는 연락처가 가려져요.</b> 전화번호·이메일·메신저 ID는 제안 수락이나 합격 후에 공개돼요. IT Free 안에서 계약하면 계약서·진행 단계·상호 평가가 기록으로 남아요.</div></div>`}
+    ${data.connected ? '' : `<div class="chat-guard">${I.verified}<div><b>안전하게 대화하세요.</b> 계약 전에 선입금·장비 구매·신분증이나 금융정보를 요구하면 사기일 수 있어요. 상대가 '사업자 확인 기업'·'경력 검증' 배지가 있는지 확인하고, 이상하면 고객센터 &gt; 문의·신고로 알려주세요.</div></div>`}
     <div class="bubble-wrap">${chatBubblesHtml(data.messages)}</div>
   </div>
   <div class="chat-edit-bar" id="chatEditBar" style="display:none;"><span>${I.edit || '✎'} 메시지 수정 중</span><button onclick="cancelEditMessage()">취소</button></div>
@@ -4525,7 +4525,7 @@ async function screenMypage(){
     <div class="list-item" onclick="go('careerVerify')"><div class="li-l"><div class="li-icon">${I.verified}</div>
       <div><div class="li-tt">경력 검증</div><div class="page-sub" style="margin-top:2px;">${Number(profile.verified)===1 ? '검증 완료 · 배지 표시 중' : '증빙 서류로 경력 검증 배지 받기'}</div></div></div>${I.back}</div>` : ''}
     <div class="list-item" onclick="go('plans')"><div class="li-l"><div class="li-icon">${I.sparkle}</div>
-      <div><div class="li-tt">${isCompany ? '기업 구독' : '프리랜서 프리미엄'}</div><div class="page-sub" style="margin-top:2px;">${isCompany ? '프리미엄 등록·제안권·AI 리포트 월 묶음 · 출시 예정' : '상단 노출·우선 알림·지원서 강조 · 출시 예정'}</div></div></div>${I.back}</div>
+      <div><div class="li-tt">${isCompany ? '기업 구독' : '프리랜서 프리미엄'}</div><div class="page-sub" style="margin-top:2px;">${isCompany ? '프리미엄 등록·제안권·분석 리포트 월 묶음 · 출시 예정' : '상단 노출·우선 알림·지원서 강조 · 출시 예정'}</div></div></div>${I.back}</div>
     ${me.user.hasPassword ? `<div class="list-item" onclick="go('changePassword')"><div class="li-l"><div class="li-icon">${I.gear}</div><div class="li-tt">비밀번호 변경</div></div>${I.back}</div>` : ''}
     ${state.isAdmin && !me.user.mfaVerified ? `
     <div class="section-label with-ic">${I.gear}관리자</div>
@@ -5334,13 +5334,13 @@ async function screenAdminPerformance(){
       <div class="page-sub" style="margin-top:6px;">모집 중 공고가 없으면 기업을, 공고 1건당 그 분야 인재가 5명 미만이면 프리랜서를 먼저 모아요. 인재는 그 분야 기술을 가진 프리랜서 수예요.</div>` : '');
     })()}
 
-    <div class="section-label with-ic">${I.verified}신뢰 · 직접 거래 방지</div>
+    <div class="section-label with-ic">${I.verified}신뢰 · 안전 거래</div>
     <div class="hero-stat">
       <div class="hs"><div class="hs-num">${p.trust.verifiedFreelancers}/${p.trust.totalFreelancers}</div><div class="hs-lbl">경력 검증 프리랜서</div></div>
       <div class="hs" onclick="go('adminCareerVerify')" style="cursor:pointer;"><div class="hs-num">${p.trust.verificationPending}</div><div class="hs-lbl">검증 대기 ›</div></div>
-      <div class="hs"><div class="hs-num">${p.trust.maskedMessages}</div><div class="hs-lbl">매칭 전 연락처 공유 시도</div></div>
+      <div class="hs"><div class="hs-num">${p.trust.maskedMessages}</div><div class="hs-lbl">매칭 전 연락처 공유</div></div>
     </div>
-    <div class="page-sub" style="margin-top:6px;">연락처 공유 시도는 매칭 전 채팅에서 전화번호·이메일·메신저 ID를 가린 횟수예요 (대화 ${p.trust.maskedConversations}곳).</div>
+    <div class="page-sub" style="margin-top:6px;">매칭 전 채팅에서 전화번호·이메일·메신저 ID가 오가 사기 주의 안내를 띄운 횟수예요(연락처는 가리지 않아요) (대화 ${p.trust.maskedConversations}곳).</div>
 
     ${planSummary ? `
     <div class="section-label with-ic">${I.sparkle}요금제 사전 신청</div>
@@ -5365,7 +5365,7 @@ function copyPerfSummary(){
     `- 재이용 의향: NPS ${p.baseline.reuseIntent.nps ?? '-'}, 평균 ${p.baseline.reuseIntent.avg ?? '-'}/10 (응답 ${p.baseline.reuseIntent.n}건)`,
     `- 재이용률: 기업 ${fmtPct(p.reuse.companies.rate)}(${p.reuse.companies.repeat}/${p.reuse.companies.total}), 프리랜서 ${fmtPct(p.reuse.freelancers.rate)}(${p.reuse.freelancers.repeat}/${p.reuse.freelancers.total})`,
     `- 경력 검증 프리랜서: ${p.trust.verifiedFreelancers}명 / 전체 ${p.trust.totalFreelancers}명`,
-    `- 매칭 전 연락처 공유 차단: ${p.trust.maskedMessages}회`,
+    `- 매칭 전 연락처 공유(사기 주의 안내): ${p.trust.maskedMessages}회`,
     ...(planSummary ? [`- 요금제 사전 신청: ` + planSummary.plans.map(x => `${x.role==='company' ? '기업 ' + x.name : x.name} ${x.count}건`).join(', ')] : []),
   ];
   copyText(lines.join('\n'), '성과 요약을 복사했어요');
@@ -5469,6 +5469,14 @@ async function screenAdminProxyJobs(){
   return `${statusbar()}
   <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('mypage')">${I.back}</div><div class="page-title" style="font-size:19.5px;">공고 대리 등록</div></div></div>
   <div class="content">
+    <div class="card" style="margin-bottom:12px; border:1.5px solid var(--amber);">
+      <div class="card-title" style="font-size:14.5px;">운영 원칙 · 게시만 대행해요</div>
+      <ul style="margin:8px 0 0; padding-left:18px; line-height:1.7; font-size:13px;">
+        <li>기업이 정한 공고 내용을 <b>그대로 게시만</b> 대신해요. 대가는 받지 않아요.</li>
+        <li>지원자 열람·선별·면접 조율·연결은 <b>하지 않아요.</b> 지원자 관리는 기업이 계정을 넘겨받아 직접 해요.</li>
+        <li>지원이 오면 기업 담당자에게 계정 연결 링크만 다시 보내주세요.</li>
+      </ul>
+    </div>
     <div class="page-sub" style="margin-bottom:12px; line-height:1.6;">기업 담당자의 <b>동의를 받은 공고만</b> 대신 등록해요. 공고에는 'IT Free 대리 등록' 표시가 붙어요.<br>
       가입한 기업은 그 계정으로 올리고 기업에 알림이 가요. 가입 전 기업은 계정을 대신 만들고, <b>계정 연결 링크</b>를 담당자에게 보내면 비밀번호를 정해 넘겨받아요.</div>
     <label class="list-item" style="cursor:pointer;"><div class="li-l"><input type="checkbox" ${proxyConsent?'checked':''} onchange="proxyConsent=this.checked" style="width:18px; height:18px;">
@@ -5584,7 +5592,7 @@ async function screenPlans(){
       <div class="banner-eyebrow">${isCompany ? 'Business Plan' : 'Premium'} · 출시 예정</div>
       <div class="banner-title">${isCompany ? '필요한 만큼 매달 묶음으로' : '기업에게 먼저 보이세요'}</div>
       <div class="banner-sub" style="color:var(--slate);">${isCompany
-        ? '공고 등록·인재 검색·추천 %는 지금처럼 <b>무료</b>예요. 구독하면 프리미엄 등록·제안권·AI 매칭 리포트를 매달 묶음으로 더 싸게 쓸 수 있어요.'
+        ? '공고 등록·인재 검색·추천 %는 지금처럼 <b>무료</b>예요. 구독하면 프리미엄 등록·제안권·인재풀 분석 리포트를 매달 묶음으로 더 싸게 쓸 수 있어요. 채용·계약이 성사돼도 <b>수수료는 받지 않아요.</b>'
         : '지원·제안 받기·채팅·계약 관리 같은 기본 기능은 계속 <b>무료</b>예요. 프리미엄은 더 많은 기업에게 먼저 보이도록 도와줘요.'}</div>
     </div>
     ${d.plans.map(p => `
@@ -5610,6 +5618,7 @@ async function screenPlans(){
     <div class="page-sub" style="margin-top:14px; line-height:1.65;">
       · 정식 출시 전이라 <b>지금은 결제되지 않아요.</b> 사전 신청하면 출시될 때 가장 먼저 알려드려요.<br>
       · 가격과 구성은 출시 때 바뀔 수 있어요.<br>
+      · IT Free는 구인·구직 정보를 제공하는 서비스예요. 채용·계약이 성사돼도 <b>수수료를 받지 않아요.</b><br>
       · 친구 초대로 적립한 1개월 이용권으로 출시 후 ${isCompany ? '스타터를' : '프리미엄을'} 1개월씩 무료로 쓸 수 있어요. <a style="text-decoration:underline; cursor:pointer;" onclick="go('invite')">친구 초대</a>
     </div>
   </div>`;
@@ -5618,10 +5627,10 @@ async function screenPlans(){
 const PLAN_TERMS = [
   { key: 'premium', role: 'company', match: '프리미엄 등록', short: '프리미엄 등록', title: '프리미엄 등록',
     body: '공고를 14일 동안 추천 목록 상단에 고정하고 "급구" 배지를 붙여요. 기술이 맞는 프리랜서에게 먼저 보여서 지원을 더 빨리 받을 수 있어요.' },
-  { key: 'proposal', role: 'company', match: '제안권', short: '제안권', title: '성과형 제안권',
-    body: '인재 검색에서 원하는 프리랜서에게 먼저 프로젝트를 제안할 때 쓰는 이용권이에요. 제안을 보낼 때가 아니라 프리랜서가 제안을 수락했을 때만 1회 차감돼요. 거절되거나 답이 없으면 차감되지 않아요.' },
-  { key: 'ai-report', role: 'company', match: 'AI 매칭 리포트', short: 'AI 리포트', title: 'AI 매칭 리포트',
-    body: '공고 하나에 대해 AI가 추천 상위 후보를 비교·분석한 보고서예요. 후보마다 맞는 점과 부족한 점, 그 기술을 가진 인재가 얼마나 있는지, 조건을 어떻게 바꾸면 후보가 늘어나는지 정리해 드려요. 내부 보고 자료로 그대로 쓸 수 있어요.' },
+  { key: 'proposal', role: 'company', match: '제안권', short: '제안권', title: '제안권',
+    body: '인재 검색에서 원하는 프리랜서에게 먼저 프로젝트를 제안할 수 있는 월 이용 횟수예요. 제안을 보낼 때 1회 차감되고, 수락·계약 여부와 관계없이 요금은 같아요. IT Free는 채용·계약 성사 수수료를 받지 않아요.' },
+  { key: 'ai-report', role: 'company', match: '인재풀 분석 리포트', short: '분석 리포트', title: '인재풀 분석 리포트',
+    body: '공고에 필요한 기술을 가진 인재가 IT Free에 얼마나 있는지, 등급·경력·희망 단가가 어떻게 분포하는지, 기술·단가·근무 형태 조건을 바꾸면 인재풀이 얼마나 넓어지는지 AI가 분석해 드려요. 특정 후보를 골라 추천하거나 연결해 드리지는 않아요. 내부 보고 자료로 그대로 쓸 수 있어요.' },
   { key: 'hire-stats', role: 'company', match: '채용 통계 리포트', short: '설명', title: '채용 통계 리포트',
     body: '공고별로 지원·제안·인터뷰·계약이 몇 건인지, 공고를 올리고 계약까지 며칠 걸렸는지 한눈에 보여줘요.' },
   { key: 'highlight', role: 'freelancer', match: '지원서 강조', short: '설명', title: '지원서 강조 표시',

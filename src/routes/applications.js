@@ -68,7 +68,7 @@ router.post('/jobs/:id/apply', requireAuth, requireRole('freelancer'), async (re
   if (owner && Number(owner.claim_pending) === 1) {
     notifyAdmins({
       title: '대리 등록 공고에 지원이 왔어요',
-      body: `"${job.title}" · 기업 계정 연결 전이에요. 담당자에게 계정 연결 링크를 보내주세요.`,
+      body: `"${job.title}" · 기업 계정 연결 전이에요. 담당자에게 계정 연결 링크만 보내주세요(지원자 선별·연결은 기업이 직접 해요).`,
       link: 'adminProxyJobs', tag: `proxy-apply-${job.id}`,
     });
   }

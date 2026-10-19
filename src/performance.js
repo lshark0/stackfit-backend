@@ -8,7 +8,7 @@ const { CATEGORIES, matchesCategory } = require('./stackCatalog');
 //  - 추천 점수 구간별 성사율: 추천 점수가 높을수록 실제로 매칭·계약이 잘 되는지(매칭 정확도 근거)
 //  - 재이용률: 두 번 이상 계약한 기업·프리랜서 비율
 //  - 분야별 성과: 어느 기술 분야에서 계약이 나오는지(집중할 분야 찾기)
-//  - 신뢰·직접 거래 방지: 경력 검증 현황, 매칭 전 연락처 공유 시도
+//  - 신뢰·안전 거래: 경력 검증 현황, 매칭 전 연락처 공유(사기 주의 안내)
 //  - 기존 방식과 비교: 계약 후 설문의 '기존 방식으로 걸리던 기간'과 같은 계약의 실제 소요 기간, 재이용 의향(NPS)
 // 데이터 양이 크지 않아 DB(SQLite·PostgreSQL) 차이를 피하려고 행을 읽어 와 서버에서 계산합니다.
 
@@ -57,7 +57,7 @@ async function computePerformance(days) {
     all(`SELECT id, job_id, company_id, freelancer_id, status, contracted_at, completed_at, created_at FROM projects ORDER BY id DESC LIMIT ${ROW_LIMIT}`),
     all(`SELECT i.status, i.created_at, c.company_id, c.freelancer_id FROM interviews i JOIN conversations c ON c.id = i.conversation_id ORDER BY i.id DESC LIMIT ${ROW_LIMIT}`),
     all('SELECT user_id, stack_json, role_title, grade, verified FROM freelancer_profiles'),
-    all(`SELECT conversation_id, created_at FROM messages WHERE meta_json LIKE ? ORDER BY id DESC LIMIT ${ROW_LIMIT}`, ['%contactMasked%']),
+    all(`SELECT conversation_id, created_at FROM messages WHERE meta_json LIKE ? ORDER BY id DESC LIMIT ${ROW_LIMIT}`, ['%contact%ed%']),
     get("SELECT COUNT(*) AS c FROM career_verifications WHERE status IN ('pending','needs_review')"),
     all(`SELECT project_id, role, prev_channel, prev_days, reuse_intent, created_at FROM contract_surveys ORDER BY id DESC LIMIT ${ROW_LIMIT}`),
   ]);
@@ -181,7 +181,7 @@ async function computePerformance(days) {
     .filter((c) => c.jobs || c.contacts || c.contracted || c.openJobs || c.talents)
     .sort((a, b) => b.contracted - a.contracted || b.contacts - a.contacts || b.jobs - a.jobs || (b.talents || 0) - (a.talents || 0));
 
-  // ----- 신뢰·직접 거래 방지 -----
+  // ----- 신뢰·안전 거래 -----
   const maskedW = masked.filter((m) => inWin(m.created_at));
   const trust = {
     verifiedFreelancers: profiles.filter((p) => Number(p.verified) === 1).length,

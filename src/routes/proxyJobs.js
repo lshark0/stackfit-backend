@@ -10,6 +10,9 @@ const { addNotification, pushTo } = require('../notify');
 const { createJob, withCompanyAndStack, bizVerified } = require('./jobs');
 const { verifyBusiness, saveBusiness } = require('../bizCheck');
 
+// 공고 대리 등록 운영 원칙: IT Free는 기업이 정한 공고 내용을 '게시만' 대신하고, 대가를 받지 않습니다.
+// 지원자 열람·선별·면접 조율·연결은 하지 않습니다(관리자도 지원자 목록을 볼 수 없고, 지원 수만 봅니다).
+
 // 관리자 공고 대리 등록: 초기에 공고를 먼저 채우기 위해, 기업 담당자의 동의를 받아 관리자가 공고를 대신 올립니다.
 //  - 이미 가입한 기업: 그 기업 계정으로 공고를 올리고 기업에 알립니다(기업이 직접 수정·마감 가능).
 //  - 가입 전 기업: 담당자 이메일로 기업 계정을 대신 만들고, '계정 연결 링크'를 담당자에게 보내 비밀번호를 정하게 합니다.

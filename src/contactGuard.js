@@ -1,8 +1,8 @@
 const { get } = require('./db');
 
-// 직접 거래(수수료 우회) 대응: 계약 전 채팅에서 전화번호·이메일·메신저 ID를 가립니다.
-// 연락처 공개 원칙(프리랜서가 제안을 수락하거나 기업이 지원을 합격 처리한 뒤에만 공개)을 채팅에도 똑같이 적용해,
-// 매칭 전에 연락처를 주고받아 플랫폼 밖에서 거래하는 것을 막습니다.
+// 채팅 속 연락처(전화번호·이메일·메신저 ID) 감지.
+// IT Free는 구인·구직 정보를 제공하는 서비스라 회원끼리 연락처를 주고받는 것을 막지 않습니다(계약 성사 수수료 없음).
+// 다만 매칭 전에 연락처가 오가면 선입금 요구 같은 사기 피해가 생길 수 있어, 감지되면 화면에 주의 안내만 띄웁니다.
 
 const MASK = '[연락처 보호]';
 const RULES = [
@@ -18,7 +18,19 @@ const RULES = [
   { type: 'messenger', re: /(?:카톡|카카오톡|텔레그램)\s*[:：]?\s*@?[A-Za-z0-9._-]{4,}/gi },
 ];
 
-// 가린 문장과 가린 종류를 돌려줍니다. 가릴 게 없으면 masked: false
+// 메시지에 들어 있는 연락처 종류를 돌려줍니다(내용은 바꾸지 않음). 없으면 빈 배열.
+function detectContacts(text) {
+  const s = String(text || '');
+  const types = new Set();
+  for (const { type, re } of RULES) {
+    re.lastIndex = 0;
+    if (re.test(s)) types.add(type);
+    re.lastIndex = 0;
+  }
+  return [...types];
+}
+
+// 연락처를 가린 문장과 가린 종류를 돌려줍니다. 가릴 게 없으면 masked: false
 function maskContacts(text) {
   let out = String(text || '');
   const types = new Set();
@@ -32,7 +44,7 @@ function maskContacts(text) {
   return { text: out, masked: types.size > 0, types: [...types] };
 }
 
-// 두 사람이 이미 매칭됐는지(연락처가 공개되는 단계인지) 확인합니다.
+// 두 사람이 이미 매칭됐는지(제안 수락·합격 단계인지) 확인합니다. 매칭 전 대화에는 사기 주의 안내를 띄웁니다.
 // 프리랜서가 기업의 제안을 수락했거나, 기업이 지원을 합격 처리해 프로젝트가 만들어진 경우입니다.
 async function isPairConnected(companyId, freelancerId) {
   const proposal = await get(
@@ -44,4 +56,4 @@ async function isPairConnected(companyId, freelancerId) {
   return !!project;
 }
 
-module.exports = { maskContacts, isPairConnected, MASK };
+module.exports = { detectContacts, maskContacts, isPairConnected, MASK };
