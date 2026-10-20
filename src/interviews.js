@@ -73,7 +73,8 @@ async function getInterview(conversationId) {
 }
 
 // 대화방에 인터뷰 카드 메시지를 남기고, 상대에게 알림·푸시를 보냅니다.
-async function announce(conv, userId, iv, action) {
+// 변경일 때는 무엇이 바뀌었는지(이전 일정 → 새 일정, 장소) 함께 알려줍니다.
+async function announce(conv, userId, iv, action, prev) {
   const verb = { created: '잡았어요', updated: '변경했어요', cancelled: '취소했어요' }[action];
   const body = action === 'cancelled'
     ? `📅 인터뷰 취소: ${formatKo(iv.interview_at)}`
@@ -82,12 +83,23 @@ async function announce(conv, userId, iv, action) {
     action, interview_at: iv.interview_at, mode: iv.mode, place: iv.place,
     link: iv.link, note: iv.note,
   };
+  if (action === 'updated' && prev) {
+    meta.prev_interview_at = prev.interview_at;
+    meta.prev_place = placeLabel(prev);
+  }
   await run('INSERT INTO messages (conversation_id, sender_id, body, kind, meta_json) VALUES (?,?,?,?,?)',
     [conv.id, userId, body, 'interview', JSON.stringify(meta)]);
 
   const { counterpartId, myName } = await participants(conv, userId);
   const title = `${myName}님이 인터뷰 일정을 ${verb}`;
-  const detail = action === 'cancelled' ? formatKo(iv.interview_at) : `${formatKo(iv.interview_at)} · ${placeLabel(iv)}`;
+  let detail = action === 'cancelled' ? formatKo(iv.interview_at) : `${formatKo(iv.interview_at)} · ${placeLabel(iv)}`;
+  if (action === 'updated' && prev) {
+    const timeChanged = prev.interview_at !== iv.interview_at;
+    const placeChanged = placeLabel(prev) !== placeLabel(iv);
+    detail = timeChanged
+      ? `${formatKo(prev.interview_at)} → ${formatKo(iv.interview_at)} · ${placeLabel(iv)}`
+      : placeChanged ? `${formatKo(iv.interview_at)} · 장소 변경: ${placeLabel(iv)}` : `${formatKo(iv.interview_at)} · 안내 내용 변경`;
+  }
   await addNotification(counterpartId, { tag: '인터뷰', title, body: detail.slice(0, 80), link: `chatRoom:${conv.id}` });
   pushTo(counterpartId, { kind: 'chat', title: `📅 ${title}`, body: detail.slice(0, 100), tag: `interview-${conv.id}`, link: `chatRoom:${conv.id}` });
 }
@@ -140,7 +152,7 @@ async function saveInterview(conv, userId, input) {
     }
   }
   const saved = await get('SELECT * FROM interviews WHERE conversation_id = ?', [conv.id]);
-  await announce(conv, userId, saved, action);
+  await announce(conv, userId, saved, action, action === 'updated' ? existing : null);
   return { interview: publicView(saved) };
 }
 

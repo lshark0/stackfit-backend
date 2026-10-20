@@ -329,6 +329,7 @@
   .qchat-head button{flex:0 0 auto; background:none; border:1px solid var(--line); border-radius:10px; padding:6px 10px; font:inherit; font-size:12.5px; font-weight:700; color:var(--slate); cursor:pointer;}
   .qchat-note{padding:7px 16px; font-size:11.5px; color:#0E5F56; background:var(--cyan-soft);}
   .qchat-iv{padding:10px 16px;}
+  .iv-card-prev{color:var(--slate); text-decoration:line-through; text-decoration-color:rgba(0,0,0,.25);}
   .qchat-body{flex:1; overflow-y:auto; padding:12px 16px;}
   .qchat-body .bubble-more{display:none;}
   .qchat-open svg{width:17px; height:17px;}
@@ -357,7 +358,7 @@
   .add-tag-row{display:flex; gap:8px; margin-top:8px;}
   .add-tag-row input{flex:1;}
   .fab{position:absolute; right:20px; bottom:96px; width:52px; height:52px; border-radius:16px; background:linear-gradient(135deg, var(--amber) 0%, var(--pink) 100%); color:#fff; display:flex; align-items:center; justify-content:center; box-shadow:0 10px 20px -6px rgba(236,72,153,.5); z-index:12; cursor:pointer; border:none;}
-  .toast{position:absolute; bottom:96px; left:50%; transform:translateX(-50%); background:var(--ink); color:#F5EFE4; font-size:13.5px; font-weight:700; padding:11px 18px; border-radius:999px; z-index:30; box-shadow:0 10px 24px rgba(0,0,0,.3); white-space:nowrap; opacity:0; pointer-events:none; transition:opacity .2s, transform .2s; max-width:80%; overflow:hidden; text-overflow:ellipsis;}
+  .toast{position:absolute; bottom:96px; left:50%; transform:translateX(-50%); background:var(--ink); color:#F5EFE4; font-size:13.5px; font-weight:700; padding:11px 18px; border-radius:999px; z-index:70; box-shadow:0 10px 24px rgba(0,0,0,.3); white-space:nowrap; opacity:0; pointer-events:none; transition:opacity .2s, transform .2s; max-width:80%; overflow:hidden; text-overflow:ellipsis;}
   .drawer-overlay{position:absolute; inset:0; background:rgba(20,23,28,.45); opacity:0; pointer-events:none; transition:opacity .22s; z-index:48;}
   .confirm-overlay{position:absolute; inset:0; background:rgba(20,23,28,.5); opacity:0; pointer-events:none; transition:opacity .18s; z-index:58; display:flex; align-items:center; justify-content:center; padding:0 32px;}
   .confirm-overlay.open{opacity:1; pointer-events:auto;}
@@ -2230,6 +2231,7 @@ function interviewCardHtml(m, mine, t){
       <div class="iv-card ${cancelled ? 'cancelled' : ''}">
         <div class="iv-card-hd">${title}</div>
         <div class="iv-card-bd">
+          ${meta.action === 'updated' && meta.prev_interview_at && meta.prev_interview_at !== meta.interview_at && ivParts(meta.prev_interview_at) ? `<div class="iv-card-prev"><span class="k">변경 전</span> ${esc(ivParts(meta.prev_interview_at).long)} ${esc(ivParts(meta.prev_interview_at).time)}</div>` : ''}
           ${p ? `<div><span class="k">날짜</span> ${esc(p.long)}</div><div><span class="k">시간</span> ${esc(p.time)}</div>` : ''}
           <div><span class="k">방식</span> ${esc(IV_MODE_LABEL[meta.mode] || '대면')}</div>
           ${meta.mode === 'offline' && meta.place ? `<div><span class="k">장소</span> ${esc(meta.place)}</div>` : ''}
@@ -2469,6 +2471,21 @@ async function openQuickChatWith(target, name, sub){
   if(quickChat) quickChat.timer = setInterval(() => loadQuickChat(false), 4000);
   const input = document.getElementById('qchatInput'); if(input) input.focus();
 }
+// 대화를 열어둔 채로 상대가 인터뷰를 잡거나 바꾸거나 취소하면 화면에 바로 알려줍니다.
+function notifyInterviewChange(messages, holder, first){
+  const lastId = messages.length ? messages[messages.length - 1].id : 0;
+  if(!first && holder.lastSeenId){
+    const news = messages.filter(m => m.id > holder.lastSeenId && m.kind === 'interview' && m.sender_id !== state.userId);
+    const m = news[news.length - 1];
+    if(m){
+      let meta = {}; try{ meta = JSON.parse(m.meta_json || '{}') || {}; }catch(e){}
+      const p = ivParts(meta.interview_at);
+      const when = p ? `${p.short}` : '';
+      toast({ created: `상대가 인터뷰 일정을 잡았어요 · ${when}`, updated: `상대가 인터뷰 일정을 변경했어요 · ${when}`, cancelled: '상대가 인터뷰를 취소했어요' }[meta.action] || '인터뷰 일정이 바뀌었어요');
+    }
+  }
+  holder.lastSeenId = lastId;
+}
 function renderQuickChat(messages, forceBottom, interview){
   const body = document.getElementById('qchatBody');
   if(!body) return;
@@ -2483,6 +2500,8 @@ async function loadQuickChat(first){
   if(!quickChat) return;
   try{
     const data = await apiFetch(`/conversations/${quickChat.convId}/messages`);
+    if(!quickChat) return;
+    notifyInterviewChange(data.messages, quickChat, first);
     renderQuickChat(data.messages, first, data.interview || null);
   }catch(e){ if(first) toast(e.message); }
 }
