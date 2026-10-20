@@ -328,6 +328,7 @@
   .qchat-head .nm{font-weight:800; font-size:16px; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
   .qchat-head button{flex:0 0 auto; background:none; border:1px solid var(--line); border-radius:10px; padding:6px 10px; font:inherit; font-size:12.5px; font-weight:700; color:var(--slate); cursor:pointer;}
   .qchat-note{padding:7px 16px; font-size:11.5px; color:#0E5F56; background:var(--cyan-soft);}
+  .qchat-iv{padding:10px 16px;}
   .qchat-body{flex:1; overflow-y:auto; padding:12px 16px;}
   .qchat-body .bubble-more{display:none;}
   .qchat-open svg{width:17px; height:17px;}
@@ -746,6 +747,7 @@ function contactSourceFor(screen, id){
 }
 function go(screen, param){
   if(typeof closeQuickChat === 'function') closeQuickChat();
+  if(screen !== 'interviewForm') ivReturn = null;
   if(screen === 'jobDetail' || screen === 'talentDetail'){
     const same = detailSource && detailSource.screen === screen && Number(detailSource.id) === Number(param);
     if(pendingDetailSource || !same) detailSource = { screen, id: param, src: pendingDetailSource || 'other' };
@@ -2200,15 +2202,16 @@ function ivPlaceText(iv){
   if(iv.mode === 'phone') return '전화 인터뷰';
   return iv.place || '';
 }
-function interviewBarHtml(iv, convId){
+function interviewBarHtml(iv, convId, opener){
+  const open = opener || `go('interviewForm', ${convId})`;
   if(!iv || iv.status !== 'scheduled'){
-    return `<button class="iv-chip strong" onclick="go('interviewForm', ${convId})">${I.calendar}인터뷰 잡기</button>
+    return `<button class="iv-chip strong" onclick="${open}">${I.calendar}인터뷰 잡기</button>
       <span class="page-sub" style="align-self:center; white-space:nowrap;">일정이 정해지면 날짜·장소를 남겨두세요</span>`;
   }
   const p = ivParts(iv.interview_at);
-  return `<button class="iv-chip ${iv.past ? 'past' : 'strong'}" onclick="go('interviewForm', ${convId})">${I.calendar}${esc(p.short)}${iv.past ? ' · 지난 일정' : ''}</button>
+  return `<button class="iv-chip ${iv.past ? 'past' : 'strong'}" onclick="${open}">${I.calendar}${esc(p.short)}${iv.past ? ' · 지난 일정' : ''}</button>
     ${ivPlaceButton(iv, 'iv-chip')}
-    <button class="iv-chip" onclick="go('interviewForm', ${convId})">${iv.past ? '다시 잡기' : '일정 변경'}</button>`;
+    <button class="iv-chip" onclick="${open}">${iv.past ? '다시 잡기' : '일정 변경'}</button>`;
 }
 // 장소 보기(대면) / 화상 링크 열기(화상) 버튼. 사용자가 입력한 글자는 data- 속성으로만 넘깁니다.
 function ivPlaceButton(iv, cls){
@@ -2285,7 +2288,7 @@ async function screenInterviewForm(){
   const p = iv ? ivParts(iv.interview_at) : null;
   const upcoming = iv && !iv.past;
   return `${statusbar()}
-  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('chatRoom', ${convId})">${I.back}</div>
+  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="ivBack(${convId})">${I.back}</div>
     <div style="min-width:0;"><div class="page-title" style="font-size:18px;">${upcoming ? '인터뷰 일정' : '인터뷰 잡기'}</div>${chatRoomInfo.counterpartName && chatRoomInfo.convId === convId ? `<div class="page-sub">${esc(chatRoomInfo.counterpartName)}님과의 인터뷰</div>` : ''}</div></div></div>
   <div class="content">
     ${upcoming ? `
@@ -2379,15 +2382,31 @@ async function submitInterview(convId){
   try{
     const data = await apiFetch(`/conversations/${convId}/interview`, {method:'POST', body});
     toast(data.unchanged ? '바뀐 내용이 없어요' : (ivCurrent ? '인터뷰 일정을 변경했어요' : '인터뷰 일정을 잡았어요'));
-    go('chatRoom', convId);
+    ivBack(convId);
   }catch(e){ toast(e.message); }
+}
+// 인터뷰 화면을 닫을 때: 바로 채팅창(시트)에서 들어왔다면 원래 화면으로 돌아가 채팅창을 다시 열고,
+// 아니면 대화방으로 돌아갑니다.
+let ivReturn = null; // {screen, param, target, name, sub}
+function ivBack(convId){
+  const r = ivReturn;
+  ivReturn = null;
+  if(r){ go(r.screen, r.param); openQuickChatWith(r.target, r.name, r.sub); return; }
+  go('chatRoom', convId);
+}
+function openIvFromQuickChat(){
+  if(!quickChat) return;
+  const q = quickChat;
+  const ret = { screen: state.screen, param: state.param, target: q.target, name: q.name, sub: q.sub };
+  go('interviewForm', q.convId);
+  ivReturn = ret;
 }
 function cancelInterviewConfirm(convId){
   showConfirm('인터뷰를 취소할까요?\n상대에게 취소 알림이 가요.', async () => {
     try{
       await apiFetch(`/conversations/${convId}/interview`, {method:'DELETE'});
       toast('인터뷰를 취소했어요');
-      go('chatRoom', convId);
+      ivBack(convId);
     }catch(e){ toast(e.message); }
   });
 }
@@ -2437,6 +2456,7 @@ async function openQuickChatWith(target, name, sub){
     <div class="qchat-head"><div class="tt"><div class="nm">${esc(name)}</div><div class="page-sub" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${esc(sub)}</div></div>
       <button onclick="closeQuickChat()" aria-label="닫기">닫기</button></div>
     <div class="qchat-note">계약 전에 선입금·장비 구매·금융정보를 요구하면 사기일 수 있어요.</div>
+    <div class="iv-bar qchat-iv" id="qchatIvBar"></div>
     <div class="qchat-body" id="qchatBody"><div class="page-sub">불러오는 중…</div></div>
     <div class="chat-input-bar">
       <input id="qchatInput" class="chat-input" placeholder="메시지를 입력하세요" onkeydown="if(event.key==='Enter'){event.preventDefault(); sendQuickChat();}">
@@ -2444,23 +2464,26 @@ async function openQuickChatWith(target, name, sub){
     </div>
   </div>`;
   host.appendChild(el);
-  quickChat = { convId: conv.id, timer: null };
+  quickChat = { convId: conv.id, timer: null, target, name, sub };
   await loadQuickChat(true);
   if(quickChat) quickChat.timer = setInterval(() => loadQuickChat(false), 4000);
   const input = document.getElementById('qchatInput'); if(input) input.focus();
 }
-function renderQuickChat(messages, forceBottom){
+function renderQuickChat(messages, forceBottom, interview){
   const body = document.getElementById('qchatBody');
   if(!body) return;
+  const bar = document.getElementById('qchatIvBar');
+  if(bar && quickChat && interview !== undefined) bar.innerHTML = interviewBarHtml(interview, quickChat.convId, 'openIvFromQuickChat()');
   const nearBottom = body.scrollHeight - body.scrollTop - body.clientHeight < 60;
-  body.innerHTML = `<div class="bubble-wrap">${chatBubblesHtml(messages)}</div>`;
+  // 대화 속 인터뷰 카드의 '인터뷰 보기'도 채팅창으로 돌아오도록 연결합니다.
+  body.innerHTML = `<div class="bubble-wrap">${chatBubblesHtml(messages).replace(/go\('interviewForm', \d+\)/g, 'openIvFromQuickChat()')}</div>`;
   if(forceBottom || nearBottom) body.scrollTop = body.scrollHeight;
 }
 async function loadQuickChat(first){
   if(!quickChat) return;
   try{
     const data = await apiFetch(`/conversations/${quickChat.convId}/messages`);
-    renderQuickChat(data.messages, first);
+    renderQuickChat(data.messages, first, data.interview || null);
   }catch(e){ if(first) toast(e.message); }
 }
 async function sendQuickChat(){
