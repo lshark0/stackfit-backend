@@ -2405,8 +2405,8 @@ async function sendMessage(convId){
 // 화면을 떠나지 않고 바로 대화하는 채팅창(아래에서 올라오는 시트).
 // 기업: 지원자 관리 → 지원자와 채팅 / 프리랜서: 공고 상세·내 지원 현황 → 기업과 채팅
 let quickChat = null; // {convId, timer}
-function openQuickChat(freelancerId, jobId, name){
-  return openQuickChatWith({ freelancerId, jobId: jobId || null }, name, '지원자와 채팅');
+function openQuickChat(freelancerId, jobId, name, sub){
+  return openQuickChatWith({ freelancerId, jobId: jobId || null }, name, sub || '지원자와 채팅');
 }
 function openCompanyChat(companyId, jobId, name, jobTitle){
   return openQuickChatWith({ companyId, jobId: jobId || null }, name || '기업', jobTitle ? `${jobTitle} · 기업과 채팅` : '기업과 채팅');
@@ -2503,27 +2503,6 @@ async function cancelAcceptance(jobId, applicationId){
       go('applicants', jobId);
     }catch(e){ toast(e.message); }
   });
-}
-
-// 잡코리아 스타일: 지원자 일괄 처리 — 검토중인 지원자를 여러 명 선택해 한 번에 합격/불합격 처리합니다.
-let selectedApplicantIds = new Set();
-function toggleApplicantSelect(id, checked){
-  if(checked) selectedApplicantIds.add(id); else selectedApplicantIds.delete(id);
-  const bar = document.getElementById('bulkActionBar');
-  if(bar) bar.hidden = selectedApplicantIds.size === 0;
-  const countEl = document.getElementById('bulkCount');
-  if(countEl) countEl.textContent = selectedApplicantIds.size + '명 선택됨';
-}
-async function bulkDecideApplicants(status){
-  const ids = [...selectedApplicantIds];
-  if(!ids.length) return;
-  const jobId = state.param;
-  try{
-    const r = await apiFetch(`/jobs/${jobId}/applicants/bulk`, {method:'PATCH', body:{applicationIds: ids, status}});
-    toast(`${r.updated}명 ${status==='accepted'?'합격':'불합격'} 처리했어요${r.skipped.length? ` (건너뜀 ${r.skipped.length}명)` : ''}`);
-    selectedApplicantIds = new Set();
-    go('applicants', jobId);
-  }catch(e){ toast(e.message); }
 }
 
 async function uploadResume(input){
@@ -3720,6 +3699,7 @@ async function screenTalentDetail(){
   </div>
   <div style="position:absolute; left:0; right:0; bottom:0; padding:14px 20px 22px; background:var(--paper); border-top:1px solid var(--line); display:flex; gap:10px;">
     <div class="star-btn ${t.saved?'filled':''}" style="width:52px;height:52px;border-radius:12px; flex:0 0 auto;" title="관심 인재" onclick="toggleSaveTalent(${t.user_id}, event)">${I.star}</div>
+    ${t.accept_proposals || t.proposed ? `<button class="btn btn-outline" style="flex:0 0 auto; width:auto; padding:13px 16px;" onclick="openQuickChat(${t.user_id}, null, '${jsAttrStr(t.name||'')}', '인재와 채팅')">채팅</button>` : ''}
     ${t.proposed
       ? `<button class="btn btn-outline" onclick="cancelProposal(${t.user_id})" style="display:flex; align-items:center; justify-content:center; gap:7px;">${I.xCircle}제안 취소</button>`
       : t.accept_proposals
@@ -4509,7 +4489,6 @@ async function screenAllApplicants(){
 async function screenApplicants(){
   const nc = await unreadCount();
   const data = await apiFetch('/jobs/' + state.param + '/applicants');
-  selectedApplicantIds = new Set();
   const badge = {
     submitted: `<span class="sbadge pending">${I.clockSm}검토중</span>`,
     accepted: `<span class="sbadge pass">${I.trophy}합격</span>`,
@@ -4523,7 +4502,6 @@ async function screenApplicants(){
       <div class="card">
         <div class="card-top">
           <div style="display:flex; gap:12px; align-items:center; min-width:0;">
-            ${a.status==='submitted' ? `<input type="checkbox" onclick="toggleApplicantSelect(${a.application_id}, this.checked)" style="width:18px; height:18px; flex:0 0 auto; accent-color:var(--ink);">` : ''}
             ${autoAvatar(a.name)}
             <div style="min-width:0;">
               <div class="card-title">${esc(a.name)} ${gradeBadge(a.grade)}</div>
@@ -4561,12 +4539,7 @@ async function screenApplicants(){
           <button class="btn btn-primary" style="margin-top:12px;" onclick="go('projects')">프로젝트 관리에서 계약 진행하기</button>
           <div class="page-sub" style="margin-top:6px;">이미 계약이 진행 중이라 합격을 취소할 수 없어요.</div>`) : ''}
       </div>`).join('') || emptyArt(ART.noTalents, '아직 지원자가 없어요', '인재풀에서 직접 포지션을 제안해볼 수도 있어요.')}
-    <div style="height:70px;"></div>
-  </div>
-  <div id="bulkActionBar" hidden style="position:absolute; left:0; right:0; bottom:0; padding:14px 20px 22px; background:var(--paper); border-top:1px solid var(--line); display:flex; align-items:center; gap:10px;">
-    <span id="bulkCount" style="font-family:var(--mono); font-size:12px; color:var(--slate); flex:1;">0명 선택됨</span>
-    <button class="btn btn-outline" style="flex:0 0 auto; width:auto; padding:11px 16px;" onclick="bulkDecideApplicants('rejected')">일괄 불합격</button>
-    <button class="btn btn-primary" style="flex:0 0 auto; width:auto; padding:11px 16px;" onclick="bulkDecideApplicants('accepted')">일괄 합격</button>
+    <div style="height:20px;"></div>
   </div>`;
 }
 
