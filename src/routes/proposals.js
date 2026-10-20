@@ -6,6 +6,7 @@ const { addNotification, pushTo } = require('../notify');
 const { contactFields } = require('../contact');
 const { pairScore } = require('../recommend');
 const { normalizeSource } = require('../contactSource');
+const { quotaFor, recordSend } = require('../proposalQuota');
 
 const router = express.Router();
 wrapAllRoutes(router);
@@ -37,10 +38,20 @@ router.post('/talents/:userId/propose', requireAuth, requireRole('company'), asy
   const existing = await get('SELECT id FROM proposals WHERE company_id=? AND freelancer_id=?', [req.user.id, freelancerId]);
   if (existing) return res.status(409).json({ error: '이미 제안을 보냈습니다.' });
 
+  // 무료 회원 월간 제안 횟수 제한 (관리자가 한도를 정했을 때만)
+  const quota = await quotaFor(req.user.id);
+  if (quota.limit && quota.remaining <= 0) {
+    return res.status(403).json({
+      error: `이번 달 무료 제안 ${quota.limit}회를 모두 사용했어요. ${Number(quota.resetsOn.slice(5, 7))}월 ${Number(quota.resetsOn.slice(8, 10))}일에 다시 채워져요.`,
+      code: 'PROPOSAL_LIMIT', quota,
+    });
+  }
+
   const safeMessage = typeof message === 'string' ? message.trim().slice(0, 1000) : '';
   await run('INSERT INTO proposals (company_id, freelancer_id, job_id, message, match_score, source) VALUES (?,?,?,?,?,?)', [
     req.user.id, freelancerId, safeJobId, safeMessage, proposalScore, normalizeSource(source),
   ]);
+  await recordSend(req.user.id, freelancerId);
 
   const company = await get('SELECT name FROM companies WHERE user_id = ?', [req.user.id]);
   await addNotification(freelancerId, {
@@ -58,6 +69,11 @@ router.post('/talents/:userId/propose', requireAuth, requireRole('company'), asy
   });
 
   res.status(201).json({ proposed: true });
+});
+
+// 이번 달 무료 제안 남은 횟수 (기업 전용)
+router.get('/proposals/quota', requireAuth, requireRole('company'), async (req, res) => {
+  res.json(await quotaFor(req.user.id));
 });
 
 // 제안 취소 (기업 전용, 본인이 보낸 제안만)

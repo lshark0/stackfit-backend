@@ -8,6 +8,7 @@ const { signedFileUrl } = require('../fileAccess');
 const ai = require('../ai');
 const { listSecurityEvents } = require('../securityLog');
 const { computePerformance } = require('../performance');
+const proposalQuota = require('../proposalQuota');
 
 const router = express.Router();
 wrapAllRoutes(router);
@@ -164,6 +165,29 @@ const toKstDate = (v) => {
 router.get('/performance', requireAuth, requireAdmin, async (req, res) => {
   const days = [7, 30, 90, 365, 3650].includes(Number(req.query.days)) ? Number(req.query.days) : 90;
   res.json(await computePerformance(days));
+});
+
+// 무료 회원 월간 제안 횟수 한도 (0 = 제한 없음) + 이번 달 사용 현황
+router.get('/settings/proposal-limit', requireAuth, requireAdmin, async (req, res) => {
+  const limit = await proposalQuota.getLimit();
+  const { start } = proposalQuota.kstMonthRange();
+  const rows = await all('SELECT company_id, COUNT(*) AS c FROM proposal_sends WHERE created_at >= ? GROUP BY company_id', [start]);
+  const counts = rows.map((r) => Number(r.c));
+  res.json({
+    limit,
+    companiesThisMonth: counts.length,
+    sendsThisMonth: counts.reduce((a, b) => a + b, 0),
+    companiesAtLimit: limit ? counts.filter((c) => c >= limit).length : 0,
+    maxPerCompany: counts.length ? Math.max(...counts) : 0,
+  });
+});
+router.put('/settings/proposal-limit', requireAuth, requireAdmin, async (req, res) => {
+  const n = Number((req.body || {}).limit);
+  if (!Number.isInteger(n) || n < 0 || n > proposalQuota.MAX_LIMIT) {
+    return res.status(400).json({ error: `0~${proposalQuota.MAX_LIMIT} 사이의 정수로 입력해주세요. (0 = 제한 없음)` });
+  }
+  await proposalQuota.setLimit(n);
+  res.json({ limit: n });
 });
 
 router.get('/signup-stats', requireAuth, requireAdmin, async (req, res) => {

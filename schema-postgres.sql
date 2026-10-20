@@ -391,3 +391,12 @@ CREATE TABLE IF NOT EXISTS contract_surveys (
   created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (project_id, user_id)
 );
+
+-- 기업이 제안을 보낸 기록(무료 회원 월간 제안 횟수 계산용). 제안을 취소해도 지우지 않습니다.
+CREATE TABLE IF NOT EXISTS proposal_sends (
+  id            SERIAL PRIMARY KEY,
+  company_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  freelancer_id INTEGER NOT NULL,
+  created_at    TEXT NOT NULL              -- UTC 'YYYY-MM-DD HH:MM:SS'
+);
+CREATE INDEX IF NOT EXISTS idx_proposal_sends_company ON proposal_sends(company_id, created_at);
