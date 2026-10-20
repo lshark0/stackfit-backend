@@ -3729,7 +3729,6 @@ async function screenTalentDetail(){
   </div>
   <div style="position:absolute; left:0; right:0; bottom:0; padding:14px 20px 22px; background:var(--paper); border-top:1px solid var(--line); display:flex; gap:10px;">
     <div class="star-btn ${t.saved?'filled':''}" style="width:52px;height:52px;border-radius:12px; flex:0 0 auto;" title="관심 인재" onclick="toggleSaveTalent(${t.user_id}, event)">${I.star}</div>
-    ${t.accept_proposals || t.proposed ? `<button class="btn btn-outline" style="flex:0 0 auto; width:auto; padding:13px 16px;" onclick="openQuickChat(${t.user_id}, null, '${jsAttrStr(t.name||'')}', '인재와 채팅')">채팅</button>` : ''}
     ${t.proposed
       ? `<button class="btn btn-outline" onclick="cancelProposal(${t.user_id})" style="display:flex; align-items:center; justify-content:center; gap:7px;">${I.xCircle}제안 취소</button>`
       : t.accept_proposals

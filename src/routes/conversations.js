@@ -106,6 +106,26 @@ router.post('/', requireAuth, async (req, res) => {
     'SELECT * FROM conversations WHERE company_id=? AND freelancer_id=? AND job_id IS NOT DISTINCT FROM ?',
     [cId, fId, safeJobId]
   );
+  // 기업이 먼저 대화를 시작하려면 제안이 수락됐거나, 그 프리랜서가 기업의 공고에 지원한 상태여야 합니다.
+  // (제안 없이 채팅으로 먼저 연락하면 제안·제안권이 의미가 없어지므로)
+  // 프리랜서가 먼저 연 대화가 있으면 기업도 그 대화로 답할 수 있습니다.
+  if (!conv && req.user.role === 'company') {
+    const accepted = await get(
+      "SELECT id FROM proposals WHERE company_id = ? AND freelancer_id = ? AND status = 'accepted' LIMIT 1", [cId, fId]
+    );
+    const applied = accepted ? null : await get(
+      'SELECT a.id FROM applications a JOIN jobs j ON j.id = a.job_id WHERE j.company_id = ? AND a.freelancer_id = ? LIMIT 1', [cId, fId]
+    );
+    const opened = accepted || applied ? null : await get(
+      'SELECT id FROM conversations WHERE company_id = ? AND freelancer_id = ? LIMIT 1', [cId, fId]
+    );
+    if (!accepted && !applied && !opened) {
+      return res.status(403).json({
+        error: '제안을 보내고 프리랜서가 수락하면 채팅할 수 있어요.',
+        code: 'CHAT_NEEDS_PROPOSAL',
+      });
+    }
+  }
   if (!conv) {
     const r = await run('INSERT INTO conversations (company_id, freelancer_id, job_id) VALUES (?,?,?)', [cId, fId, safeJobId]);
     conv = await get('SELECT * FROM conversations WHERE id = ?', [r.lastInsertRowid]);
