@@ -3438,6 +3438,9 @@ function screenServerSetup(){
 
 // 직업정보제공사업 신고번호 — 관할 고용노동청에 신고해 번호를 받으면 여기에 적습니다(비어 있으면 표시 안 함).
 const JOB_INFO_REPORT_NO = '';
+// 통신판매업 신고번호와 공정위 사업자정보 확인 링크(전자상거래법상 표시 사항)
+const MAIL_ORDER_REPORT_NO = '제2021-서울마포-1382호';
+const FTC_BIZ_INFO_URL = 'https://www.ftc.go.kr/bizCommPop.do?wrkr_no=1771701535';
 // 잡코리아 스타일 홈 화면 하단 footer — 약관 링크 + 사업자 정보(접었다 펼치기)
 function siteFooterHtml(){
   return `<div class="site-footer">
@@ -3448,6 +3451,7 @@ function siteFooterHtml(){
     <div class="site-footer-detail">
       <div>대표: 이승학</div>
       <div>사업자등록번호: 177-17-01535</div>
+      <div>통신판매업 신고번호: ${esc(MAIL_ORDER_REPORT_NO)} <a href="${FTC_BIZ_INFO_URL}" target="_blank" rel="noopener" onclick="event.stopPropagation()">사업자정보 확인</a></div>
       ${JOB_INFO_REPORT_NO ? `<div>직업정보제공사업 신고번호: ${esc(JOB_INFO_REPORT_NO)}</div>` : ''}
       <div>이메일: <a href="mailto:lshark4541@gmail.com">lshark4541@gmail.com</a></div>
     </div>
