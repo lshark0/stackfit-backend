@@ -2435,7 +2435,7 @@ async function openQuickChatWith(target, name, sub){
   el.onclick = (ev) => { if(ev.target === el) closeQuickChat(); };
   el.innerHTML = `<div class="qchat-sheet" role="dialog" aria-label="${esc(name)}님과 채팅">
     <div class="qchat-head"><div class="tt"><div class="nm">${esc(name)}</div><div class="page-sub" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${esc(sub)}</div></div>
-      <button onclick="openQuickChatFull()">크게 보기</button><button onclick="closeQuickChat()" aria-label="닫기">닫기</button></div>
+      <button onclick="closeQuickChat()" aria-label="닫기">닫기</button></div>
     <div class="qchat-note">계약 전에 선입금·장비 구매·금융정보를 요구하면 사기일 수 있어요.</div>
     <div class="qchat-body" id="qchatBody"><div class="page-sub">불러오는 중…</div></div>
     <div class="chat-input-bar">
@@ -2476,12 +2476,6 @@ async function sendQuickChat(){
     renderQuickChat(data.messages, true);
   }catch(e){ toast(e.message); }
   finally{ input.disabled = false; input.focus(); }
-}
-function openQuickChatFull(){
-  if(!quickChat) return;
-  const id = quickChat.convId;
-  closeQuickChat();
-  go('chatRoom', id);
 }
 function closeQuickChat(){
   if(quickChat && quickChat.timer) clearInterval(quickChat.timer);
