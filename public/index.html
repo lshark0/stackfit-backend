@@ -327,6 +327,7 @@
   .qchat-head .tt{flex:1; min-width:0;}
   .qchat-head .nm{font-weight:800; font-size:16px; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
   .qchat-head button{flex:0 0 auto; background:none; border:1px solid var(--line); border-radius:10px; padding:6px 10px; font:inherit; font-size:12.5px; font-weight:700; color:var(--slate); cursor:pointer;}
+  .qchat-note{padding:7px 16px; font-size:11.5px; color:#0E5F56; background:var(--cyan-soft);}
   .qchat-body{flex:1; overflow-y:auto; padding:12px 16px;}
   .qchat-body .bubble-more{display:none;}
   .qchat-open svg{width:17px; height:17px;}
@@ -2401,20 +2402,28 @@ async function sendMessage(convId){
   catch(e){ toast(e.message); }
   finally{ input.disabled=false; input.focus(); }
 }
-// 지원자 관리에서 화면을 떠나지 않고 바로 대화하는 채팅창(아래에서 올라오는 시트).
+// 화면을 떠나지 않고 바로 대화하는 채팅창(아래에서 올라오는 시트).
+// 기업: 지원자 관리 → 지원자와 채팅 / 프리랜서: 공고 상세·내 지원 현황 → 기업과 채팅
 let quickChat = null; // {convId, timer}
-async function openQuickChat(freelancerId, jobId, name){
+function openQuickChat(freelancerId, jobId, name){
+  return openQuickChatWith({ freelancerId, jobId: jobId || null }, name, '지원자와 채팅');
+}
+function openCompanyChat(companyId, jobId, name, jobTitle){
+  return openQuickChatWith({ companyId, jobId: jobId || null }, name || '기업', jobTitle ? `${jobTitle} · 기업과 채팅` : '기업과 채팅');
+}
+async function openQuickChatWith(target, name, sub){
   closeQuickChat();
   let conv;
-  try{ conv = await apiFetch('/conversations', {method:'POST', body:{freelancerId, jobId: jobId || null}}); }
+  try{ conv = await apiFetch('/conversations', {method:'POST', body: target}); }
   catch(e){ toast(e.message); return; }
   const host = document.getElementById('confirmOverlay').parentElement;
   const el = document.createElement('div');
   el.className = 'qchat-overlay'; el.id = 'qchatOverlay';
   el.onclick = (ev) => { if(ev.target === el) closeQuickChat(); };
   el.innerHTML = `<div class="qchat-sheet" role="dialog" aria-label="${esc(name)}님과 채팅">
-    <div class="qchat-head"><div class="tt"><div class="nm">${esc(name)}</div><div class="page-sub">지원자와 채팅</div></div>
+    <div class="qchat-head"><div class="tt"><div class="nm">${esc(name)}</div><div class="page-sub" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${esc(sub)}</div></div>
       <button onclick="openQuickChatFull()">크게 보기</button><button onclick="closeQuickChat()" aria-label="닫기">닫기</button></div>
+    <div class="qchat-note">계약 전에 선입금·장비 구매·금융정보를 요구하면 사기일 수 있어요.</div>
     <div class="qchat-body" id="qchatBody"><div class="page-sub">불러오는 중…</div></div>
     <div class="chat-input-bar">
       <input id="qchatInput" class="chat-input" placeholder="메시지를 입력하세요" onkeydown="if(event.key==='Enter'){event.preventDefault(); sendQuickChat();}">
@@ -3612,7 +3621,7 @@ async function screenJobDetail(){
               ? `<button class="btn btn-outline" disabled style="opacity:.5; cursor:not-allowed;">마감된 공고예요</button>`
               : `<button class="btn btn-primary" onclick="openApplyConfirm(${j.id})">지원하기</button>`);
         return `<div class="star-btn ${j.saved?'filled':''}" style="width:52px;height:52px;border-radius:12px;" onclick="toggleSaveJob(${j.id}, event)">${I.star}</div>
-       <button class="btn btn-outline" style="flex:0 0 auto; width:auto; padding:13px 16px;" onclick="startChatWithCompany(${j.company_id}, ${j.id})">채팅</button>
+       <button class="btn btn-outline" style="flex:0 0 auto; width:auto; padding:13px 16px;" onclick="openCompanyChat(${j.company_id}, ${j.id}, '${jsAttrStr(j.org||'')}', '${jsAttrStr(j.title||'')}')">채팅</button>
        ${applyBtn}`;
       })()}
   </div>`;
@@ -4448,6 +4457,7 @@ async function screenMyApplications(){
           <span class="im">${I.calendar}${(parseServerTime(a.created_at)||new Date()).toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric'})} 지원</span>
         </div>
         ${a.status==='accepted' ? `<div class="page-sub" style="margin-top:8px;">${acceptedProjectHint(a.projectState)}</div>` : ''}
+        <button class="btn btn-outline qchat-open" style="margin-top:10px; display:flex; align-items:center; justify-content:center; gap:6px;" onclick="event.stopPropagation(); openCompanyChat(${a.company_id}, ${a.id}, '${jsAttrStr(a.org||'')}', '${jsAttrStr(a.title||'')}')">${I.chat}기업과 채팅하기</button>
       </div>`).join('') || emptyArt(ART.noJobs, '아직 지원한 공고가 없어요', '마음에 드는 공고에 지원해보세요.')}
   </div>${tabbar('home')}`;
 }
