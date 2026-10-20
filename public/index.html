@@ -2027,7 +2027,7 @@ async function screenProposeForm(){
     ${quota && quota.limit ? (outOfQuota
       ? `<div class="reco-empty" style="text-align:left; border-color:var(--amber); background:#FDF6E9; margin-bottom:10px;">
            <b style="color:var(--ink);">이번 달 무료 제안 ${quota.limit}회를 모두 사용했어요</b>
-           <div style="margin-top:6px; line-height:1.6;">${resetLabel}에 다시 채워져요. 그 전에는 인재와 채팅으로 먼저 이야기를 나눠 보시거나, 출시 예정인 기업 구독을 사전 신청해 두세요.</div>
+           <div style="margin-top:6px; line-height:1.6;">${resetLabel}에 다시 채워져요. 그 전에는 공고를 올려 지원을 받아 보시거나, 출시 예정인 기업 구독을 사전 신청해 두세요.</div>
            <button class="btn btn-outline" style="margin-top:10px;" onclick="go('plans')">기업 구독 보기</button>
          </div>`
       : `<div class="page-sub" style="margin-bottom:8px;">이번 달 무료 제안 <b>${quota.remaining}회</b> 남았어요 (매월 1일에 ${quota.limit}회로 채워져요)</div>`) : ''}
