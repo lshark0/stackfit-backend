@@ -43,12 +43,61 @@ const app = express();
 app.set('trust proxy', 1); // Render는 프록시 뒤에 있으므로 rate-limit이 실제 클라이언트 IP를 보게 함
 
 // 대표 도메인은 kimfree.co.kr — kimfree.com(www 포함)으로 들어오면 같은 경로로 영구 이동시킵니다.
-// onrender.com 주소는 소셜 로그인 콜백 등록이 남아 있어 그대로 둡니다.
 const PRIMARY_HOST = 'kimfree.co.kr';
 const REDIRECT_HOSTS = new Set(['kimfree.com', 'www.kimfree.com']);
+// 기존 Render 주소(onrender.com)로 들어온 화면 요청도 대표 도메인으로 보냅니다.
+// 단, /api/는 그대로 처리합니다(이 주소로 등록된 소셜 로그인 콜백·외부 웹훅, 아직 예전 화면을 연 사용자의 요청).
+// 대표 도메인이 실제로 응답할 때만 이동시켜, 도메인 연결에 문제가 생겨도 사이트가 끊기지 않게 합니다.
+const RENDER_HOST = 'stackfit-backend.onrender.com';
+let primaryHostReady = false;
+async function checkPrimaryHost() {
+  let ok = false;
+  try {
+    const r = await fetch(`https://${PRIMARY_HOST}/api/health`, { signal: AbortSignal.timeout(10000) });
+    ok = r.ok;
+  } catch (e) {
+    ok = false;
+  }
+  if (ok !== primaryHostReady) {
+    console.log(`[IT Free] 대표 도메인 ${PRIMARY_HOST} ${ok ? '응답 확인 → onrender.com 화면 접속을 이동시킵니다' : '응답 없음 → onrender.com 접속을 그대로 둡니다'}`);
+  }
+  primaryHostReady = ok;
+}
+if (process.env.RENDER) {
+  checkPrimaryHost();
+  setInterval(checkPrimaryHost, 10 * 60 * 1000);
+}
+
+// onrender.com 첫 화면은 이 페이지가 받아서, 브라우저에 저장된 로그인 정보를 들고 대표 도메인으로 넘어갑니다.
+// (로그인 정보는 주소마다 따로 저장되므로, 그냥 이동시키면 다시 로그인해야 합니다)
+const MOVE_PAGE = `<!doctype html><html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>IT Free</title>
+<noscript><meta http-equiv="refresh" content="0;url=https://${PRIMARY_HOST}/"></noscript></head>
+<body style="font-family:sans-serif;text-align:center;padding-top:40vh;color:#555">IT Free로 이동하는 중…
+<script>
+var t = null;
+try {
+  t = localStorage.getItem('stackfit_token');
+  // 만료된 로그인 정보는 넘기지 않습니다(넘기면 대표 도메인에서 '로그인 확인 실패'가 뜸)
+  var exp = t && JSON.parse(atob(t.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).exp;
+  if (exp && exp * 1000 < Date.now()) t = null;
+} catch (e) { t = null; }
+var q = location.search;
+if (t && !/[?&](token|oauth_pending|mfa|claim)=/.test(q)) q += (q ? '&' : '?') + 'token=' + encodeURIComponent(t);
+location.replace('https://${PRIMARY_HOST}/' + q);
+</script></body></html>`;
+
 app.use((req, res, next) => {
   const host = String(req.hostname || '').toLowerCase();
-  if (!REDIRECT_HOSTS.has(host)) return next();
+  if (host === RENDER_HOST && primaryHostReady
+      && !req.path.startsWith('/api/') && req.path !== '/service-worker.js') {
+    if ((req.method === 'GET' || req.method === 'HEAD') && (req.path === '/' || req.path === '/index.html')) {
+      res.set('Cache-Control', 'no-store');
+      return res.type('html').send(MOVE_PAGE);
+    }
+  } else if (!REDIRECT_HOSTS.has(host)) {
+    return next();
+  }
   // GET/HEAD는 301, 그 외 요청은 메서드와 본문이 유지되도록 308
   const status = req.method === 'GET' || req.method === 'HEAD' ? 301 : 308;
   res.redirect(status, `https://${PRIMARY_HOST}${req.originalUrl}`);

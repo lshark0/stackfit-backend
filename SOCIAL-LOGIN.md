@@ -14,6 +14,7 @@ STACKFIT 코드에는 이미 구글/네이버/카카오 로그인이 전부 구�
 | 카카오 | `https://kimfree.co.kr/api/auth/oauth/kakao/callback` | `https://stackfit-backend.onrender.com/api/auth/oauth/kakao/callback` |
 
 `kimfree.com`으로 들어온 요청은 서버가 `kimfree.co.kr`로 이동시키므로 따로 등록하지 않아도 됩니다.
+`stackfit-backend.onrender.com`으로 연 화면도 `kimfree.co.kr`로 이동하지만, 이미 시작된 로그인이 끊기지 않도록 Render 주소의 콜백 등록은 지우지 말고 그대로 두세요.
 
 ---
 

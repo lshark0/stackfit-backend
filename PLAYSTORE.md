@@ -4,7 +4,7 @@ IT Free는 이미 PWA(설치 가능한 웹앱)이므로, 네이티브 앱을 새
 **TWA(Trusted Web Activity)** 방식으로 감싸서 Play 스토어에 올립니다.
 Android Studio 없이 구글이 만든 무료 웹 도구 **PWABuilder**로 진행합니다.
 
-- 배포 주소: `https://kimfree.co.kr` (대표 도메인. 기존 `https://stackfit-backend.onrender.com`도 동작)
+- 배포 주소: `https://kimfree.co.kr` (대표 도메인. 기존 `https://stackfit-backend.onrender.com`으로 열면 이 주소로 이동)
 - 권장 패키지 ID: **`com.markettier.itfree`** (한 번 정하면 영구히 변경 불가)
 - 앱 아이콘: `public/icons/icon-512.png`
 
