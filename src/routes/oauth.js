@@ -77,13 +77,9 @@ router.get('/:provider/callback', async (req, res) => {
     { pending: true, provider, oauthId: profile.id, email: profile.email || '', name: profile.name || '' },
     600
   );
-  // 이메일을 받지 못해 임시 주소(@stackfit.local)로 만든 경우에는 화면에 보여주지 않습니다.
-  const realEmail = profile.email && !String(profile.email).endsWith('@stackfit.local') ? profile.email : '';
+  // 이름 칸은 비워 두고 가입 화면에서 직접 입력받습니다(소셜 프로필 이름이 이메일·닉네임인 경우가 많음).
   const qs = new URLSearchParams({
     oauth_pending: pendingToken,
-    name: profile.name || '',
-    email: realEmail,
-    provider,
     role_hint: statePayload.intent || '',
   });
   res.redirect(`/?${qs.toString()}`);

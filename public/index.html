@@ -1720,7 +1720,7 @@ function setOauthRole(role, el){
   if(input) input.placeholder = role === 'company' ? '예: 마켓리어' : '실명을 입력해주세요';
 }
 function screenOauthRole(){
-  const p = oauthPending || {name:'', email:''};
+  const p = oauthPending || {};
   if(p.roleHint==='company' || p.roleHint==='freelancer') oauthRoleChoice = p.roleHint;
   const isCompany = oauthRoleChoice==='company';
   return `${statusbar()}
@@ -1730,7 +1730,7 @@ function screenOauthRole(){
       <div class="chip ${isCompany?'':'active'}" onclick="setOauthRole('freelancer', this)">프리랜서</div>
       <div class="chip ${isCompany?'active':''}" onclick="setOauthRole('company', this)">기업</div>
     </div>
-    <div class="form-field" style="margin-top:14px;"><label class="form-label" id="or-name-label">${isCompany ? '회사명' : '이름'}</label><input id="or-name" class="form-input" maxlength="60" placeholder="${isCompany ? '예: 마켓리어' : '실명을 입력해주세요'}" value="${esc(p.name||'')}"></div>
+    <div class="form-field" style="margin-top:14px;"><label class="form-label" id="or-name-label">${isCompany ? '회사명' : '이름'}</label><input id="or-name" class="form-input" maxlength="60" placeholder="${isCompany ? '예: 마켓리어' : '실명을 입력해주세요'}" value=""></div>
     ${refCodeField('or-refcode')}
     <button class="btn btn-primary" onclick="finishOAuthSignup()">가입 완료하기</button>
   </div>`;
@@ -1839,7 +1839,7 @@ async function consumeOAuthHash(){
     }
     if(params.get('mfa')){ startMfaVerify(params.get('mfa')); return true; } // 소셜 로그인한 관리자의 2단계 인증
     if(params.get('oauth_pending')){
-      oauthPending = { token: params.get('oauth_pending'), email: params.get('email')||'', name: params.get('name')||'', provider: params.get('provider')||'', roleHint: params.get('role_hint')||'' };
+      oauthPending = { token: params.get('oauth_pending'), roleHint: params.get('role_hint')||'' };
       go('oauthRole');
       return true;
     }
