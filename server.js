@@ -83,7 +83,7 @@ try {
   if (exp && exp * 1000 < Date.now()) t = null;
 } catch (e) { t = null; }
 var q = location.search;
-if (t && !/[?&](token|oauth_pending|mfa|claim)=/.test(q)) q += (q ? '&' : '?') + 'token=' + encodeURIComponent(t);
+if (t && !/[?&](token|oauth_pending|mfa|claim)=/.test(q)) q += (q ? '&' : '?') + 'token=' + encodeURIComponent(t) + '&moved=1';
 location.replace('https://${PRIMARY_HOST}/' + q);
 </script></body></html>`;
 

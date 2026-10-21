@@ -1834,7 +1834,12 @@ async function consumeOAuthHash(){
         syncPushSubscription();
         go('home');
         maybeShowOnboardingNudge();
-      }catch(e){ lastAuthError = '로그인 확인 실패: ' + e.message; go('onboarding'); }
+      }catch(e){
+        clearToken();
+        // 예전 주소(onrender.com)에서 넘어온 로그인 정보가 더는 유효하지 않으면(탈퇴·삭제된 계정 등) 오류 없이 로그인 화면으로 보냅니다.
+        if(!params.get('moved')) lastAuthError = '로그인 확인 실패: ' + e.message;
+        go('onboarding');
+      }
       return true;
     }
     if(params.get('mfa')){ startMfaVerify(params.get('mfa')); return true; } // 소셜 로그인한 관리자의 2단계 인증
