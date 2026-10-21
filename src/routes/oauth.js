@@ -77,10 +77,13 @@ router.get('/:provider/callback', async (req, res) => {
     { pending: true, provider, oauthId: profile.id, email: profile.email || '', name: profile.name || '' },
     600
   );
+  // 이메일을 받지 못해 임시 주소(@stackfit.local)로 만든 경우에는 화면에 보여주지 않습니다.
+  const realEmail = profile.email && !String(profile.email).endsWith('@stackfit.local') ? profile.email : '';
   const qs = new URLSearchParams({
     oauth_pending: pendingToken,
     name: profile.name || '',
-    email: profile.email || '',
+    email: realEmail,
+    provider,
     role_hint: statePayload.intent || '',
   });
   res.redirect(`/?${qs.toString()}`);
@@ -96,6 +99,10 @@ router.post('/finish', async (req, res) => {
     return res.status(400).json({ error: "role은 'freelancer' 또는 'company'여야 합니다." });
   }
 
+  if (!String(name || '').trim()) {
+    return res.status(400).json({ error: role === 'company' ? '회사명을 입력해주세요.' : '이름을 입력해주세요.' });
+  }
+
   const email = payload.email || `${payload.provider}_${payload.oauthId}@stackfit.local`;
   const already = await get('SELECT id FROM users WHERE email=?', [email]);
   if (already) {
@@ -109,7 +116,7 @@ router.post('/finish', async (req, res) => {
     [email, hash, salt, role, payload.provider, payload.oauthId]
   );
   const userId = Number(r.lastInsertRowid);
-  const safeName = (name || payload.name || '이름 미입력').toString().trim().slice(0, 60) || '이름 미입력';
+  const safeName = String(name || '').trim().slice(0, 60);
 
   if (role === 'freelancer') {
     await run('INSERT INTO freelancer_profiles (user_id, name, completion) VALUES (?,?,20)', [userId, safeName]);

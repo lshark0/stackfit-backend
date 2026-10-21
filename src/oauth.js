@@ -48,7 +48,7 @@ const PROVIDERS = {
       return {
         id: String(data.id),
         email: account.email || `kakao_${data.id}@stackfit.local`,
-        name: (account.profile && account.profile.nickname) || '카카오사용자',
+        name: (account.profile && account.profile.nickname) || '', // 닉네임이 없으면 가입 화면에서 직접 입력
       };
     },
   },

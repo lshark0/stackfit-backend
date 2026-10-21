@@ -1714,7 +1714,12 @@ function setOauthRole(role, el){
   oauthRoleChoice = role;
   document.querySelectorAll('#oauthRoleChips .chip').forEach(c=>c.classList.remove('active'));
   el.classList.add('active');
+  // 프리랜서는 이름, 기업은 회사명을 받습니다.
+  const label = document.getElementById('or-name-label'), input = document.getElementById('or-name');
+  if(label) label.textContent = role === 'company' ? '회사명' : '이름';
+  if(input) input.placeholder = role === 'company' ? '예: 마켓리어' : '실명을 입력해주세요';
 }
+const OAUTH_LABEL = { kakao: '카카오', naver: '네이버', google: '구글' };
 function screenOauthRole(){
   const p = oauthPending || {name:'', email:''};
   if(p.roleHint==='company' || p.roleHint==='freelancer') oauthRoleChoice = p.roleHint;
@@ -1722,12 +1727,12 @@ function screenOauthRole(){
   return `${statusbar()}
   <div class="app-header"><div class="page-title">몇 가지만 더 알려주세요</div></div>
   <div class="content">
-    <div class="page-sub" style="margin-bottom:16px;">${p.email?esc(p.email)+' 계정으로 가입해요':'소셜 계정으로 가입해요'}</div>
+    <div class="page-sub" style="margin-bottom:16px;">${esc(OAUTH_LABEL[p.provider] || '소셜')} 계정으로 가입해요${p.email ? ` <span style="color:var(--slate-light);">(${esc(p.email)})</span>` : ''}</div>
     <div class="chip-row" id="oauthRoleChips">
       <div class="chip ${isCompany?'':'active'}" onclick="setOauthRole('freelancer', this)">프리랜서</div>
       <div class="chip ${isCompany?'active':''}" onclick="setOauthRole('company', this)">기업</div>
     </div>
-    <div class="form-field" style="margin-top:14px;"><label class="form-label">이름 / 회사명</label><input id="or-name" class="form-input" value="${esc(p.name||'')}"></div>
+    <div class="form-field" style="margin-top:14px;"><label class="form-label" id="or-name-label">${isCompany ? '회사명' : '이름'}</label><input id="or-name" class="form-input" maxlength="60" placeholder="${isCompany ? '예: 마켓리어' : '실명을 입력해주세요'}" value="${esc(p.name||'')}"></div>
     ${refCodeField('or-refcode')}
     <button class="btn btn-primary" onclick="finishOAuthSignup()">가입 완료하기</button>
   </div>`;
@@ -1772,6 +1777,7 @@ function refCodeField(id){
 async function finishOAuthSignup(){
   if(!oauthPending){ toast('인증 정보가 없어요. 다시 시도해주세요.'); go('onboarding'); return; }
   const name = document.getElementById('or-name').value.trim();
+  if(!name){ toast(oauthRoleChoice === 'company' ? '회사명을 입력해주세요' : '이름을 입력해주세요'); document.getElementById('or-name').focus(); return; }
   try{
     const data = await apiFetch('/auth/oauth/finish', {method:'POST', body:{
       pendingToken: oauthPending.token, role: oauthRoleChoice, name,
@@ -1835,7 +1841,7 @@ async function consumeOAuthHash(){
     }
     if(params.get('mfa')){ startMfaVerify(params.get('mfa')); return true; } // 소셜 로그인한 관리자의 2단계 인증
     if(params.get('oauth_pending')){
-      oauthPending = { token: params.get('oauth_pending'), email: params.get('email')||'', name: params.get('name')||'', roleHint: params.get('role_hint')||'' };
+      oauthPending = { token: params.get('oauth_pending'), email: params.get('email')||'', name: params.get('name')||'', provider: params.get('provider')||'', roleHint: params.get('role_hint')||'' };
       go('oauthRole');
       return true;
     }
