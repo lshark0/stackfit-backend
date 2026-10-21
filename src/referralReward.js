@@ -59,7 +59,7 @@ async function grantReferralReward(inviteeId, { notify = true } = {}) {
 
 // 요청 처리를 막지 않도록 결과를 기다리지 않고 실행합니다(실패해도 다음 확인 때 다시 적립됨).
 function grantReferralRewardLater(inviteeId) {
-  grantReferralReward(inviteeId).catch((e) => console.warn('[IT Free] 초대 보상 적립 실패:', e.message));
+  grantReferralReward(inviteeId).catch((e) => console.warn('[김프리] 초대 보상 적립 실패:', e.message));
 }
 
 module.exports = { REWARD_MAX, activationOf, grantReferralReward, grantReferralRewardLater };

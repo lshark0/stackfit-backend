@@ -1,7 +1,7 @@
 {
   "id": "/?app=itfree",
-  "name": "IT Free",
-  "short_name": "IT Free",
+  "name": "김프리 Kim Free",
+  "short_name": "김프리",
   "description": "최적의 IT 매칭 솔루션 — IT 프리랜서와 기업을 기술스택으로 연결합니다",
   "start_url": "/?src=pwa",
   "scope": "/",

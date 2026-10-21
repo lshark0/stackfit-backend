@@ -72,7 +72,7 @@ async function notifyNewJob(jobId) {
 }
 
 function notifyNewJobLater(jobId) {
-  setImmediate(() => notifyNewJob(jobId).catch((e) => console.warn('[IT Free] 새 공고 알림 실패:', e.message)));
+  setImmediate(() => notifyNewJob(jobId).catch((e) => console.warn('[김프리] 새 공고 알림 실패:', e.message)));
 }
 
 // 교차 초대: 기업의 초대 링크로 가입한 프리랜서는 그 기업을 관심 기업에 자동으로 추가합니다.

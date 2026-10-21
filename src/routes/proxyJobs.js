@@ -10,14 +10,14 @@ const { addNotification, pushTo } = require('../notify');
 const { createJob, withCompanyAndStack, bizVerified } = require('./jobs');
 const { verifyBusiness, saveBusiness } = require('../bizCheck');
 
-// 공고 대리 등록 운영 원칙: IT Free는 기업이 정한 공고 내용을 '게시만' 대신하고, 대가를 받지 않습니다.
+// 공고 대리 등록 운영 원칙: 김프리는 기업이 정한 공고 내용을 '게시만' 대신하고, 대가를 받지 않습니다.
 // 지원자 열람·선별·면접 조율·연결은 하지 않습니다(관리자도 지원자 목록을 볼 수 없고, 지원 수만 봅니다).
 
 // 관리자 공고 대리 등록: 초기에 공고를 먼저 채우기 위해, 기업 담당자의 동의를 받아 관리자가 공고를 대신 올립니다.
 //  - 이미 가입한 기업: 그 기업 계정으로 공고를 올리고 기업에 알립니다(기업이 직접 수정·마감 가능).
 //  - 가입 전 기업: 담당자 이메일로 기업 계정을 대신 만들고, '계정 연결 링크'를 담당자에게 보내 비밀번호를 정하게 합니다.
 //    연결 전에는 비밀번호를 아무도 모르므로 로그인할 수 없고, 지원이 오면 관리자에게 알려 연결을 안내하게 합니다.
-// 대리 등록한 공고에는 'IT Free 대리 등록' 표시가 붙습니다.
+// 대리 등록한 공고에는 '김프리 대리 등록' 표시가 붙습니다.
 const router = express.Router();
 wrapAllRoutes(router);
 router.use(requireAuth, requireAdmin);
@@ -109,7 +109,7 @@ router.post('/jobs', async (req, res) => {
   const job = await createJob(company.id, b, { proxyBy: req.user.id });
   if (!job) return res.status(400).json({ error: '공고 제목은 필수입니다.' });
   if (Number(company.claim_pending) !== 1) {
-    const title = 'IT Free가 공고를 대신 등록했어요';
+    const title = '김프리가 공고를 대신 등록했어요';
     const body = `"${job.title}" 공고를 요청하신 내용으로 등록했어요. 내용을 확인하고 언제든 수정·마감할 수 있어요.`;
     await addNotification(company.id, { tag: '공고', title, body: body.slice(0, 80), link: `jobDetail:${job.id}` });
     pushTo(company.id, { kind: 'result', title, body: body.slice(0, 100), tag: `proxy-job-${job.id}`, link: `jobDetail:${job.id}` });

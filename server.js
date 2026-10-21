@@ -59,7 +59,7 @@ async function checkPrimaryHost() {
     ok = false;
   }
   if (ok !== primaryHostReady) {
-    console.log(`[IT Free] 대표 도메인 ${PRIMARY_HOST} ${ok ? '응답 확인 → onrender.com 화면 접속을 이동시킵니다' : '응답 없음 → onrender.com 접속을 그대로 둡니다'}`);
+    console.log(`[김프리] 대표 도메인 ${PRIMARY_HOST} ${ok ? '응답 확인 → onrender.com 화면 접속을 이동시킵니다' : '응답 없음 → onrender.com 접속을 그대로 둡니다'}`);
   }
   primaryHostReady = ok;
 }
@@ -71,9 +71,9 @@ if (process.env.RENDER) {
 // onrender.com 첫 화면은 이 페이지가 받아서, 브라우저에 저장된 로그인 정보를 들고 대표 도메인으로 넘어갑니다.
 // (로그인 정보는 주소마다 따로 저장되므로, 그냥 이동시키면 다시 로그인해야 합니다)
 const MOVE_PAGE = `<!doctype html><html lang="ko"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1"><title>IT Free</title>
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>김프리</title>
 <noscript><meta http-equiv="refresh" content="0;url=https://${PRIMARY_HOST}/"></noscript></head>
-<body style="font-family:sans-serif;text-align:center;padding-top:40vh;color:#555">IT Free로 이동하는 중…
+<body style="font-family:sans-serif;text-align:center;padding-top:40vh;color:#555">김프리로 이동하는 중…
 <script>
 var t = null;
 try {
@@ -389,32 +389,32 @@ async function main() {
   await resetMfaFromEnv(securityLog.logEvent); // 비상시 관리자 2단계 인증 초기화 (MFA_RESET_EMAILS)
   await dedupeAllPortfolios(); // 예전에 AI 자동 채우기로 중복 등록된 수행 프로젝트를 한 번 정리
   app.listen(PORT, () => {
-    console.log(`[IT Free] API 서버 실행 중 → http://localhost:${PORT} (DB: ${USE_POSTGRES ? 'PostgreSQL' : 'SQLite'})`);
+    console.log(`[김프리] API 서버 실행 중 → http://localhost:${PORT} (DB: ${USE_POSTGRES ? 'PostgreSQL' : 'SQLite'})`);
   });
 
   // 마감일이 지난 공고 자동 마감 처리 + 저장한 공고 마감임박 알림: 기동 직후 한 번, 이후 6시간마다 확인합니다.
   const runScheduledChecks = () => {
-    closeExpiredJobs().catch((e) => console.warn('[IT Free] 공고 자동 마감 처리 실패:', e.message));
-    purgeOldSecurityEvents().catch((e) => console.warn('[IT Free] 오래된 보안 로그 삭제 실패:', e.message));
-    checkDeadlineAlerts().catch((e) => console.warn('[IT Free] 마감임박 알림 확인 실패:', e.message));
+    closeExpiredJobs().catch((e) => console.warn('[김프리] 공고 자동 마감 처리 실패:', e.message));
+    purgeOldSecurityEvents().catch((e) => console.warn('[김프리] 오래된 보안 로그 삭제 실패:', e.message));
+    checkDeadlineAlerts().catch((e) => console.warn('[김프리] 마감임박 알림 확인 실패:', e.message));
   };
   runScheduledChecks();
   setInterval(runScheduledChecks, 6 * 60 * 60 * 1000);
 
   // 인터뷰 1시간 전 알림: 5분마다 확인합니다.
   const runInterviewReminders = () => sendInterviewReminders()
-    .catch((e) => console.warn('[IT Free] 인터뷰 알림 확인 실패:', e.message));
+    .catch((e) => console.warn('[김프리] 인터뷰 알림 확인 실패:', e.message));
   runInterviewReminders();
   setInterval(runInterviewReminders, 5 * 60 * 1000);
 
   // 서버 재시작 등으로 끊긴 경력 검증 AI 심사를 이어서 처리합니다(기동 1분 뒤, 이후 5분마다).
   const runCareerReviews = () => resumePendingReviews()
-    .catch((e) => console.warn('[IT Free] 경력 검증 재심사 확인 실패:', e.message));
+    .catch((e) => console.warn('[김프리] 경력 검증 재심사 확인 실패:', e.message));
   setTimeout(runCareerReviews, 60 * 1000);
   setInterval(runCareerReviews, 5 * 60 * 1000);
 }
 
 main().catch((err) => {
-  console.error('[IT Free] 서버 시작 실패:', err);
+  console.error('[김프리] 서버 시작 실패:', err);
   process.exit(1);
 });

@@ -173,9 +173,9 @@ if (USE_POSTGRES) {
     // DB가 어느 업체·지역에 있는지 확인용(개인정보처리방침의 국외 이전 고지). 접속 계정·비밀번호는 출력하지 않습니다.
     try {
       const host = new URL(process.env.DATABASE_URL).hostname;
-      console.log(`[IT Free] DB 호스트 지역: ${host.split('.').slice(1).join('.') || host}`);
+      console.log(`[김프리] DB 호스트 지역: ${host.split('.').slice(1).join('.') || host}`);
     } catch (e) { /* 무시 */ }
-    console.log('[IT Free] PostgreSQL 연결 및 스키마 준비 완료 (영구 저장)');
+    console.log('[김프리] PostgreSQL 연결 및 스키마 준비 완료 (영구 저장)');
   };
 
   async function ensureColumnPg(table, column, ddl) {
@@ -298,7 +298,7 @@ if (USE_POSTGRES) {
     addCol('users', 'totp_backup_codes', 'TEXT');
     try { db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_ci ON users(ci) WHERE ci IS NOT NULL'); } catch (e) {}
     await removeDemoAccounts();
-    console.log('[IT Free] SQLite 로컬 DB 준비 완료 (data/stackfit.db, 로컬 개발 전용)');
+    console.log('[김프리] SQLite 로컬 DB 준비 완료 (data/stackfit.db, 로컬 개발 전용)');
   };
 }
 
@@ -316,9 +316,9 @@ async function migrateProjectStages() {
     // 이미 완료된 프로젝트는 양측이 계약에 동의한 것으로 간주합니다.
     await run("UPDATE projects SET company_agreed = 1, freelancer_agreed = 1 WHERE stage >= 2 OR status = '완료'");
     await run('INSERT INTO app_settings (key, value) VALUES (?,?)', ['stage_v3_migrated', '1']);
-    console.log('[IT Free] 프로젝트 단계를 3단계 체계로 변환했습니다.');
+    console.log('[김프리] 프로젝트 단계를 3단계 체계로 변환했습니다.');
   } catch (e) {
-    console.warn('[IT Free] 프로젝트 단계 변환 건너뜀:', e.message);
+    console.warn('[김프리] 프로젝트 단계 변환 건너뜀:', e.message);
   }
 }
 
@@ -331,7 +331,7 @@ async function removeDemoAccounts() {
     const user = await get('SELECT id FROM users WHERE email = ?', [email]);
     if (user) {
       await run('DELETE FROM users WHERE id = ?', [user.id]); // 연관 데이터는 CASCADE로 함께 삭제됨
-      console.log(`[IT Free] 데모 계정 삭제: ${email}`);
+      console.log(`[김프리] 데모 계정 삭제: ${email}`);
     }
   }
 }

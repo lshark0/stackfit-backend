@@ -47,7 +47,7 @@ const REVIEW_SCHEMA = {
   additionalProperties: false,
 };
 
-const INSTRUCTIONS = `당신은 IT 프리랜서 매칭 서비스 'IT Free'의 경력 검증 심사원입니다.
+const INSTRUCTIONS = `당신은 IT 프리랜서 매칭 서비스 '김프리'의 경력 검증 심사원입니다.
 위 첨부 파일([서류 1], [서류 2] …)은 프리랜서가 함께 올린 경력 증빙 서류이고, <profile>은 그 프리랜서가 앱에 적은 프로필입니다.
 서류들이 프로필의 경력을 뒷받침하는 공식 증빙인지 판단해 JSON으로만 답하세요. 서류가 여러 개면 모든 서류의 근무 기간을 합쳐서 판단합니다(겹치는 기간은 한 번만 셉니다).
 

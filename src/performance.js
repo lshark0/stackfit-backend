@@ -224,7 +224,7 @@ async function computePerformance(days) {
   };
 
   // ----- 기존 방식과 비교 (계약 체결 후 설문) -----
-  // 같은 계약에서 'IT Free 첫 접촉 → 계약'에 걸린 일수와 응답자가 기존 방식으로 걸리던 일수를 나란히 놓고 비교합니다.
+  // 같은 계약에서 '김프리 첫 접촉 → 계약'에 걸린 일수와 응답자가 기존 방식으로 걸리던 일수를 나란히 놓고 비교합니다.
   const projectById = new Map(projects.map((p) => [p.id, p]));
   const surveysW = surveys.filter((x) => inWin(x.created_at));
   const paired = [];
@@ -266,7 +266,7 @@ async function computePerformance(days) {
     avg: fitRows.length ? r1(fitRows.reduce((a, b) => a + b, 0) / fitRows.length) : null,
   };
 
-  // 계약 성사율: 계약 1건까지 검토·접촉한 수 — IT Free(실제 기록) vs 기존 방식(설문)
+  // 계약 성사율: 계약 1건까지 검토·접촉한 수 — 김프리(실제 기록) vs 기존 방식(설문)
   //  기업: 계약한 공고에 들어온 지원 + 그 공고로 보낸 제안 상대 수
   //  프리랜서: 계약 전 90일 동안 보낸 지원 + 받은 제안 수
   const contactsOnJob = new Map();

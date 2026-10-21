@@ -42,7 +42,7 @@ async function fetchVerifiedCustomer(identityVerificationId) {
   }
   const data = await resp.json().catch(() => ({}));
   if (!resp.ok) {
-    console.warn('[IT Free] 포트원 본인인증 조회 실패:', resp.status, data && (data.type || data.message));
+    console.warn('[김프리] 포트원 본인인증 조회 실패:', resp.status, data && (data.type || data.message));
     if (resp.status === 401 || resp.status === 403) throw new IdentityError(503, '본인인증 설정(API Secret)을 확인해주세요.');
     throw new IdentityError(400, '본인인증 내역을 찾을 수 없어요. 다시 인증해주세요.');
   }

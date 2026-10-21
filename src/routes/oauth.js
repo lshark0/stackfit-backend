@@ -120,7 +120,7 @@ router.post('/finish', async (req, res) => {
     await run('INSERT INTO companies (user_id, name) VALUES (?,?)', [userId, safeName]);
   }
   await recordSignupAttribution(userId, req.body.attribution)
-    .catch((e) => console.warn('[IT Free] 가입 경로 기록 실패:', e.message));
+    .catch((e) => console.warn('[김프리] 가입 경로 기록 실패:', e.message));
 
   const token = signToken({ id: userId, role, email });
   res.status(201).json({ token, user: { id: userId, email, role, isAdmin: isAdminEmail(email) } });

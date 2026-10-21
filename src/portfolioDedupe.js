@@ -71,9 +71,9 @@ async function dedupeAllPortfolios() {
       if (n) { removed += n; users++; }
     }
     await run('INSERT INTO app_settings (key, value) VALUES (?,?)', [FLAG, String(removed)]);
-    console.log(`[IT Free] 중복 수행 프로젝트 정리: 회원 ${users}명, ${removed}건 삭제`);
+    console.log(`[김프리] 중복 수행 프로젝트 정리: 회원 ${users}명, ${removed}건 삭제`);
   } catch (e) {
-    console.warn('[IT Free] 중복 수행 프로젝트 정리 건너뜀:', e.message);
+    console.warn('[김프리] 중복 수행 프로젝트 정리 건너뜀:', e.message);
   }
 }
 

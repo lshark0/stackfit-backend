@@ -48,7 +48,7 @@ async function resetMfaFromEnv(logEvent) {
     const u = await get('SELECT id FROM users WHERE email = ?', [email]);
     if (!u) continue;
     await run('UPDATE users SET totp_secret = NULL, totp_enabled_at = NULL, totp_last_counter = 0, totp_backup_codes = NULL WHERE id = ?', [u.id]);
-    console.warn(`[IT Free] 2단계 인증 초기화: ${email} (MFA_RESET_EMAILS)`);
+    console.warn(`[김프리] 2단계 인증 초기화: ${email} (MFA_RESET_EMAILS)`);
     if (logEvent) await logEvent('mfa_reset', { email, userId: u.id, detail: '환경변수로 2단계 인증 초기화' });
   }
 }

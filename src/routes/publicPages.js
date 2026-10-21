@@ -14,7 +14,7 @@ const esc = (v) => String(v == null ? '' : v)
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
   .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
-// 공유 주소는 PUBLIC_BASE_URL(예: https://itfree.co.kr)을 우선 쓰고, 없으면 요청이 들어온 주소를 씁니다.
+// 공유 주소는 PUBLIC_BASE_URL(예: https://kimfree.co.kr)을 우선 쓰고, 없으면 요청이 들어온 주소를 씁니다.
 function baseUrl(req) {
   const env = String(process.env.PUBLIC_BASE_URL || '').trim().replace(/\/+$/, '');
   if (/^https?:\/\/[^/\s]+$/i.test(env)) return env;
@@ -101,7 +101,7 @@ function page({ title, description, canonical, ogImage, noindex = false, body, j
 <meta name="description" content="${esc(description)}">
 ${noindex ? '<meta name="robots" content="noindex">' : `<link rel="canonical" href="${esc(canonical)}">`}
 <meta property="og:type" content="website">
-<meta property="og:site_name" content="IT Free">
+<meta property="og:site_name" content="김프리">
 <meta property="og:title" content="${esc(title)}">
 <meta property="og:description" content="${esc(description)}">
 <meta property="og:url" content="${esc(canonical)}">
@@ -116,13 +116,13 @@ ${jsonLd ? `<script type="application/ld+json">${JSON.stringify(jsonLd).replace(
 </head>
 <body><div class="wrap">
   <div class="top">
-    <a class="brand" href="/"><img src="/icons/icon-192.png" alt="">IT Free</a>
+    <a class="brand" href="/"><img src="/icons/icon-192.png" alt="">김프리</a>
     <a class="top-cta" href="/?utm_source=jobpage&amp;utm_medium=organic">앱에서 열기</a>
   </div>
   ${body}
   <div class="foot">
     <a href="/jobs">전체 공고</a><a href="/company.html">사업자 정보</a><a href="/terms.html">이용약관</a><a href="/privacy.html">개인정보처리방침</a>
-    <p>IT Free는 기술스택 기반으로 IT 프리랜서와 기업의 구인·구직 정보를 제공하는 서비스입니다. © 마켓리어</p>
+    <p>김프리는 기술스택 기반으로 IT 프리랜서와 기업의 구인·구직 정보를 제공하는 서비스입니다. © 마켓리어</p>
   </div>
 </div></body>
 </html>`;
@@ -149,12 +149,12 @@ router.get('/jobs', async (req, res) => {
   }).join('');
   res.set('Cache-Control', 'public, max-age=300');
   res.type('html').send(page({
-    title: 'IT 프리랜서 프로젝트 공고 — IT Free',
-    description: `지금 모집 중인 IT 프리랜서 프로젝트 공고 ${jobs.length}건. 기술스택·업무·등급별 프로젝트를 확인하고, 내 기술스택과 몇 % 맞는지 IT Free에서 바로 확인하세요.`,
+    title: 'IT 프리랜서 프로젝트 공고 — 김프리',
+    description: `지금 모집 중인 IT 프리랜서 프로젝트 공고 ${jobs.length}건. 기술스택·업무·등급별 프로젝트를 확인하고, 내 기술스택과 몇 % 맞는지 김프리에서 바로 확인하세요.`,
     canonical: `${base}/jobs`,
-    ogImage: `${base}/icons/og-itfree.png`,
+    ogImage: `${base}/icons/og-kimfree.png`,
     body: `<h1>모집 중인 IT 프로젝트</h1>
-      <p class="sub">총 ${jobs.length}건 · 공고를 누르면 상세 내용을 볼 수 있어요. 지원과 추천 %는 IT Free 앱에서 확인할 수 있어요.</p>
+      <p class="sub">총 ${jobs.length}건 · 공고를 누르면 상세 내용을 볼 수 있어요. 지원과 추천 %는 김프리 앱에서 확인할 수 있어요.</p>
       ${cards || '<div class="empty">지금 모집 중인 공고가 없어요.<br>새 공고가 올라오면 이곳에 표시돼요.</div>'}`,
   }));
 });
@@ -170,9 +170,9 @@ router.get('/jobs/:id', async (req, res, next) => {
   );
   if (!j) {
     return res.status(404).type('html').send(page({
-      title: '공고를 찾을 수 없어요 — IT Free',
+      title: '공고를 찾을 수 없어요 — 김프리',
       description: '삭제되었거나 없는 공고입니다.',
-      canonical: `${base}/jobs`, ogImage: `${base}/icons/og-itfree.png`, noindex: true,
+      canonical: `${base}/jobs`, ogImage: `${base}/icons/og-kimfree.png`, noindex: true,
       body: '<h1>공고를 찾을 수 없어요</h1><p class="sub">삭제되었거나 없는 공고입니다.</p><a class="cta" href="/jobs">모집 중인 공고 보기</a>',
     }));
   }
@@ -199,7 +199,7 @@ router.get('/jobs/:id', async (req, res, next) => {
   if (ref) track.set('ref', ref);
   const applyUrl = `/?${track.toString()}`;
   const summary = [stack.slice(0, 5).join(', '), j.duty, j.grade, j.location, j.period].filter((v) => v && v !== '협의').join(' · ');
-  const description = `${org} · ${summary || 'IT 프로젝트'} — IT Free에서 내 기술스택과 몇 % 맞는지 확인하고 바로 지원하세요.`.slice(0, 200);
+  const description = `${org} · ${summary || 'IT 프로젝트'} — 김프리에서 내 기술스택과 몇 % 맞는지 확인하고 바로 지원하세요.`.slice(0, 200);
 
   // 구글 검색의 채용 정보용 구조화 데이터(JobPosting). 열려 있는 공고에만 넣습니다.
   let jsonLd = null;
@@ -225,10 +225,10 @@ router.get('/jobs/:id', async (req, res, next) => {
 
   res.set('Cache-Control', 'public, max-age=300');
   res.type('html').send(page({
-    title: `${j.title} — ${org} | IT Free`,
+    title: `${j.title} — ${org} | 김프리`,
     description,
     canonical: `${base}/jobs/${j.id}`,
-    ogImage: `${base}/icons/og-itfree.png`,
+    ogImage: `${base}/icons/og-kimfree.png`,
     noindex: !open,
     jsonLd,
     body: `<p class="sub" style="margin:0;"><a href="/jobs">← 전체 공고</a></p>
@@ -239,7 +239,7 @@ router.get('/jobs/:id', async (req, res, next) => {
       <table>${rows.map(([k, v]) => `<tr><td class="lbl">${esc(k)}</td><td>${esc(v)}</td></tr>`).join('')}</table>
       ${j.description && j.description.trim() ? `<div class="desc">${esc(j.description.trim())}</div>` : ''}
       ${open
-        ? `<a class="cta" href="${esc(applyUrl)}">IT Free에서 지원하기</a>
+        ? `<a class="cta" href="${esc(applyUrl)}">김프리에서 지원하기</a>
            <p class="cta-note">로그인하면 내 기술스택과 몇 % 맞는지 바로 보여드려요. 가입은 무료예요.</p>`
         : '<a class="cta" href="/jobs">모집 중인 다른 공고 보기</a>'}`,
   }));

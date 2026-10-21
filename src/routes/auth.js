@@ -163,7 +163,7 @@ router.post('/signup', async (req, res) => {
   }
 
   await recordSignupAttribution(userId, req.body.attribution)
-    .catch((e) => console.warn('[IT Free] 가입 경로 기록 실패:', e.message));
+    .catch((e) => console.warn('[김프리] 가입 경로 기록 실패:', e.message));
 
   const token = signToken({ id: userId, role, email });
   res.status(201).json({ token, user: { id: userId, email, role, isAdmin: isAdminEmail(email) } });
@@ -217,7 +217,7 @@ async function claimTarget(token) {
 }
 router.get('/claim', async (req, res) => {
   const u = await claimTarget(req.query.token);
-  if (!u) return res.status(400).json({ error: '계정 연결 링크가 만료됐거나 이미 사용됐어요. IT Free에 새 링크를 요청해주세요.' });
+  if (!u) return res.status(400).json({ error: '계정 연결 링크가 만료됐거나 이미 사용됐어요. 김프리에 새 링크를 요청해주세요.' });
   const c = await get('SELECT name, contact_person, phone FROM companies WHERE user_id = ?', [u.id]);
   const { n } = await get('SELECT COUNT(*) AS n FROM jobs WHERE company_id = ?', [u.id]);
   res.json({ email: u.email, companyName: c ? c.name : '', contactPerson: c ? c.contact_person : '', needPhone: !(c && c.phone), jobs: Number(n) });
@@ -225,7 +225,7 @@ router.get('/claim', async (req, res) => {
 router.post('/claim', async (req, res) => {
   const { token, password } = req.body || {};
   const u = await claimTarget(token);
-  if (!u) return res.status(400).json({ error: '계정 연결 링크가 만료됐거나 이미 사용됐어요. IT Free에 새 링크를 요청해주세요.' });
+  if (!u) return res.status(400).json({ error: '계정 연결 링크가 만료됐거나 이미 사용됐어요. 김프리에 새 링크를 요청해주세요.' });
   if (typeof password !== 'string' || password.length < MIN_PASSWORD_LEN || !PASSWORD_RE.test(password)) {
     return res.status(400).json({ error: `비밀번호는 영문과 숫자를 포함해 ${MIN_PASSWORD_LEN}자 이상이어야 해요.` });
   }

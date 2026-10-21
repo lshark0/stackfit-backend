@@ -64,7 +64,7 @@ async function verifyBusiness({ bizRegNo, ceoName, startDt }) {
     return { ...base, ok: true, method: 'nts', status: st.b_stt || '계속사업자' };
   } catch (e) {
     // 국세청 서버 장애로 공고 등록이 막히지 않도록, 형식 확인만 통과시키고 나중에 다시 확인합니다.
-    console.warn('[IT Free] 국세청 사업자 진위확인 실패:', e.message);
+    console.warn('[김프리] 국세청 사업자 진위확인 실패:', e.message);
     return { ...base, ok: true, method: 'format', status: '' };
   }
 }

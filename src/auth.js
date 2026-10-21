@@ -5,11 +5,11 @@ const SECRET = process.env.JWT_SECRET || DEFAULT_SECRET;
 
 // 운영 서버(Render)에서 비밀키가 없으면 누구나 토큰을 위조할 수 있으므로 아예 시작하지 않습니다.
 if (SECRET === DEFAULT_SECRET && (process.env.RENDER || process.env.NODE_ENV === 'production')) {
-  throw new Error('[IT Free] JWT_SECRET 환경변수가 없어 서버를 시작하지 않습니다.');
+  throw new Error('[김프리] JWT_SECRET 환경변수가 없어 서버를 시작하지 않습니다.');
 }
 if (SECRET === DEFAULT_SECRET) {
   console.warn(
-    '[IT Free] 경고: JWT_SECRET 환경변수가 설정되지 않아 기본값을 사용 중입니다. ' +
+    '[김프리] 경고: JWT_SECRET 환경변수가 설정되지 않아 기본값을 사용 중입니다. ' +
     '운영 배포 시 반드시 무작위 값으로 설정하세요 (토큰이 위조될 수 있습니다).'
   );
 }

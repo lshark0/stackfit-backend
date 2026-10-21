@@ -53,7 +53,7 @@ function verifyTotp(secretB32, code, lastCounter = 0, now = Date.now()) {
   return null;
 }
 
-function otpauthUrl(secretB32, account, issuer = 'IT Free') {
+function otpauthUrl(secretB32, account, issuer = 'Kim Free') {
   const label = encodeURIComponent(`${issuer}:${account}`);
   return `otpauth://totp/${label}?secret=${secretB32}&issuer=${encodeURIComponent(issuer)}&algorithm=SHA1&digits=6&period=${STEP}`;
 }

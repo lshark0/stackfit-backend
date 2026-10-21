@@ -4,7 +4,7 @@ const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '')
   .split(',')
   .map((e) => e.trim().toLowerCase())
   .filter(Boolean);
-if (!ADMIN_EMAILS.length) console.warn('[IT Free] ADMIN_EMAILS 환경변수가 없어 관리자 계정이 지정되지 않았습니다.');
+if (!ADMIN_EMAILS.length) console.warn('[김프리] ADMIN_EMAILS 환경변수가 없어 관리자 계정이 지정되지 않았습니다.');
 
 function isAdminEmail(email) {
   return !!email && ADMIN_EMAILS.includes(String(email).toLowerCase());

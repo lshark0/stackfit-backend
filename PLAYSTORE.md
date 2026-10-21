@@ -1,6 +1,6 @@
-# IT Free — Google Play 스토어 등록 가이드
+# 김프리 — Google Play 스토어 등록 가이드
 
-IT Free는 이미 PWA(설치 가능한 웹앱)이므로, 네이티브 앱을 새로 만들지 않고
+김프리는 이미 PWA(설치 가능한 웹앱)이므로, 네이티브 앱을 새로 만들지 않고
 **TWA(Trusted Web Activity)** 방식으로 감싸서 Play 스토어에 올립니다.
 Android Studio 없이 구글이 만든 무료 웹 도구 **PWABuilder**로 진행합니다.
 
@@ -30,14 +30,14 @@ Android Studio 없이 구글이 만든 무료 웹 도구 **PWABuilder**로 진�
 2. **Package for stores → Android → Generate Package**
 3. 옵션
    - Package ID: `com.markettier.itfree`
-   - App name: `IT Free` / Launcher name: `IT Free`
+   - App name: `김프리` / Launcher name: `김프리`
    - Signing key: **Create new** (자동 생성)
 4. 다운로드된 zip 안의 `.aab`, `signing.keystore`, `signing-key-info.txt`를 **안전한 곳 2군데 이상에 백업**합니다.
    이 키를 잃어버리면 앱을 다시는 업데이트할 수 없습니다.
 
 ## 3단계 — Play Console에 앱 만들기 · 업로드
 
-1. **앱 만들기** → 앱 이름 `IT Free`, 기본 언어 한국어, 앱, 무료
+1. **앱 만들기** → 앱 이름 `김프리`, 기본 언어 한국어, 앱, 무료
 2. **테스트 → 내부 테스트 → 새 버전 만들기** → `.aab` 업로드
    (처음 올릴 때 **Play 앱 서명** 사용에 동의합니다. 구글이 최종 서명키를 보관합니다.)
 
@@ -66,7 +66,7 @@ TWA가 주소창 없이 전체화면으로 열리려면, 웹사이트가 "이 �
 
 | 항목 | 내용 |
 |---|---|
-| 앱 이름 | IT Free |
+| 앱 이름 | 김프리 |
 | 짧은 설명 (80자) | IT 프리랜서와 기업을 기술스택·업무·등급으로 자동 매칭하는 구인구직 플랫폼 |
 | 카테고리 | 비즈니스 |
 | 아이콘 | 512×512 PNG (`public/icons/icon-512.png`) |
@@ -76,7 +76,7 @@ TWA가 주소창 없이 전체화면으로 열리려면, 웹사이트가 "이 �
 | 개인정보처리방침 | `https://kimfree.co.kr/privacy.html` |
 
 자세한 설명 예시 첫 문단:
-> IT Free는 SI·SM·인프라 프로젝트를 찾는 IT 프리랜서와 인재를 찾는 기업을 연결합니다.
+> 김프리는 SI·SM·인프라 프로젝트를 찾는 IT 프리랜서와 인재를 찾는 기업을 연결합니다.
 > 공고의 요구 기술스택·업무·등급을 프리랜서 프로필과 비교해 추천 %와 스택매치 %로 보여주고,
 > 지원·제안·채팅·계약 진행까지 한 앱에서 관리할 수 있습니다.
 
