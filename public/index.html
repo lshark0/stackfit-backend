@@ -493,8 +493,14 @@
   .gbadge.g2{background:var(--cyan-soft); color:#0E7A6E;}
   .gbadge.g3{background:#FDF0D9; color:var(--amber-deep);}
   .gbadge.g4{background:linear-gradient(135deg, var(--purple) 0%, var(--pink) 100%); color:#fff;}
-  .btn-social{width:100%; height:54px; border-radius:999px; border:1px solid var(--line); background:#fff; display:flex; align-items:center; justify-content:center; gap:10px; font-size:16px; font-weight:700; cursor:pointer; -webkit-tap-highlight-color:transparent;}
+  .btn-social{width:100%; height:54px; border-radius:12px; border:1px solid var(--line); background:#fff; display:flex; align-items:center; justify-content:center; gap:10px; font-size:16px; font-weight:700; cursor:pointer; -webkit-tap-highlight-color:transparent;}
   .btn-social:active{transform:scale(.98);}
+  /* 네이버 로그인은 네이버가 배포한 공식 버튼 이미지를 비율·색 그대로 씁니다(검수 기준). 다른 버튼도 이 폭(최대 368px)에 맞춥니다. */
+  .social-btns{display:flex; flex-direction:column; gap:12px; width:100%; max-width:368px; margin:0 auto;}
+  .social-btns .btn-social{height:auto; aspect-ratio:368/56;} /* 공식 네이버 버튼과 높이를 똑같이 */
+  .btn-naver-official{display:block; width:100%; padding:0; border:0; background:none; cursor:pointer; -webkit-tap-highlight-color:transparent;}
+  .btn-naver-official img{display:block; width:100%; height:auto;}
+  .btn-naver-official:active{transform:scale(.98);}
   .soc-ic{width:22px; height:22px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:12px; font-weight:900; flex:0 0 auto; background:#fff;}
   .toast.show{opacity:1; transform:translateX(-50%) translateY(-6px);}
   .empty{display:flex; flex-direction:column; align-items:center; text-align:center; gap:6px; padding:50px 20px; color:var(--slate);}
@@ -3214,9 +3220,9 @@ async function screenOnboarding(){
 
 function socialLoginButtons(){
   return `
-  <div style="display:flex; flex-direction:column; gap:12px;">
+  <div class="social-btns">
     <button class="btn-social" style="background:#FEE500; color:#3C1E1E;" onclick="oauthStart('kakao')"><span class="soc-ic" style="background:#3C1E1E; color:#FEE500;">💬</span>카카오로 시작하기</button>
-    <button class="btn-social" style="background:#03C75A; color:#fff;" onclick="oauthStart('naver')"><span class="soc-ic" style="background:#fff; color:#03C75A;">N</span>네이버로 시작하기</button>
+    <button class="btn-naver-official" onclick="oauthStart('naver')" aria-label="네이버 로그인"><img src="/icons/naver-login.png" alt="네이버 로그인" width="368" height="56"></button>
     <button class="btn-social" style="background:#4285F4; color:#fff; border-color:#4285F4;" onclick="oauthStart('google')"><span class="soc-ic" style="background:#fff; color:#4285F4;">G</span>구글로 시작하기</button>
   </div>
   <div style="display:flex; align-items:center; gap:10px; margin:20px 0;">
