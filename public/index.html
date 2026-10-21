@@ -1719,7 +1719,6 @@ function setOauthRole(role, el){
   if(label) label.textContent = role === 'company' ? '회사명' : '이름';
   if(input) input.placeholder = role === 'company' ? '예: 마켓리어' : '실명을 입력해주세요';
 }
-const OAUTH_LABEL = { kakao: '카카오', naver: '네이버', google: '구글' };
 function screenOauthRole(){
   const p = oauthPending || {name:'', email:''};
   if(p.roleHint==='company' || p.roleHint==='freelancer') oauthRoleChoice = p.roleHint;
@@ -1727,7 +1726,6 @@ function screenOauthRole(){
   return `${statusbar()}
   <div class="app-header"><div class="page-title">몇 가지만 더 알려주세요</div></div>
   <div class="content">
-    <div class="page-sub" style="margin-bottom:16px;">${esc(OAUTH_LABEL[p.provider] || '소셜')} 계정으로 가입해요${p.email ? ` <span style="color:var(--slate-light);">(${esc(p.email)})</span>` : ''}</div>
     <div class="chip-row" id="oauthRoleChips">
       <div class="chip ${isCompany?'':'active'}" onclick="setOauthRole('freelancer', this)">프리랜서</div>
       <div class="chip ${isCompany?'active':''}" onclick="setOauthRole('company', this)">기업</div>
