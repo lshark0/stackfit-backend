@@ -4,7 +4,7 @@ IT Free는 이미 PWA(설치 가능한 웹앱)이므로, 네이티브 앱을 새
 **TWA(Trusted Web Activity)** 방식으로 감싸서 Play 스토어에 올립니다.
 Android Studio 없이 구글이 만든 무료 웹 도구 **PWABuilder**로 진행합니다.
 
-- 배포 주소: `https://stackfit-backend.onrender.com`
+- 배포 주소: `https://kimfree.co.kr` (대표 도메인. 기존 `https://stackfit-backend.onrender.com`도 동작)
 - 권장 패키지 ID: **`com.markettier.itfree`** (한 번 정하면 영구히 변경 불가)
 - 앱 아이콘: `public/icons/icon-512.png`
 
@@ -26,7 +26,7 @@ Android Studio 없이 구글이 만든 무료 웹 도구 **PWABuilder**로 진�
 
 ## 2단계 — PWABuilder로 Android 패키지(.aab) 만들기
 
-1. https://www.pwabuilder.com 에 `https://stackfit-backend.onrender.com` 입력 → **Start**
+1. https://www.pwabuilder.com 에 `https://kimfree.co.kr` 입력 → **Start**
 2. **Package for stores → Android → Generate Package**
 3. 옵션
    - Package ID: `com.markettier.itfree`
@@ -57,7 +57,7 @@ TWA가 주소창 없이 전체화면으로 열리려면, 웹사이트가 "이 �
      "업로드 키 SHA-256 (signing-key-info.txt)"
    ]
    ```
-4. 확인: `https://stackfit-backend.onrender.com/.well-known/assetlinks.json` 이 열리는지,
+4. 확인: `https://kimfree.co.kr/.well-known/assetlinks.json` 이 열리는지,
    https://developers.google.com/digital-asset-links/tools/generator 에서 검증
 
 증명이 안 되면 앱 상단에 브라우저 주소창이 계속 보입니다.
@@ -73,7 +73,7 @@ TWA가 주소창 없이 전체화면으로 열리려면, 웹사이트가 "이 �
 | 그래픽 이미지 | 1024×500 PNG (배너) |
 | 스크린샷 | 휴대폰 2~8장 (홈 추천, 공고 상세, 인재 상세, 채팅, 프로젝트 관리 권장) |
 | 연락처 이메일 | lshark4541@gmail.com |
-| 개인정보처리방침 | `https://stackfit-backend.onrender.com/privacy.html` |
+| 개인정보처리방침 | `https://kimfree.co.kr/privacy.html` |
 
 자세한 설명 예시 첫 문단:
 > IT Free는 SI·SM·인프라 프로젝트를 찾는 IT 프리랜서와 인재를 찾는 기업을 연결합니다.
@@ -83,7 +83,7 @@ TWA가 주소창 없이 전체화면으로 열리려면, 웹사이트가 "이 �
 ## 6단계 — 정책 항목 (앱 콘텐츠)
 
 - **개인정보처리방침**: 위 URL
-- **계정 삭제**: 앱 안에서 마이페이지 → 회원탈퇴 / 웹 요청 URL `https://stackfit-backend.onrender.com/delete-account.html`
+- **계정 삭제**: 앱 안에서 마이페이지 → 회원탈퇴 / 웹 요청 URL `https://kimfree.co.kr/delete-account.html`
 - **데이터 보안** (사실대로 체크)
   - 수집: 이메일, 이름, 전화번호, 생년월일·성별(선택), 이력서 파일, 회사 정보, 앱 내 메시지
   - 목적: 앱 기능(매칭·계정 관리), 커뮤니케이션
@@ -114,4 +114,4 @@ TWA가 주소창 없이 전체화면으로 열리려면, 웹사이트가 "이 �
 **마이페이지 → 관리자 → 가입 경로 통계**에서 채널별 가입 수를 볼 수 있습니다.
 (같은 화면의 "채널별 공유 링크 만들기"로 링크를 만들 수 있습니다.)
 
-예) `https://stackfit-backend.onrender.com/?utm_source=okky&utm_medium=social&utm_campaign=ta_post_1`
+예) `https://kimfree.co.kr/?utm_source=okky&utm_medium=social&utm_campaign=ta_post_1`

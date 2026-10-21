@@ -5,11 +5,15 @@ STACKFIT 코드에는 이미 구글/네이버/카카오 로그인이 전부 구�
 
 공통으로 등록해야 할 **콜백(리다이렉트) 주소**는 아래와 같습니다 (플랫폼마다 다름에 유의):
 
-| 플랫폼 | 콜백 URL |
-|---|---|
-| 구글 | `https://stackfit-backend.onrender.com/api/auth/oauth/google/callback` |
-| 네이버 | `https://stackfit-backend.onrender.com/api/auth/oauth/naver/callback` |
-| 카카오 | `https://stackfit-backend.onrender.com/api/auth/oauth/kakao/callback` |
+콜백 주소는 사용자가 접속한 도메인을 따라가므로, 대표 도메인(`kimfree.co.kr`)과 기존 Render 주소를 **둘 다** 등록합니다.
+
+| 플랫폼 | 콜백 URL (대표 도메인) | 콜백 URL (기존 Render 주소) |
+|---|---|---|
+| 구글 | `https://kimfree.co.kr/api/auth/oauth/google/callback` | `https://stackfit-backend.onrender.com/api/auth/oauth/google/callback` |
+| 네이버 | `https://kimfree.co.kr/api/auth/oauth/naver/callback` | `https://stackfit-backend.onrender.com/api/auth/oauth/naver/callback` |
+| 카카오 | `https://kimfree.co.kr/api/auth/oauth/kakao/callback` | `https://stackfit-backend.onrender.com/api/auth/oauth/kakao/callback` |
+
+`kimfree.com`으로 들어온 요청은 서버가 `kimfree.co.kr`로 이동시키므로 따로 등록하지 않아도 됩니다.
 
 ---
 
@@ -42,7 +46,7 @@ STACKFIT 코드에는 이미 구글/네이버/카카오 로그인이 전부 구�
    - 사용 API: **네이버 로그인** 체크
    - 제공 정보 선택: 최소 **이메일**, **이름**은 체크 (사용자 동의 시 제공)
 3. 로그인 오픈 API 서비스 환경
-   - 서비스 URL: `https://stackfit-backend.onrender.com`
+   - 서비스 URL: `https://kimfree.co.kr` (기존 `https://stackfit-backend.onrender.com`도 함께 등록)
    - Callback URL: 위 표의 네이버 콜백 URL 추가
 4. 등록 완료하면 **Client ID**, **Client Secret** 확인 가능
 

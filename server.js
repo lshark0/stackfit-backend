@@ -42,6 +42,18 @@ const { purgeOldSecurityEvents } = securityLog;
 const app = express();
 app.set('trust proxy', 1); // Render는 프록시 뒤에 있으므로 rate-limit이 실제 클라이언트 IP를 보게 함
 
+// 대표 도메인은 kimfree.co.kr — kimfree.com(www 포함)으로 들어오면 같은 경로로 영구 이동시킵니다.
+// onrender.com 주소는 소셜 로그인 콜백 등록이 남아 있어 그대로 둡니다.
+const PRIMARY_HOST = 'kimfree.co.kr';
+const REDIRECT_HOSTS = new Set(['kimfree.com', 'www.kimfree.com']);
+app.use((req, res, next) => {
+  const host = String(req.hostname || '').toLowerCase();
+  if (!REDIRECT_HOSTS.has(host)) return next();
+  // GET/HEAD는 301, 그 외 요청은 메서드와 본문이 유지되도록 308
+  const status = req.method === 'GET' || req.method === 'HEAD' ? 301 : 308;
+  res.redirect(status, `https://${PRIMARY_HOST}${req.originalUrl}`);
+});
+
 // 보안 HTTP 헤더. CSP는 정적 프론트엔드가 인라인 스크립트/스타일을 쓰므로 완화해서 적용.
 app.use(
   helmet({
