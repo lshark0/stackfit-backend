@@ -1705,7 +1705,42 @@ async function doLogin(){
     go('home');
     openPendingDeepLink();
     maybeShowOnboardingNudge();
-  }catch(e){ toast(e.message); }
+  }catch(e){
+    if(e.status === 401) showLoginFailHelp(email);
+    else toast(e.message);
+  }
+}
+// 이메일 로그인 실패: 계정이 없는지 비밀번호가 틀렸는지는 보안상 구분해 알려주지 않고(서버도 같은 응답),
+// 대신 아직 회원이 아니면 회원가입을 하도록 권합니다.
+function showLoginFailHelp(email){
+  const role = state.param === 'company' ? 'company' : 'freelancer';
+  const btn = 'flex:1; padding:12px 0; border-radius:12px; border:none; font-size:14.5px; font-weight:700; cursor:pointer;';
+  document.getElementById('confirmMsg').innerHTML = `
+    <div style="text-align:left;">
+      <div style="font-size:17px; font-weight:800; color:var(--ink); margin-bottom:10px;">로그인하지 못했어요</div>
+      <div style="font-size:14px; line-height:1.65; color:var(--ink);">이메일 또는 비밀번호가 맞지 않아요.<br><b>아직 김프리 회원이 아니라면</b> 회원가입 후 이용해 주세요.</div>
+      <div class="page-sub" style="margin-top:8px; line-height:1.6;">카카오·네이버·구글로 가입했다면 위쪽 버튼으로 로그인해 주세요.</div>
+      <div style="display:flex; gap:8px; margin-top:16px;">
+        <button class="confirm-cancel" style="${btn}" onclick="closeConfirm(); const pw=document.getElementById('li-password'); if(pw){ pw.value=''; pw.focus(); }">다시 입력</button>
+        <button class="confirm-ok" style="${btn} flex:1.4;" onclick="closeConfirm(); signupFromLogin('${role}', ${esc(JSON.stringify(email))})">회원가입</button>
+      </div>
+    </div>`;
+  const actions = document.querySelector('#confirmOverlay .confirm-actions');
+  if(actions) actions.style.display = 'none';
+  document.getElementById('confirmOverlay').classList.add('open');
+}
+// 로그인 화면에서 회원가입으로 넘어갈 때, 고른 회원 유형(프리랜서/기업)과 입력한 이메일을 그대로 이어줍니다.
+function signupFromLogin(role, email){
+  go('signup');
+  let tries = 0;
+  const apply = () => {
+    const tabs = document.querySelectorAll('#signupRoleTabs .tab');
+    const emailEl = document.getElementById('su-email');
+    if(state.screen !== 'signup' || !tabs.length || !emailEl){ if(++tries < 40) setTimeout(apply, 50); return; }
+    setSignupRole(role, tabs[role === 'company' ? 1 : 0]);
+    if(email && !emailEl.value) emailEl.value = email;
+  };
+  apply();
 }
 
 function oauthStart(provider){
