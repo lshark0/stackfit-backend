@@ -4660,6 +4660,9 @@ async function screenMypage(){
     const fixed = await enablePush({silent:true}).catch(()=>false);
     if(fixed) pushOn = true; else pushBroken = true;
   }
+  // 알림을 켠 적이 있는데 허용 상태가 '미정'으로 돌아와 있으면, 이 화면에서는 허용이 저장되지 않는 것입니다.
+  // (예전 주소로 설치한 앱이 kimfree.co.kr을 바깥 페이지로 여는 경우 등) → 새로 설치하도록 안내합니다.
+  const pushNotSaved = canPush && !pushOn && Notification.permission === 'default' && everPushEnabled();
   return `${statusbar()}${header("마이페이지","",{bell:false})}
   <div class="content">
     <div class="mypage-head">
@@ -4717,6 +4720,7 @@ async function screenMypage(){
       <label class="switch"><input type="checkbox" ${pushOn?'checked':''} onchange="togglePush(this)"><span class="slider"></span></label>
     </div>
     ${pushBroken ? `<div class="list-item" onclick="repairPush()"><div class="li-l"><div class="li-icon">${I.gear}</div><div><div class="li-tt">알림이 안 오면 여기를 눌러주세요</div><div class="page-sub" style="margin-top:2px;">알림 기능을 처음부터 다시 설치해요</div></div></div>${I.back}</div>` : ''}
+    ${pushNotSaved ? `<div class="reco-empty" style="margin-top:8px; text-align:left;">이 화면에서는 알림 허용이 저장되지 않아요.<br>홈 화면의 예전 김프리 아이콘을 지우고, 크롬에서 <b>kimfree.co.kr</b>을 열어 <b>홈 화면에 추가</b>한 새 아이콘으로 알림을 켜 주세요.</div>` : ''}
     ${!pushOn && Notification.permission === 'denied' ? `<div class="reco-empty" style="margin-top:8px; text-align:left;">알림이 <b>차단</b>되어 있어요.<br>브라우저 주소창 왼쪽 자물쇠 → 알림 → 허용으로 바꿔주세요.</div>` : ''}` :
     (inAppBrowserName()
       ? `<div class="reco-empty" style="margin-top:8px; text-align:left;"><b>${esc(inAppBrowserName())}</b> 안의 브라우저에서는 앱 설치·푸시 알림을 쓸 수 없어요.<br>${isIOSDevice() ? 'Safari' : '크롬'}에서 열면 사용할 수 있어요.
