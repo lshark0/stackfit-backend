@@ -130,7 +130,10 @@
   .gauge-label{font-family:var(--mono); font-size:10.5px; font-weight:700; letter-spacing:.1em; color:var(--slate); text-transform:uppercase; white-space:nowrap;}
   .gauge-track{flex:1; height:7px; border-radius:4px; position:relative; overflow:hidden; background:repeating-linear-gradient(90deg, var(--paper-dim) 0 8px, #E4E1D8 8px 9px);}
   .gauge-fill{position:absolute; top:0; left:0; height:100%; border-radius:4px; background:linear-gradient(90deg, var(--amber), var(--pink), var(--cyan));}
-  .gauge-value{font-family:var(--mono); font-weight:700; font-size:13px; color:var(--ink); min-width:34px; text-align:right;}
+  .gauge-value{font-family:var(--mono); font-weight:700; font-size:13px; color:var(--ink); min-width:34px; text-align:right; white-space:nowrap;}
+  .stack-bar{flex:1; display:flex; gap:4px;}
+  .stack-bar i{flex:1; height:9px; border-radius:3px; background:var(--paper-dim); box-shadow:inset 0 0 0 1px #E4E1D8;}
+  .stack-bar i.on{background:var(--green); box-shadow:none;}
   .avatar{width:44px; height:44px; border-radius:12px; flex:0 0 auto; background:linear-gradient(150deg, var(--purple) 0%, var(--blue) 100%); color:#fff; font-family:var(--mono); font-weight:700; font-size:15px; display:flex; align-items:center; justify-content:center;}
   .avatar.lg{width:64px; height:64px; border-radius:16px; font-size:20px;}
   .star-btn{width:34px; height:34px; border-radius:10px; background:var(--card); border:1px solid var(--line); display:flex; align-items:center; justify-content:center; color:var(--slate-light); cursor:pointer; flex:0 0 auto;}
@@ -934,7 +937,7 @@ function toast(msg){
 
 // ── 그래픽 컴포넌트 ──────────────────────────────
 // 원형 도넛 게이지 (프로필 완성도, 매칭률 등)
-function ringGauge(pct, label, color){
+function ringGauge(pct, label, color, text){
   const p = Math.max(0, Math.min(100, Number(pct)||0));
   const r = 44, c = 2 * Math.PI * r;
   const offset = c - (p/100) * c;
@@ -944,7 +947,7 @@ function ringGauge(pct, label, color){
       <circle class="ring-fill" cx="52" cy="52" r="${r}" fill="none" stroke-width="10"
         stroke="${color||'var(--amber)'}" stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}"/>
     </svg>
-    <div class="ring-center"><div class="ring-num">${p}%</div><div class="ring-lbl">${esc(label||'')}</div></div>
+    <div class="ring-center"><div class="ring-num">${text != null ? esc(text) : p + '%'}</div><div class="ring-lbl">${esc(label||'')}</div></div>
   </div>`;
 }
 
@@ -996,13 +999,20 @@ function sparkline(values){
   }).join('')}</div>`;
 }
 
-function gauge(pct){
-  return `<div class="gauge"><span class="gauge-label">스택매치</span>
-    <div class="gauge-track"><div class="gauge-fill" style="width:${pct}%"></div></div>
-    <span class="gauge-value">${pct}%</span></div>`;
+// 기술스택 일치: 공고 요구 기술 수만큼 칸을 나누고, 가진 기술 수만큼 채운 막대 + "2/3개".
+// o = { match, matchCount, matchTotal } (서버 응답의 공고·인재·추천 항목)
+function gauge(o){
+  if(!o || o.match == null) return '';
+  const total = Number(o.matchTotal), cnt = Number(o.matchCount) || 0;
+  if(!total) return '';
+  const bar = total <= 12
+    ? `<div class="stack-bar">${Array.from({length: total}, (_, i) => `<i class="${i < cnt ? 'on' : ''}"></i>`).join('')}</div>`
+    : `<div class="gauge-track"><div class="gauge-fill" style="width:${Math.round(cnt / total * 100)}%"></div></div>`;
+  return `<div class="gauge"><span class="gauge-label">스택 일치</span>${bar}<span class="gauge-value">${cnt}/${total}개</span></div>`;
 }
-function gaugeSm(pct){
-  return `<span style="font-family:var(--mono); font-weight:700; font-size:11px; color:var(--ink);">${pct}%</span>`;
+function gaugeSm(o){
+  if(!o || !Number(o.matchTotal)) return '';
+  return `<span style="font-family:var(--mono); font-weight:700; font-size:11px; color:var(--ink);">스택 ${Number(o.matchCount)||0}/${Number(o.matchTotal)}</span>`;
 }
 function statusbar(){
   return `<div class="statusbar"></div>`;
@@ -1269,7 +1279,7 @@ function jobCard(j){
       ${state.role==='company' ? `<span class="im">${I.eyeSm}<b>${j.viewCount||0}</b>회 조회</span><span class="im">${I.usersSm}<b>${j.applicantCount||0}</b>명 지원</span>` : ''}
     </div>
     <div class="meta-row" style="margin-top:6px;">${j.status==='closed' ? '' : ddayBadge(j.d_day)}${ratingBadge(j.rating_avg, j.rating_count)}</div>
-    ${state.role==='freelancer' ? gauge(j.match) : ''}
+    ${state.role==='freelancer' ? gauge(j) : ''}
   </div>`;
 }
 // 잡코리아 스타일: 최근 본 공고 / 비슷한 공고에 쓰는 가로 스크롤용 축약 카드
@@ -1277,7 +1287,7 @@ function miniJobCard(j){
   return `<div class="mini-card" onclick="openDetail('jobDetail', ${j.id}, 'search')">
     <div class="mc-title">${esc(j.title)}</div>
     <div class="mc-org">${esc(j.org)}</div>
-    <div class="mc-meta">${ddayBadge(j.status==='closed' ? '마감' : j.d_day)}${state.role==='freelancer' ? gaugeSm(j.match) : ''}</div>
+    <div class="mc-meta">${ddayBadge(j.status==='closed' ? '마감' : j.d_day)}${state.role==='freelancer' ? gaugeSm(j) : ''}</div>
   </div>`;
 }
 // 잡코리아 스타일: 최근 본 인재 가로 스크롤용 축약 카드
@@ -1293,7 +1303,7 @@ function stackTags(stack, matched){
   const hit = new Set((matched||[]).map(s=>String(s).toLowerCase()));
   return `<div class="tag-row">${(stack||[]).map(s=>`<span class="tag${hit.has(String(s).toLowerCase())?' hit':''}">${esc(s)}</span>`).join('')}</div>`;
 }
-// 추천 % 점수 내역: 스택(45) + 업무(15) + 등급(10) + 시기(10) + 근무(10) + 자격(5) + 평점(5)
+// 추천 점수 내역: 스택(45) + 업무(15) + 등급(10) + 시기(10) + 근무(10) + 자격(5) + 평점(5)
 // 근무 조건을 입력하지 않았으면 시기·근무는 중간 점수(중립)로 들어갑니다.
 // 평점은 "상대방" 평판입니다 — 기업이 보면 인재 평점, 프리랜서가 보면 기업 평점. 가산점은 ★4.0 이상일 때만.
 function recoBreakdown(b, total, ratingLabel, avg, count){
@@ -1314,13 +1324,13 @@ function recoJobCard(j){
   return `<div class="card clickable" onclick="openDetail('jobDetail', ${j.id}, 'reco')">
     <div class="card-top">
       <div><div class="card-title">${esc(j.title)}</div><div class="card-org">${esc(j.org)}</div></div>
-      <span class="reco-badge">추천 ${j.score}%</span>
+      <span class="reco-badge">추천 ${j.score}점</span>
     </div>
     ${stackTags(j.stack, j.matchedStack)}
     <div class="meta-row"><span>${I.pin}${esc(j.location)}</span><span class="rate">${esc(j.rate)}</span></div>
     ${recoReasons(j.reasons, '기업 평점')}
     ${recoBreakdown(j.breakdown, j.score, '기업 평점', j.rating_avg, j.rating_count)}
-    ${j.match!=null ? gauge(j.match) : ''}
+    ${gauge(j)}
   </div>`;
 }
 function recoTalentCard(t){
@@ -1333,12 +1343,12 @@ function recoTalentCard(t){
           <div style="margin-top:5px;">${dutyBadge(t.role_title)}</div>
         </div>
       </div>
-      <span class="reco-badge">추천 ${t.score}%</span>
+      <span class="reco-badge">추천 ${t.score}점</span>
     </div>
     ${stackTags(t.stack, t.matchedStack)}
     ${recoReasons(t.reasons, '인재 평점')}
     ${recoBreakdown(t.breakdown, t.score, '인재 평점', t.rating_avg, t.rating_count)}
-    ${t.match!=null ? gauge(t.match) : ''}
+    ${gauge(t)}
   </div>`;
 }
 function talentCard(t){
@@ -1363,24 +1373,24 @@ function talentCard(t){
       <span class="im">${I.wallet}<b>${esc(t.rate)}</b></span>
       ${t.rating_count>0?`<span class="im">${ratingBadge(t.rating_avg, t.rating_count)}</span>`:''}
     </div>
-    ${t.match!=null ? gauge(t.match) : ''}
+    ${gauge(t)}
   </div>`;
 }
 
-// 인재풀 검색·관심 인재에서 스택매치를 어느 공고 기준으로 계산했는지 보여주고 바꿀 수 있게 합니다.
+// 인재풀 검색·관심 인재에서 스택 일치를 어느 공고 기준으로 계산했는지 보여주고 바꿀 수 있게 합니다.
 let talentMatchJobId = null;
 function matchBasisHtml(data, onChange){
   if(!data.matchJob){
-    return `<div class="reco-legend">공고를 등록하면 그 공고 기준으로 <b>스택매치 %</b>가 표시돼요.</div>`;
+    return `<div class="reco-legend">공고를 등록하면 그 공고 기준으로 <b>스택 일치</b>가 표시돼요.</div>`;
   }
   return `<div style="display:flex; align-items:center; gap:8px; margin:6px 0 4px;">
-      <span style="flex:0 0 auto; font-size:12.5px; font-weight:700; color:var(--ink);">스택매치 기준 공고</span>
+      <span style="flex:0 0 auto; font-size:12.5px; font-weight:700; color:var(--ink);">스택 일치 기준 공고</span>
       <select class="form-input" style="flex:1; min-width:0; padding:9px 10px; font-size:12.5px;" onchange="talentMatchJobId=Number(this.value); ${onChange}">
         ${(data.matchJobs.some(j=>j.id===data.matchJob.id) ? data.matchJobs : [data.matchJob, ...data.matchJobs])
           .map(j=>`<option value="${j.id}" ${j.id===data.matchJob.id?'selected':''}>${esc(j.title)}</option>`).join('')}
       </select>
     </div>
-    <div class="reco-legend">· <b>스택매치 %</b>: 선택한 공고 기준으로 기술스택만 본 점수입니다.</div>`;
+    <div class="reco-legend">· <b>스택 일치</b>: 선택한 공고가 요구하는 기술 중 보유한 기술 수입니다.</div>`;
 }
 
 /* ---------------- Actions ---------------- */
@@ -1491,7 +1501,7 @@ function showProfileNudge(info){
 }
 function showJobPostNudge(){
   nudgeShell('첫 프로젝트를 등록해 보세요', `
-      <div style="font-size:13.5px; color:var(--ink); line-height:1.55;">프로젝트(공고)를 등록하면 필요한 기술·등급에 맞는 인재를 추천 %와 함께 바로 보여드려요.</div>
+      <div style="font-size:13.5px; color:var(--ink); line-height:1.55;">프로젝트(공고)를 등록하면 필요한 기술·등급·근무 조건에 맞는 인재를 추천 점수와 함께 바로 보여드려요.</div>
       <div style="margin-top:12px; background:#EEF4FF; border-radius:12px; padding:11px 13px; font-size:12.5px; color:var(--ink); line-height:1.6;">
         <div>① 프로젝트 정보·필요 기술스택 입력</div>
         <div>② 맞춤 인재 추천 확인</div>
@@ -3556,13 +3566,13 @@ async function screenHome(){
     ]);
     const jobs = jobsData.jobs;
     const appliedCount = jobs.filter(j=>j.applied).length;
-    const maxMatch = jobs.length ? Math.max(...jobs.map(j=>j.match)) : 0;
+    const maxScore = recoData.jobs.length ? Math.max(...recoData.jobs.map(j=>j.score)) : 0;
     const activeProjects = projectsData.projects.filter(p=>p.status==='진행중').length;
     return `${statusbar()}${header(`안녕하세요, ${esc(profile.name)}님`,"오늘도 좋은 매칭 찾아드릴게요",{roleChip:true}, nc)}
     <div class="content">
       <div class="hero-stat">
         <div class="hs" onclick="go('myApplications')"><div class="hs-num">${appliedCount}</div><div class="hs-lbl">지원한 공고</div>${sparkline([1,2,1,3,appliedCount||1])}</div>
-        <div class="hs" onclick="go('jobs')"><div class="hs-num">${maxMatch}%</div><div class="hs-lbl">최고 매칭률</div>${sparkline([2,1,3,2,Math.max(1,Math.round(maxMatch/25))])}</div>
+        <div class="hs" onclick="go('jobs')"><div class="hs-num">${maxScore}점</div><div class="hs-lbl">최고 추천 점수</div>${sparkline([2,1,3,2,Math.max(1,Math.round(maxScore/25))])}</div>
         <div class="hs" onclick="go('projects')"><div class="hs-num">${activeProjects}</div><div class="hs-lbl">진행 프로젝트</div>${sparkline([1,1,2,2,activeProjects||1])}</div>
       </div>
       <div class="banner light" onclick="go('profileEdit')">
@@ -3585,7 +3595,7 @@ async function screenHome(){
       </div>
       <div class="section-label with-ic reco-title">${I.badgeCheck}나에게 맞는 프로젝트</div>
       ${recoData.jobs.length
-        ? `<div class="reco-legend">· <b>추천 %</b>: 스택(60) + 업무(20) + 등급(15) + 기업 평점(5)을 합친 종합 점수입니다.<br>· <b>기업 평점</b>: 공고를 올린 기업이 받은 리뷰 평균이 ★4.0 이상이면 5점입니다.<br>· <b>스택매치 %</b>: 요구 기술스택 중 보유한 비율입니다.</div>`
+        ? `<div class="reco-legend">· <b>추천 점수(100점)</b>: 스택(45) + 업무(15) + 등급(10) + 투입 시기(10) + 근무 형태·지역(10) + 자격증(5) + 기업 평점(5)<br>· 프로필에 투입 가능일·선호 근무 형태·근무 가능 지역을 입력하면 더 정확해져요(입력하지 않으면 중간 점수).<br>· <b>기업 평점</b>: 공고를 올린 기업이 받은 리뷰 평균이 ★4.0 이상이면 5점입니다.<br>· <b>스택 일치</b>: 공고가 요구하는 기술 중 보유한 기술 수입니다.</div>`
           + [...recoData.jobs].sort((a,b)=>(b.score-a.score) || ((b.match||0)-(a.match||0))).map(recoJobCard).join('')
         : (profile.completion >= 100
             ? `<div class="reco-empty">아직 조건에 맞는 새 프로젝트가 없어요.<br>이미 지원했거나 마감된 공고는 추천에서 빠져요.<br><b onclick="go('jobs')" style="color:var(--ink); text-decoration:underline; cursor:pointer;">전체 공고 보러 가기</b></div>`
@@ -3597,7 +3607,7 @@ async function screenHome(){
     apiFetch('/profile'), apiFetch('/jobs'),
     apiFetch('/recommend/talents?limit=20').catch(()=>({job:null, talents:[]})),
   ]);
-  // 인재풀의 스택매치도 추천과 같은 공고 기준으로 계산해야 두 숫자가 어긋나지 않습니다.
+  // 인재풀의 스택 일치도 추천과 같은 공고 기준으로 계산해야 두 숫자가 어긋나지 않습니다.
   const talentsData = await apiFetch('/talents' + (recoData.job ? `?jobId=${recoData.job.id}` : ''));
   const jobs = jobsData.jobs;
   const applicantSum = jobs.reduce((a,j)=>a+(j.applicantCount||0),0);
@@ -3628,7 +3638,7 @@ async function screenHome(){
     </div>
     <div class="section-label with-ic reco-title">${I.badgeCheck}${recoData.job ?`"${esc(recoData.job.title)}"에 맞는 인재` : '맞춤 인재 추천'}</div>
     ${recoData.talents.length
-      ? `<div class="reco-legend">· <b>추천 %</b>: 스택(60) + 업무(20) + 등급(15) + 인재 평점(5)을 합친 종합 점수입니다.<br>· <b>인재 평점</b>: 프리랜서가 받은 리뷰 평균이 ★4.0 이상이면 5점입니다.<br>· <b>스택매치 %</b>: 요구 기술스택 중 보유한 비율입니다.</div>`
+      ? `<div class="reco-legend">· <b>추천 점수(100점)</b>: 스택(45) + 업무(15) + 등급(10) + 투입 시기(10) + 근무 형태·지역(10) + 자격증(5) + 인재 평점(5)<br>· 공고에 투입 예정일·근무 형태(상주/재택/혼합)를 적으면 더 정확해져요.<br>· <b>인재 평점</b>: 프리랜서가 받은 리뷰 평균이 ★4.0 이상이면 5점입니다.<br>· <b>스택 일치</b>: 공고가 요구하는 기술 중 인재가 보유한 기술 수입니다.</div>`
         + [...recoData.talents].sort((a,b)=>(b.score-a.score) || ((b.match||0)-(a.match||0))).map(recoTalentCard).join('')
       : `<div class="reco-empty">${recoData.job
           ? '아직 조건에 맞는 인재가 없어요.<br>공고의 기술스택·업무·등급을 채우면 정확도가 올라가요.'
@@ -3703,7 +3713,7 @@ async function screenJobDetail(){
     <div class="card">
       <div class="card-title" style="font-size:13.5px;">나와의 매칭 분석</div>
       <div class="ring-wrap">
-        ${ringGauge(j.match, '스택매치', 'var(--cyan)')}
+        ${ringGauge(j.match, '스택 일치', 'var(--cyan)', j.matchTotal ? `${j.matchCount||0}/${j.matchTotal}` : '-')}
         <div style="flex:1; min-width:0;">
           ${skillBars(j.stack, myProfile ? myProfile.stack : [])}
         </div>
@@ -4625,7 +4635,7 @@ async function screenAllApplicants(){
             ${badge[a.status] || `<span class="sbadge fail">${esc(a.status)}</span>`}
           </div>
           <div class="tag-row">${a.stack.map(s=>`<span class="tag">${esc(s)}</span>`).join('')}</div>
-          ${gauge(a.match)}
+          ${gauge(a)}
         </div>`).join('')}
     `).join('') || emptyArt(ART.noTalents, '아직 지원자가 없어요', '인재풀에서 직접 포지션을 제안해볼 수도 있어요.')}
     <div style="height:20px;"></div>
@@ -4660,7 +4670,7 @@ async function screenApplicants(){
           ${badge[a.status] || `<span class="sbadge fail">${esc(a.status)}</span>`}
         </div>
         <div class="tag-row">${a.stack.map(s=>`<span class="tag">${esc(s)}</span>`).join('')}</div>
-        ${gauge(a.match)}
+        ${gauge(a)}
         <div class="meta-row">
           <span class="rate">${esc(a.rate)}</span>
           ${a.resume_url? `<span style="display:flex; align-items:center; gap:8px;"><a href="${viewerUrl(a.resume_url)}" target="_blank" style="color:var(--ink); font-weight:600;">📄 경력기술서 보기</a><span onclick="downloadResume('${jsAttrStr(a.resume_url)}', '${jsAttrStr(a.resume_original_name||'경력기술서')}')" style="color:var(--slate); font-weight:600; cursor:pointer;">⬇ 다운로드</span></span>` : `<span style="color:var(--slate-light);">경력기술서 미첨부</span>`}
@@ -4920,7 +4930,7 @@ function saveAiChat(){ try{ sessionStorage.setItem(AI_CHAT_KEY, JSON.stringify(a
 function aiChatSuggestions(){
   return state.role === 'company'
     ? ['공고는 어떻게 등록하나요?', '계약은 어떻게 진행되나요?', '추천 인재 점수는 어떻게 계산되나요?', '푸시 알림이 안 와요']
-    : ['지원하려면 무엇을 채워야 하나요?', '추천 %는 어떻게 계산되나요?', '제안을 수락하면 연락처가 공개되나요?', '푸시 알림이 안 와요'];
+    : ['지원하려면 무엇을 채워야 하나요?', '추천 점수는 어떻게 계산되나요?', '제안을 수락하면 연락처가 공개되나요?', '푸시 알림이 안 와요'];
 }
 function aiBubble(role, text){
   const mine = role === 'user';
@@ -5851,7 +5861,7 @@ async function screenPlans(){
       <div class="banner-eyebrow">${isCompany ? 'Business Plan' : 'Premium'} · 출시 예정</div>
       <div class="banner-title">${isCompany ? '필요한 만큼 매달 묶음으로' : '기업에게 먼저 보이세요'}</div>
       <div class="banner-sub" style="color:var(--slate);">${isCompany
-        ? '공고 등록·인재 검색·추천 %는 지금처럼 <b>무료</b>예요. 구독하면 프리미엄 등록·제안권·인재풀 분석 리포트를 매달 묶음으로 더 싸게 쓸 수 있어요. 채용·계약이 성사돼도 <b>수수료는 받지 않아요.</b>'
+        ? '공고 등록·인재 검색·추천 점수는 지금처럼 <b>무료</b>예요. 구독하면 프리미엄 등록·제안권·인재풀 분석 리포트를 매달 묶음으로 더 싸게 쓸 수 있어요. 채용·계약이 성사돼도 <b>수수료는 받지 않아요.</b>'
         : '지원·제안 받기·채팅·계약 관리 같은 기본 기능은 계속 <b>무료</b>예요. 프리미엄은 더 많은 기업에게 먼저 보이도록 도와줘요.'}</div>
     </div>
     ${isCompany ? `<div class="card" style="margin-top:12px;">
@@ -5861,7 +5871,7 @@ async function screenPlans(){
         <div>· 한 달에 공고 <b>3~10건</b>, 여러 직무 동시 모집 → <b>프로</b></div>
         <div>· 공고 <b>10건 이상</b>, 상시 채용·회사 홍보까지 → <b>비즈니스</b></div>
       </div>
-      <div class="page-sub" style="margin-top:6px;">구독하지 않아도 공고 등록·인재 검색·추천 %는 무료예요.</div>
+      <div class="page-sub" style="margin-top:6px;">구독하지 않아도 공고 등록·인재 검색·추천 점수는 무료예요.</div>
     </div>` : ''}
     ${d.plans.map(p => `
       <div class="card" style="margin-top:12px; ${p.recommended ? 'border:1.5px solid var(--amber, #F5A623);' : ''}">

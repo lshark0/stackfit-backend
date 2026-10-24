@@ -1,5 +1,5 @@
 const { all } = require('./db');
-const { computeMatch, matchedStack } = require('./match');
+const { computeMatch, matchedStack, stackCounts } = require('./match');
 const { getRatingSummaries } = require('./ratings');
 const { scoreTiming, scoreWorkType, scoreRegion, scoreCerts } = require('./workConditions');
 
@@ -37,7 +37,8 @@ function scoreMatch(job, profile, rating) {
   const match = computeMatch(job.stack, profile.stack);
   const stackScore = Math.round((match / 100) * 45);
   const matched = matchedStack(job.stack, profile.stack);
-  if (matched.length > 0) reasons.push(`기술스택 ${matched.length}개 일치`);
+  const { matchTotal } = stackCounts(job.stack, profile.stack);
+  if (matched.length > 0) reasons.push(`기술스택 ${matchTotal}개 중 ${matched.length}개 일치`);
 
   let dutyScore = 0;
   if (job.duty && profile.role_title) {
@@ -82,7 +83,7 @@ function scoreMatch(job, profile, rating) {
   };
   // 근무 조건은 중립 점수가 있으므로, 기술·업무·자격증 중 하나라도 맞아야 '접점이 있다'고 봅니다.
   const relevant = stackScore > 0 || dutyScore > 0 || certs.matched > 0;
-  return { score: total, match, matched, reasons, breakdown, relevant };
+  return { score: total, match, matched, matchTotal, reasons, breakdown, relevant };
 }
 
 // [기업용] 특정 공고에 맞는 프리랜서를 자동 추천합니다.
@@ -96,8 +97,8 @@ async function recommendTalentsForJob(job, limit = 5) {
   return profiles
     .map((p) => {
       const rating = ratingById[p.user_id] || { rating_avg: null, rating_count: 0 };
-      const { score, match, matched, reasons, breakdown, relevant } = scoreMatch(job, p, rating);
-      return { ...p, ...rating, score, match, matchedStack: matched, reasons, breakdown, relevant };
+      const { score, match, matched, matchTotal, reasons, breakdown, relevant } = scoreMatch(job, p, rating);
+      return { ...p, ...rating, score, match, matchedStack: matched, matchCount: matched.length, matchTotal, reasons, breakdown, relevant };
     })
     .filter((p) => p.relevant) // 접점이 전혀 없는 사람은 추천하지 않음
     .sort((a, b) => b.score - a.score)
@@ -134,7 +135,7 @@ async function recommendJobsForProfile(profile, limit = 5) {
     })
     .map((j) => {
       const rating = ratingById[j.company_id] || { rating_avg: null, rating_count: 0 };
-      const { score, match, matched, reasons, breakdown, relevant } = scoreMatch(j, profile, rating);
+      const { score, match, matched, matchTotal, reasons, breakdown, relevant } = scoreMatch(j, profile, rating);
       return {
         ...j,
         org: companyNameById[j.company_id] || '알 수 없음',
@@ -142,6 +143,8 @@ async function recommendJobsForProfile(profile, limit = 5) {
         score,
         match,
         matchedStack: matched,
+        matchCount: matched.length,
+        matchTotal,
         reasons,
         breakdown,
         relevant,

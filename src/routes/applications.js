@@ -1,7 +1,7 @@
 const express = require('express');
 const { run, get, all } = require('../db');
 const { signedFileUrl } = require('../fileAccess');
-const { computeMatch } = require('../match');
+const { computeMatch, stackCounts } = require('../match');
 const { requireAuth, requireRole } = require('../middleware/requireAuth');
 const { wrapAllRoutes } = require('../middleware/asyncHandler');
 const { addNotification, pushTo, notifyAdmins } = require('../notify');
@@ -163,6 +163,7 @@ router.get('/company/applicants', requireAuth, requireRole('company'), async (re
         rate: r.rate || '',
         stack,
         match: computeMatch(JSON.parse(r.job_stack_json), stack),
+        ...stackCounts(JSON.parse(r.job_stack_json), stack),
       };
     }),
   });
@@ -198,6 +199,7 @@ router.get('/jobs/:id/applicants', requireAuth, requireRole('company'), async (r
         rate: r.rate || '',
         stack,
         match: computeMatch(jobStack, stack),
+        ...stackCounts(jobStack, stack),
         resume_url: signedFileUrl(r.resume_filename),
         canCancelAcceptance: r.status === 'accepted' ? !!canCancelById[r.freelancer_id] : false,
       };

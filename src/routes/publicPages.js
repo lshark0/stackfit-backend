@@ -154,7 +154,7 @@ router.get('/jobs', async (req, res) => {
     canonical: `${base}/jobs`,
     ogImage: `${base}/icons/og-kimfree.png`,
     body: `<h1>모집 중인 IT 프로젝트</h1>
-      <p class="sub">총 ${jobs.length}건 · 공고를 누르면 상세 내용을 볼 수 있어요. 지원과 추천 %는 김프리 앱에서 확인할 수 있어요.</p>
+      <p class="sub">총 ${jobs.length}건 · 공고를 누르면 상세 내용을 볼 수 있어요. 지원과 추천 점수는 김프리 앱에서 확인할 수 있어요.</p>
       ${cards || '<div class="empty">지금 모집 중인 공고가 없어요.<br>새 공고가 올라오면 이곳에 표시돼요.</div>'}`,
   }));
 });

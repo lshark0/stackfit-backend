@@ -15,4 +15,12 @@ function matchedStack(jobStack = [], profileStack = []) {
   return [...new Set(jobStack.map(s => s.toLowerCase()))].filter(s => profSet.has(s));
 }
 
-module.exports = { computeMatch, matchedStack };
+// 공고 요구 기술 수와 그중 프리랜서가 가진 기술 수. 화면에 "기술스택 3개 중 2개 일치"로 보여줍니다.
+function stackCounts(jobStack = [], profileStack = []) {
+  return {
+    matchCount: matchedStack(jobStack, profileStack).length,
+    matchTotal: new Set(jobStack.map((s) => s.toLowerCase())).size,
+  };
+}
+
+module.exports = { computeMatch, matchedStack, stackCounts };

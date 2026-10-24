@@ -5,7 +5,7 @@ const { run, get, all } = require('../db');
 const { requireAuth, requireRole } = require('../middleware/requireAuth');
 const { wrapAllRoutes } = require('../middleware/asyncHandler');
 const { verifySessionToken } = require('../auth');
-const { computeMatch } = require('../match');
+const { computeMatch, stackCounts } = require('../match');
 const { matchesCategory } = require('../stackCatalog');
 const { getRatingSummary, getRatingSummaries } = require('../ratings');
 const { signedFileUrl } = require('../fileAccess');
@@ -162,6 +162,7 @@ router.get('/', optionalAuth, async (req, res) => {
   const result = jobs.map(j => ({
     ...j,
     match: computeMatch(j.stack, profileStack),
+    ...stackCounts(j.stack, profileStack),
     applied: appliedJobIds.has(j.id),
     saved: savedJobIds.has(j.id),
     applicantCount: applicantCountByJobId[j.id] || 0,
@@ -203,7 +204,7 @@ router.get('/recent-views', requireAuth, requireRole('freelancer'), async (req, 
     const full = await withCompanyAndStack(row);
     // 마감된 공고는 최근 본 목록에서 더 이상 노출하지 않습니다(다른 공고 목록과 동일한 기준).
     if (full.status !== 'open' || full.d_day === '마감') continue;
-    jobs.push({ ...full, match: computeMatch(full.stack, profileStack) });
+    jobs.push({ ...full, match: computeMatch(full.stack, profileStack), ...stackCounts(full.stack, profileStack) });
   }
   res.json({ jobs });
 });
@@ -248,7 +249,7 @@ async function similarJobsFor(job, profileStack) {
   const result = [];
   for (const s of scored) {
     const full = await withCompanyAndStack(s.row);
-    result.push({ ...full, match: computeMatch(full.stack, profileStack) });
+    result.push({ ...full, match: computeMatch(full.stack, profileStack), ...stackCounts(full.stack, profileStack) });
   }
   return result;
 }
@@ -272,7 +273,7 @@ router.get('/:id', optionalAuth, async (req, res) => {
 
   const applicantCount = (await get('SELECT COUNT(*) AS c FROM applications WHERE job_id = ?', [job.id])).c;
   const similarJobs = await similarJobsFor(job, profileStack);
-  res.json({ ...full, match, applied, saved, following, applicantCount: Number(applicantCount), similarJobs });
+  res.json({ ...full, match, ...stackCounts(full.stack, profileStack), applied, saved, following, applicantCount: Number(applicantCount), similarJobs });
 });
 
 // 공고 저장(기업 본인 등록과 관리자 대리 등록이 함께 씁니다). 제목이 없으면 null.
