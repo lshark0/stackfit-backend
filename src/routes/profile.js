@@ -9,6 +9,7 @@ const { normalizeMobile, normalizePhone, normalizeEmail, normalizeBirthDate } = 
 const { freelancerMissingFields, FREELANCER_REQUIRED_COUNT } = require('../profileCheck');
 const { grantReferralRewardLater } = require('../referralReward');
 const { verifyBusiness, saveBusiness, businessInfo } = require('../bizCheck');
+const { normalizeDate, normalizeRegions, parseRegions, PREF_WORK_TYPES } = require('../workConditions');
 
 const router = express.Router();
 wrapAllRoutes(router);
@@ -120,6 +121,7 @@ router.get('/', requireAuth, async (req, res) => {
       account_email: accountEmail,
       stack: JSON.parse(p.stack_json),
       certs: JSON.parse(p.certs_json || '[]'),
+      pref_regions: parseRegions(p.pref_regions_json),
       resume_url: signedFileUrl(p.resume_filename),
     });
   }
@@ -168,7 +170,8 @@ router.put('/business', requireAuth, requireRole('company'), async (req, res) =>
 
 router.put('/', requireAuth, async (req, res) => {
   if (req.user.role === 'freelancer') {
-    const { name, role_title, years, rate, stack, summary, grade, certs, phone, email, birthDate, gender } = req.body || {};
+    const { name, role_title, years, rate, stack, summary, grade, certs, phone, email, birthDate, gender,
+      available_from, pref_work_type, pref_regions } = req.body || {};
     const current = await get('SELECT * FROM freelancer_profiles WHERE user_id = ?', [req.user.id]);
 
     // 휴대폰은 필수, 이메일은 선택입니다.
@@ -203,6 +206,19 @@ router.put('/', requireAuth, async (req, res) => {
       .slice(0, 20)
       .map((c) => c.trim().slice(0, 60));
 
+    // 근무 조건(추천 점수의 투입 시기·근무 형태·근무 지역). 값이 없으면 기존 값 유지.
+    let nextAvailable = current.available_from || '';
+    if (available_from !== undefined) {
+      nextAvailable = normalizeDate(available_from);
+      if (nextAvailable === null) return res.status(400).json({ error: '투입 가능일을 날짜로 선택해주세요.' });
+    }
+    const nextWorkType = pref_work_type === undefined
+      ? (current.pref_work_type || '')
+      : (PREF_WORK_TYPES.includes(pref_work_type) ? pref_work_type : '');
+    const nextRegions = pref_regions === undefined
+      ? parseRegions(current.pref_regions_json)
+      : normalizeRegions(pref_regions);
+
     const GRADE_OPTIONS = ['초급', '중급', '고급', '특급'];
     const nextGrade = grade === undefined ? current.grade : (GRADE_OPTIONS.includes(grade) ? grade : null);
     const nextRoleTitle = role_title !== undefined ? clamp(role_title, 60, current.role_title) : current.role_title;
@@ -214,7 +230,8 @@ router.put('/', requireAuth, async (req, res) => {
       stackCount: nextStack.length, hasResume: !!current.resume_filename,
     });
     await run(
-      `UPDATE freelancer_profiles SET name=?, role_title=?, years=?, rate=?, stack_json=?, certs_json=?, summary=?, grade=?, completion=?, phone=?, email=?, birth_date=?, gender=?, updated_at=? WHERE user_id=?`,
+      `UPDATE freelancer_profiles SET name=?, role_title=?, years=?, rate=?, stack_json=?, certs_json=?, summary=?, grade=?, completion=?, phone=?, email=?, birth_date=?, gender=?,
+        available_from=?, pref_work_type=?, pref_regions_json=?, updated_at=? WHERE user_id=?`,
       [
         name !== undefined ? clamp(name, 60, current.name) : current.name,
         nextRoleTitle,
@@ -229,6 +246,9 @@ router.put('/', requireAuth, async (req, res) => {
         nextEmail,
         nextBirthDate,
         nextGender,
+        nextAvailable || null,
+        nextWorkType || null,
+        JSON.stringify(nextRegions),
         nowStr(),
         req.user.id,
       ]
@@ -239,7 +259,10 @@ router.put('/', requireAuth, async (req, res) => {
     const updated = await get('SELECT * FROM freelancer_profiles WHERE user_id = ?', [req.user.id]);
     // eslint-disable-next-line no-unused-vars
     const { resume_data, ...rest } = updated;
-    return res.json({ ...rest, stack: JSON.parse(updated.stack_json), certs: JSON.parse(updated.certs_json || '[]') });
+    return res.json({
+      ...rest, stack: JSON.parse(updated.stack_json), certs: JSON.parse(updated.certs_json || '[]'),
+      pref_regions: parseRegions(updated.pref_regions_json),
+    });
   }
 
   const { name, contact_person, description, position, company_phone, phone, email, address } = req.body || {};

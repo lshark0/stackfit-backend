@@ -147,6 +147,11 @@ if (USE_POSTGRES) {
     await ensureColumnPg('job_reports', 'attachment_data', 'BYTEA');
     // 잡코리아 스타일 "바로 지원하기" 확인 화면에 "MM/DD HH:mm 저장" 형태로 보여주기 위한 프로필 최종 수정 시각
     await ensureColumnPg('freelancer_profiles', 'updated_at', 'TEXT');
+    // 추천 점수의 근무 조건 요소: 공고 투입 예정일, 프리랜서 투입 가능일·선호 근무 형태·근무 가능 지역
+    await ensureColumnPg('jobs', 'start_date', 'TEXT');
+    await ensureColumnPg('freelancer_profiles', 'available_from', 'TEXT');
+    await ensureColumnPg('freelancer_profiles', 'pref_work_type', 'TEXT');
+    await ensureColumnPg('freelancer_profiles', 'pref_regions_json', "TEXT NOT NULL DEFAULT '[]'");
     // 친구 초대 코드 + 가입 경로(어느 채널/캠페인으로 들어왔는지)
     await ensureColumnPg('users', 'referral_code', 'TEXT');
     await ensureColumnPg('users', 'referred_by', 'INTEGER');
@@ -277,6 +282,11 @@ if (USE_POSTGRES) {
     addCol('job_reports', 'attachment_data', 'BLOB');
     // 잡코리아 스타일 "바로 지원하기" 확인 화면에 "MM/DD HH:mm 저장" 형태로 보여주기 위한 프로필 최종 수정 시각
     addCol('freelancer_profiles', 'updated_at', 'TEXT');
+    // 추천 점수의 근무 조건 요소: 공고 투입 예정일, 프리랜서 투입 가능일·선호 근무 형태·근무 가능 지역
+    addCol('jobs', 'start_date', 'TEXT');
+    addCol('freelancer_profiles', 'available_from', 'TEXT');
+    addCol('freelancer_profiles', 'pref_work_type', 'TEXT');
+    addCol('freelancer_profiles', 'pref_regions_json', "TEXT NOT NULL DEFAULT '[]'");
     // 친구 초대 코드 + 가입 경로(어느 채널/캠페인으로 들어왔는지)
     addCol('users', 'referral_code', 'TEXT');
     addCol('users', 'referred_by', 'INTEGER');

@@ -29,7 +29,7 @@ router.post('/talents/:userId/propose', requireAuth, requireRole('company'), asy
   if (jobId !== undefined && jobId !== null && jobId !== '') {
     const jid = Number(jobId);
     if (!Number.isInteger(jid)) return res.status(400).json({ error: '올바르지 않은 공고 ID입니다.' });
-    const job = await get('SELECT id, stack_json, duty, grade FROM jobs WHERE id = ? AND company_id = ?', [jid, req.user.id]);
+    const job = await get('SELECT id, stack_json, certs_json, work_type, location, start_date, duty, grade FROM jobs WHERE id = ? AND company_id = ?', [jid, req.user.id]);
     if (!job) return res.status(404).json({ error: '공고를 찾을 수 없습니다.' });
     safeJobId = jid;
     proposalScore = pairScore(job, talent);

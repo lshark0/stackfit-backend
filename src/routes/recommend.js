@@ -19,7 +19,7 @@ router.get('/jobs', requireAuth, requireRole('freelancer'), async (req, res) => 
   const p = await get('SELECT * FROM freelancer_profiles WHERE user_id = ?', [req.user.id]);
   if (!p) return res.json({ jobs: [] });
 
-  const profile = { ...p, stack: JSON.parse(p.stack_json) };
+  const profile = { ...p, stack: JSON.parse(p.stack_json), certs: JSON.parse(p.certs_json || '[]') };
   const jobs = await recommendJobsForProfile(profile, parseLimit(req.query.limit));
   res.json({ jobs });
 });
@@ -42,7 +42,7 @@ router.get('/talents', requireAuth, requireRole('company'), async (req, res) => 
   }
   if (!job) return res.json({ job: null, talents: [] });
 
-  const target = { ...job, stack: JSON.parse(job.stack_json) };
+  const target = { ...job, stack: JSON.parse(job.stack_json), certs: JSON.parse(job.certs_json || '[]') };
   const talents = await recommendTalentsForJob(target, parseLimit(req.query.limit));
   res.json({
     job: { id: job.id, title: job.title },

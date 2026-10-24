@@ -29,7 +29,7 @@ async function notifyNewJob(jobId) {
 
   // 기술이 맞는 프리랜서(새 공고 알림을 끈 회원 제외)
   const profiles = await all(
-    "SELECT user_id, stack_json, role_title, grade FROM freelancer_profiles WHERE COALESCE(job_alerts, 1) = 1 AND stack_json IS NOT NULL AND stack_json <> '[]' LIMIT 5000"
+    "SELECT user_id, stack_json, certs_json, role_title, grade, available_from, pref_work_type, pref_regions_json FROM freelancer_profiles WHERE COALESCE(job_alerts, 1) = 1 AND stack_json IS NOT NULL AND stack_json <> '[]' LIMIT 5000"
   );
   const scored = profiles
     .map((p) => ({ id: p.user_id, score: pairScore(job, p) }))

@@ -54,12 +54,12 @@ async function computePerformance(days) {
   const inWin = (v) => { const t = toMs(v); return t !== null && t >= since; };
 
   const [jobs, apps, props, projects, interviews, profiles, masked, cvPending, surveys] = await Promise.all([
-    all(`SELECT id, company_id, category, stack_json, duty, grade, status, created_at FROM jobs ORDER BY id DESC LIMIT ${ROW_LIMIT}`),
+    all(`SELECT id, company_id, category, stack_json, certs_json, work_type, location, start_date, duty, grade, status, created_at FROM jobs ORDER BY id DESC LIMIT ${ROW_LIMIT}`),
     all(`SELECT id, job_id, freelancer_id, status, created_at, match_score, source FROM applications ORDER BY id DESC LIMIT ${ROW_LIMIT}`),
     all(`SELECT id, company_id, freelancer_id, job_id, status, created_at, responded_at, match_score, source FROM proposals ORDER BY id DESC LIMIT ${ROW_LIMIT}`),
     all(`SELECT id, job_id, company_id, freelancer_id, status, contracted_at, completed_at, created_at FROM projects ORDER BY id DESC LIMIT ${ROW_LIMIT}`),
     all(`SELECT i.status, i.created_at, c.company_id, c.freelancer_id FROM interviews i JOIN conversations c ON c.id = i.conversation_id ORDER BY i.id DESC LIMIT ${ROW_LIMIT}`),
-    all('SELECT user_id, stack_json, role_title, grade, verified FROM freelancer_profiles'),
+    all('SELECT user_id, stack_json, certs_json, role_title, grade, verified, available_from, pref_work_type, pref_regions_json FROM freelancer_profiles'),
     all(`SELECT conversation_id, created_at FROM messages WHERE meta_json LIKE ? ORDER BY id DESC LIMIT ${ROW_LIMIT}`, ['%contact%ed%']),
     get("SELECT COUNT(*) AS c FROM career_verifications WHERE status IN ('pending','needs_review')"),
     all(`SELECT project_id, role, prev_channel, prev_days, reuse_intent, fit_vs_prev, prev_contacts, created_at FROM contract_surveys ORDER BY id DESC LIMIT ${ROW_LIMIT}`),

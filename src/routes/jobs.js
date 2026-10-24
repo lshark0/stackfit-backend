@@ -13,6 +13,7 @@ const { normalizeEmail } = require('../contact');
 const { grantReferralRewardLater } = require('../referralReward');
 const { notifyAdmins } = require('../notify');
 const { notifyNewJobLater } = require('../coldStart');
+const { normalizeDate } = require('../workConditions');
 
 // 잡코리아 문의·신고 양식과 동일한 첨부 가능 파일 종류(용량 10MB)
 const REPORT_ATTACH_EXT = ['.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.hwp', '.jpg', '.jpeg', '.gif', '.png', '.pdf', '.zip'];
@@ -276,7 +277,7 @@ router.get('/:id', optionalAuth, async (req, res) => {
 
 // 공고 저장(기업 본인 등록과 관리자 대리 등록이 함께 씁니다). 제목이 없으면 null.
 async function createJob(companyId, body, { proxyBy = null } = {}) {
-  const { title, stack, certs, period, rate, work_type, location, category, description, deadline, duty, grade } = body || {};
+  const { title, stack, certs, period, rate, work_type, location, category, description, deadline, duty, grade, start_date } = body || {};
   if (!title || typeof title !== 'string' || !title.trim()) return null;
   const clamp = (v, max, fallback) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : fallback);
   const safeStack = (Array.isArray(stack) ? stack : [])
@@ -290,8 +291,8 @@ async function createJob(companyId, body, { proxyBy = null } = {}) {
   const safeDeadline = typeof deadline === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(deadline.trim()) ? deadline.trim() : null;
 
   const r = await run(
-    `INSERT INTO jobs (company_id, title, stack_json, certs_json, period, rate, work_type, location, category, description, deadline, duty, grade, proxy_by)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    `INSERT INTO jobs (company_id, title, stack_json, certs_json, period, rate, work_type, location, category, description, deadline, duty, grade, start_date, proxy_by)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     [
       companyId,
       clamp(title, 120, title.trim()),
@@ -306,6 +307,7 @@ async function createJob(companyId, body, { proxyBy = null } = {}) {
       safeDeadline,
       pickFrom(duty, DUTY_OPTIONS, null),
       pickFrom(grade, GRADE_OPTIONS, null),
+      normalizeDate(start_date) || null,
       proxyBy,
     ]
   );
@@ -338,7 +340,7 @@ router.put('/:id', requireAuth, requireRole('company'), async (req, res) => {
   const job = await get('SELECT * FROM jobs WHERE id = ? AND company_id = ?', [jobId, req.user.id]);
   if (!job) return res.status(404).json({ error: '공고를 찾을 수 없거나 수정 권한이 없어요.' });
 
-  const { title, stack, certs, period, rate, work_type, location, category, description, deadline, duty, grade } = req.body || {};
+  const { title, stack, certs, period, rate, work_type, location, category, description, deadline, duty, grade, start_date } = req.body || {};
   if (!title || typeof title !== 'string' || !title.trim()) {
     return res.status(400).json({ error: '공고 제목은 필수입니다.' });
   }
@@ -355,9 +357,11 @@ router.put('/:id', requireAuth, requireRole('company'), async (req, res) => {
       : (typeof deadline === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(deadline.trim()) ? deadline.trim() : null);
   const safeDuty = duty === undefined ? job.duty : pickFrom(duty, DUTY_OPTIONS, null);
   const safeGrade = grade === undefined ? job.grade : pickFrom(grade, GRADE_OPTIONS, null);
+  // 투입 예정일: 값이 없으면 기존 값 유지, 빈 문자열이면 '협의'로 되돌림(null)
+  const safeStart = start_date === undefined ? job.start_date : (normalizeDate(start_date) || null);
 
   await run(
-    `UPDATE jobs SET title=?, stack_json=?, certs_json=?, period=?, rate=?, work_type=?, location=?, category=?, description=?, deadline=?, duty=?, grade=? WHERE id=?`,
+    `UPDATE jobs SET title=?, stack_json=?, certs_json=?, period=?, rate=?, work_type=?, location=?, category=?, description=?, deadline=?, duty=?, grade=?, start_date=? WHERE id=?`,
     [
       clamp(title, 120, job.title),
       JSON.stringify(safeStack),
@@ -371,6 +375,7 @@ router.put('/:id', requireAuth, requireRole('company'), async (req, res) => {
       safeDeadline,
       safeDuty,
       safeGrade,
+      safeStart,
       jobId,
     ]
   );
@@ -392,8 +397,8 @@ router.post('/:id/duplicate', requireAuth, requireRole('company'), async (req, r
   }
 
   const r = await run(
-    `INSERT INTO jobs (company_id, title, stack_json, certs_json, period, rate, work_type, location, category, description, deadline, duty, grade)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    `INSERT INTO jobs (company_id, title, stack_json, certs_json, period, rate, work_type, location, category, description, deadline, duty, grade, start_date)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     [
       req.user.id,
       `${job.title} (복사본)`.slice(0, 120),
@@ -408,6 +413,7 @@ router.post('/:id/duplicate', requireAuth, requireRole('company'), async (req, r
       job.deadline,
       job.duty,
       job.grade,
+      job.start_date,
     ]
   );
   const created = await get('SELECT * FROM jobs WHERE id = ?', [r.lastInsertRowid]);
