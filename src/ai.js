@@ -1,4 +1,4 @@
-// Claude(Anthropic) API 연동 — 고객센터 AI 상담과 경력기술서 → 프로필 자동 작성에 사용합니다.
+// Claude(Anthropic) API 연동 — 고객센터 AI 상담, 경력기술서 → 프로필 자동 작성, 공고 원문 → 공고 자동 작성에 사용합니다.
 // ANTHROPIC_API_KEY가 없으면 AI 기능은 꺼진 상태(aiEnabled() === false)로 동작하고,
 // 화면에는 "준비 중" 안내만 표시됩니다.
 //
@@ -20,6 +20,7 @@ const DAILY_LIMITS = {
   support_chat: Number(process.env.AI_SUPPORT_DAILY_LIMIT) || 30,
   profile_from_resume: Number(process.env.AI_PROFILE_DAILY_LIMIT) || 5,
   career_verify: Number(process.env.AI_CAREER_DAILY_LIMIT) || 3,
+  job_from_text: Number(process.env.AI_JOB_DAILY_LIMIT) || 10,
 };
 
 // 서비스 전체 1일 이용 한도. 봇이 계정을 여러 개 만들어 AI를 대신 돌리게 하는

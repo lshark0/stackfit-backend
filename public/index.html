@@ -5691,7 +5691,7 @@ async function screenAdminAiUsage(){
   const s = await apiFetch('/admin/ai-usage?days=' + adminAiDays);
   const periods = [[7,'7일'],[30,'30일'],[90,'90일'],[3650,'전체']];
   const daily = s.daily.slice(-14);
-  const limitLabel = { support_chat: 'AI 상담', profile_from_resume: '경력기술서 자동 채우기', career_verify: '경력 검증 AI 심사' };
+  const limitLabel = { support_chat: 'AI 상담', profile_from_resume: '경력기술서 자동 채우기', career_verify: '경력 검증 AI 심사', job_from_text: '공고 자동 채우기' };
   return `${statusbar()}
   <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('mypage')">${I.back}</div><div class="page-title" style="font-size:19.5px;">AI 사용량 통계</div></div></div>
   <div class="content">
@@ -6395,6 +6395,111 @@ async function markAllAlertsRead(){
   }catch(e){ toast(e.message); }
 }
 
+// 공고 원문 → 공고 자동 채우기: 요청서·메일·공고 글을 붙여넣거나 파일을 올리면 AI가 입력값을 제안하고,
+// 기업이 고른 항목만 입력란에 반영합니다. (등록은 '공고 등록하기'를 눌러야 이루어집니다)
+let jobAiSuggestion = null;
+function jobAiBoxHtml(){
+  return `<div class="ai-fill-box" style="margin-top:0; margin-bottom:16px;">
+    <div class="ai-fill-tt">${I.sparkle}AI로 자동 채우기</div>
+    <div class="page-sub" style="margin-top:4px;">받은 요청서·메일·다른 곳에 올린 공고 글을 붙여넣거나 파일(PDF·Word·PPT)을 올리면 AI가 아래 항목을 채워드려요.</div>
+    <textarea id="pj-ai-text" class="form-input" style="margin-top:10px; min-height:110px;" maxlength="20000" placeholder="예: OO사 차세대 시스템 Java/Spring 백엔드 개발자 1명, 11/3 투입, 6개월, 마곡 상주, 월 650만원, 정보처리기사 우대…"></textarea>
+    <div style="display:flex; gap:8px; margin-top:8px; align-items:center;">
+      <label class="chip" style="flex:0 0 auto; cursor:pointer;">파일 선택<input id="pj-ai-file" type="file" accept=".pdf,.docx,.pptx" style="display:none" onchange="jobAiFileChanged(this)"></label>
+      <span id="pj-ai-file-name" class="page-sub" style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">선택한 파일 없음 (PDF·Word·PPT, 10MB 이하)</span>
+    </div>
+    <button class="btn btn-primary" id="jobAiBtn" style="margin-top:10px;" onclick="aiFillJob()">AI로 자동 채우기</button>
+    <div id="jobAiResult"></div>
+  </div>`;
+}
+function jobAiFileChanged(input){
+  const f = input.files && input.files[0];
+  const el = document.getElementById('pj-ai-file-name');
+  if(!f){ if(el) el.textContent = '선택한 파일 없음 (PDF·Word·PPT, 10MB 이하)'; return; }
+  const ext = '.' + (f.name.split('.').pop() || '').toLowerCase();
+  if(!['.pdf','.docx','.pptx'].includes(ext)){ toast('PDF, Word(docx), PPT(pptx) 파일만 올릴 수 있어요. 한글(HWP)은 PDF로 저장해 주세요'); input.value = ''; return; }
+  if(f.size > 10*1024*1024){ toast('파일은 10MB까지 올릴 수 있어요'); input.value = ''; return; }
+  if(el) el.textContent = f.name;
+}
+async function aiFillJob(){
+  const text = (document.getElementById('pj-ai-text')?.value || '').trim();
+  const file = document.getElementById('pj-ai-file')?.files?.[0];
+  if(!file && text.length < 20){ toast('공고 내용을 20자 이상 붙여넣거나 파일을 올려주세요'); return; }
+  const btn = document.getElementById('jobAiBtn');
+  if(btn){ btn.disabled = true; btn.textContent = 'AI가 공고 내용을 읽는 중… (30초 정도 걸려요)'; }
+  try{
+    const fd = new FormData();
+    if(text) fd.append('text', text);
+    if(file) fd.append('file', file);
+    const res = await fetch(API_BASE + '/ai/job-from-text', {
+      method: 'POST', headers: state.token ? {Authorization:'Bearer '+state.token} : {}, body: fd,
+    });
+    let data = null;
+    try{ data = await res.json(); }catch(e){ /* no body */ }
+    if(!res.ok) throw new Error((data && data.error) || `요청 실패 (${res.status})`);
+    jobAiSuggestion = data.suggestion;
+    const box = document.getElementById('jobAiResult');
+    if(box) box.innerHTML = jobAiResultHtml(jobAiSuggestion);
+  }catch(e){ toast(e.message); }
+  finally{ if(btn){ btn.disabled = false; btn.textContent = 'AI로 다시 분석하기'; } }
+}
+function jobAiResultHtml(s){
+  const cur = (id) => (document.getElementById(id)?.value || '').trim();
+  const rows = [];
+  // 지금 비어 있는 칸은 기본 선택, 이미 입력한 칸은 바꿀지 직접 고르게 합니다.
+  const add = (key, label, value, current, html) => {
+    if(!value || value === current) return;
+    rows.push(`<label class="ai-fill-row"><input type="checkbox" data-ai-key="${key}" ${current ? '' : 'checked'}>
+      <div style="min-width:0;"><div class="ai-fill-lbl">${label}${current ? ' <span class="page-sub">(지금 내용을 바꿔요)</span>' : ''}</div><div class="ai-fill-val">${html || esc(value)}</div></div></label>`);
+  };
+  add('title', '공고 제목', s.title, cur('pj-title'));
+  const newStack = s.stack.filter(x => !pendingJobStack.some(p => p.toLowerCase() === x.toLowerCase()));
+  if(newStack.length) rows.push(`<label class="ai-fill-row"><input type="checkbox" data-ai-key="stack" checked><div style="min-width:0;"><div class="ai-fill-lbl">기술스택 ${newStack.length}개 추가</div><div class="ai-fill-val">${newStack.map(x=>`<span class="tag">${esc(x)}</span>`).join(' ')}</div></div></label>`);
+  const newCerts = s.certs.filter(x => !pendingJobCerts.includes(x));
+  if(newCerts.length) rows.push(`<label class="ai-fill-row"><input type="checkbox" data-ai-key="certs" checked><div style="min-width:0;"><div class="ai-fill-lbl">자격증 ${newCerts.length}개 추가</div><div class="ai-fill-val">${newCerts.map(x=>`<span class="tag">${esc(x)}</span>`).join(' ')}</div></div></label>`);
+  add('period', '근무 기간', s.period, cur('pj-period'));
+  add('start', '투입 예정일', s.start_date, cur('pj-start'), esc(s.start_date) + ` <span class="page-sub">(${esc(availLabel(s.start_date))})</span>`);
+  add('rate', '단가', s.rate, cur('pj-rate'));
+  add('type', '근무 형태', s.work_type, cur('pj-type'));
+  const loc = [s.region, s.location_detail].filter(Boolean).join(' ');
+  add('location', '근무지', loc, document.getElementById('pj-location') ? jobLocationValue() : '', esc(s.region === '원격' ? '원격(재택)' : loc));
+  add('duty', '업무', s.duty, cur('pj-duty'));
+  add('grade', '등급', s.grade, cur('pj-grade'));
+  add('deadline', '지원 마감일', s.deadline, cur('pj-deadline'));
+  add('desc', '상세 내용', s.description, cur('pj-desc'), esc(s.description).replace(/\n/g, '<br>'));
+  if(!rows.length) return `<div class="page-sub" style="margin-top:10px;">새로 채울 내용을 찾지 못했어요. 글에 프로젝트 내용이 충분히 들어 있는지 확인해 주세요.</div>`;
+  return `<div class="ai-fill-result">
+    <div class="page-sub" style="margin-bottom:6px;">반영할 항목을 고르세요. AI 결과는 틀릴 수 있으니 등록 전에 꼭 확인해주세요.</div>
+    ${rows.join('')}
+    <button class="btn btn-outline" style="margin-top:8px;" onclick="applyJobAiFill()">선택한 항목 반영하기</button>
+  </div>`;
+}
+function applyJobAiFill(){
+  const s = jobAiSuggestion;
+  if(!s) return;
+  const on = (k) => !!document.querySelector(`#jobAiResult input[data-ai-key="${k}"]`)?.checked;
+  const setVal = (id, v) => { const el = document.getElementById(id); if(el) el.value = v; };
+  if(on('title')) setVal('pj-title', s.title);
+  if(on('stack')) s.stack.forEach(x => { if(!pendingJobStack.some(p => p.toLowerCase() === x.toLowerCase())) pendingJobStack.push(x); });
+  if(on('certs')) s.certs.forEach(x => { if(!pendingJobCerts.includes(x)) pendingJobCerts.push(x); });
+  if(on('period')) setVal('pj-period', s.period);
+  if(on('start')) setVal('pj-start', s.start_date);
+  if(on('rate')) setVal('pj-rate', s.rate);
+  if(on('type')) setVal('pj-type', s.work_type);
+  if(on('location')){ setVal('pj-location', s.region); setVal('pj-location-detail', s.location_detail); }
+  if(on('duty')) setVal('pj-duty', s.duty);
+  if(on('grade')) setVal('pj-grade', s.grade);
+  if(on('deadline')) setVal('pj-deadline', s.deadline);
+  if(on('desc')) setVal('pj-desc', s.description);
+  const st = document.getElementById('pj-stack-tags');
+  if(st) st.innerHTML = pendingJobStack.map((v,idx)=>`<span class="tag on rm" onclick="removeJobStack(${idx})">${esc(v)} ${I.x}</span>`).join('');
+  const ct = document.getElementById('pj-cert-tags');
+  if(ct) ct.innerHTML = pendingJobCerts.map((v,idx)=>`<span class="tag on rm" onclick="removeJobCert(${idx})">${esc(v)} ${I.x}</span>`).join('');
+  jobAiSuggestion = null;
+  const box = document.getElementById('jobAiResult');
+  if(box) box.innerHTML = '';
+  toast('반영했어요. 내용을 확인한 뒤 공고 등록하기를 눌러주세요');
+  document.getElementById('pj-title')?.scrollIntoView({behavior:'smooth', block:'center'});
+}
 async function screenJobPost(){
   const isEdit = !!state.param;
   const server = isEdit ? await apiFetch('/jobs/' + state.param) : null;
@@ -6420,6 +6525,7 @@ async function screenJobPost(){
       <div class="banner-title" style="font-size:16px;">${esc(proxyCompany.name)}의 공고를 대신 등록해요</div>
       <div class="banner-sub" style="color:var(--slate);">공고에 '김프리 대리 등록' 표시가 붙고, 기술이 맞는 프리랜서에게 새 공고 알림이 가요.</div></div>` : ''}
     ${biz.verified ? '' : bizCheckCardHtml(biz, proxy)}
+    ${isEdit ? '' : jobAiBoxHtml()}
     <div class="form-field"><label class="form-label">공고 제목</label><input id="pj-title" class="form-input" placeholder="예: 클라우드 전환 인프라 아키텍트" value="${job?esc(job.title):''}"></div>
     <div class="form-field">
       <label class="form-label">필요 기술스택</label>

@@ -249,7 +249,7 @@ router.get('/signup-stats', requireAuth, requireAdmin, async (req, res) => {
 });
 
 // AI 사용량 통계 — 기능별 호출 수·토큰·예상 비용(USD/원), 일별 추이, 많이 쓴 회원
-const AI_FEATURE_LABELS = { support_chat: 'AI 상담', profile_from_resume: '경력기술서 자동 채우기', career_verify: '경력 검증 AI 심사' };
+const AI_FEATURE_LABELS = { support_chat: 'AI 상담', profile_from_resume: '경력기술서 자동 채우기', career_verify: '경력 검증 AI 심사', job_from_text: '공고 자동 채우기' };
 router.get('/ai-usage', requireAuth, requireAdmin, async (req, res) => {
   const days = Math.min(3650, Math.max(1, Number.parseInt(req.query.days, 10) || 30));
   const today = ai.kstDay();
