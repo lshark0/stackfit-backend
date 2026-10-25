@@ -7,6 +7,7 @@ const { checkDeadlineAlerts, closeExpiredJobs } = require('./src/deadlineAlerts'
 const { sendInterviewReminders } = require('./src/interviews');
 const { resumePendingReviews } = require('./src/careerReview');
 const { seedNotices } = require('./src/seedNotices');
+const { logDailyMetricsOnce } = require('./src/dailyMetrics');
 
 const authRoutes = require('./src/routes/auth');
 const profileRoutes = require('./src/routes/profile');
@@ -342,6 +343,7 @@ app.use(express.static(path.join(__dirname, 'public'), {
 app.get('/api/health', async (_req, res) => {
   try {
     await get('SELECT 1 AS ok');
+    logDailyMetricsOnce(); // 그날 첫 호출 때 운영 지표 한 줄을 로그에 남김(응답은 기다리지 않음)
     res.json({ ok: true }); // 내부 구성(서비스명·DB 종류)은 응답에 담지 않습니다
   } catch (err) {
     res.status(503).json({ ok: false, error: 'DB에 연결할 수 없어요.' });
