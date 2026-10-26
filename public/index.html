@@ -187,6 +187,13 @@
     #splash-mark{animation:none;}
     .splash-hex .hex, .splash-hex .arrow-shaft, .splash-hex .arrow-head, .splash-name span, .splash-tag{animation-duration:.01s !important; animation-delay:0s !important;}
   }
+  /* 로그인(첫) 화면 로고 — 스플래시와 같은 어두운 바탕의 청록 육각형 + 주황 화살표 + '김프리' */
+  .onb-logo{align-self:flex-start; display:flex; flex-direction:column; align-items:center; gap:8px; padding:18px 24px 16px; background:var(--ink); border-radius:20px;}
+  .onb-logo .hex{stroke-width:7;}
+  .onb-logo .arrow-shaft,.onb-logo .arrow-head{stroke-width:8;}
+  .onb-logo-name{font-weight:800; font-size:24px; letter-spacing:-.01em; line-height:1;}
+  .onb-logo-name .w1{color:#F5EFE4;}
+  .onb-logo-name .w2{color:var(--cyan);}
   .onb-headline{font-size:26px; font-weight:800; line-height:1.32; color:var(--ink); letter-spacing:-.015em;}
   .onb-headline em{font-style:normal; color:var(--amber-deep);}
   .role-card{background:var(--card); border:1.5px solid var(--line); border-radius:16px; padding:16px; display:flex; align-items:center; gap:14px; cursor:pointer;}
@@ -3287,11 +3294,11 @@ async function screenOnboarding(){
     </div>` : '';
   return `${statusbar()}
   <div class="onb-wrap">
-    <div class="brand-mark"><svg class="hex-mark" width="34" height="34" viewBox="0 0 120 120" aria-hidden="true">
-        <polygon class="hex" points="106,60 83,99.8 37,99.8 14,60 37,20.2 83,20.2" stroke="var(--ink)"/>
+    <div class="onb-logo" role="img" aria-label="김프리"><svg class="hex-mark" width="64" height="64" viewBox="0 0 120 120" aria-hidden="true">
+        <polygon class="hex" points="106,60 83,99.8 37,99.8 14,60 37,20.2 83,20.2" stroke="var(--cyan)"/>
         <path class="arrow-shaft" d="M45,75 L75,45"/>
         <path class="arrow-head" d="M45,45 L75,45 L75,75"/>
-      </svg><div><div class="brand-name">김프리 <span style="font-size:13px; font-weight:700; color:var(--slate);">Kim Free</span></div><div class="brand-tag">최적의 IT 매칭 솔루션</div></div></div>
+      </svg><div class="onb-logo-name"><span class="w1">김</span><span class="w2">프리</span></div></div>
     <div class="onb-headline">기술 스택으로<br><em>가장 정확하게</em><br>연결합니다.</div>
     ${errorBanner}
     <div style="display:flex; flex-direction:column; gap:12px;">
