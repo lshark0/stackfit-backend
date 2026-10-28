@@ -6,6 +6,7 @@ const { wrapAllRoutes } = require('../middleware/asyncHandler');
 const { normalizeMobile, normalizePhone, normalizeBirthDate } = require('../contact');
 const { isAdminEmail } = require('../middleware/requireAdmin');
 const { recordSignupAttribution } = require('../attribution');
+const { findFreelancerByPhone, duplicatePhoneMessage } = require('../duplicateAccount');
 const identity = require('../identity');
 const securityLog = require('../securityLog');
 const mfa = require('../mfa');
@@ -115,6 +116,11 @@ router.post('/signup', async (req, res) => {
   }
   if (await get('SELECT id FROM users WHERE email = ?', [email])) {
     return res.status(409).json({ error: '이미 가입된 이메일입니다.' });
+  }
+  // 로그인 방법만 바꿔 같은 사람이 프리랜서 계정을 또 만들지 않도록 휴대폰 번호로 확인합니다.
+  if (role === 'freelancer') {
+    const dup = await findFreelancerByPhone(normalizedPhone);
+    if (dup) return res.status(409).json({ error: duplicatePhoneMessage(dup) });
   }
 
   if (verified && verified.ci && (await get('SELECT id FROM users WHERE ci = ?', [verified.ci]))) {

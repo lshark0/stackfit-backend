@@ -7,6 +7,7 @@ const { requireAuth, requireRole } = require('../middleware/requireAuth');
 const { wrapAllRoutes } = require('../middleware/asyncHandler');
 const { normalizeMobile, normalizePhone, normalizeEmail, normalizeBirthDate } = require('../contact');
 const { freelancerMissingFields, FREELANCER_REQUIRED_COUNT } = require('../profileCheck');
+const { findFreelancerByPhone, duplicatePhoneMessage } = require('../duplicateAccount');
 const { grantReferralRewardLater } = require('../referralReward');
 const { verifyBusiness, saveBusiness, businessInfo } = require('../bizCheck');
 const { normalizeDate, normalizeRegions, parseRegions, PREF_WORK_TYPES } = require('../workConditions');
@@ -181,6 +182,16 @@ router.put('/', requireAuth, async (req, res) => {
       if (!nextPhone) return res.status(400).json({ error: '휴대폰 번호를 정확히 입력해주세요. (예: 010-1234-5678)' });
     }
     if (!nextPhone) return res.status(400).json({ error: '휴대폰 번호는 필수 항목이에요.' });
+    // 소셜 로그인으로 새로 만든 계정에 기존 계정의 번호를 넣으면 같은 사람이 두 번 나오므로 막습니다.
+    // 번호를 바꾸지 않는 저장은 확인하지 않습니다(이미 겹쳐 있는 계정도 프로필은 고칠 수 있게).
+    if (nextPhone !== (current.phone || '')) {
+      const dup = await findFreelancerByPhone(nextPhone, req.user.id);
+      if (dup) {
+        return res.status(409).json({
+          error: `${duplicatePhoneMessage(dup)} 새로 만든 이 계정은 MY > 회원탈퇴로 정리할 수 있어요.`,
+        });
+      }
+    }
     let nextEmail = current.email || '';
     if (email !== undefined) {
       nextEmail = normalizeEmail(email);
