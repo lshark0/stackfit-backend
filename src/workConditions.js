@@ -105,7 +105,31 @@ function scoreCerts(jobCerts = [], profileCerts = []) {
   return { score: matched === need.size ? 5 : 3, matched, reason: `자격증 ${matched}개 일치` };
 }
 
+// 단가 문자열("600만원/월", "500~700만원", "월 700", "1,200만원")을 월 단가 범위(만원)로 읽습니다.
+// 자유 입력이라 월 단가로 분명히 읽히는 경우만 인정하고, "협의"·시급·일급·연봉처럼 판단이 어려우면 null.
+function parseMonthlyRate(text) {
+  const s = String(text || '').replace(/,/g, '').trim();
+  if (!s || /협의|무관|미정|시급|일급|일당|연봉|\/\s*(시간|일|년)|시간당|연\s*\d/.test(s)) return null;
+  const nums = (s.match(/\d+(?:\.\d+)?/g) || []).map(Number);
+  if (!nums.length || nums.length > 2) return null;
+  const man = /만/.test(s);
+  const vals = nums.map((n) => (man ? n : n >= 100000 ? n / 10000 : /월/.test(s) ? n : NaN));
+  if (vals.some((v) => !Number.isFinite(v) || v < 50 || v > 5000)) return null;
+  return { min: Math.min(...vals), max: Math.max(...vals) };
+}
+
+// 희망 단가 (보너스 최대 3점, 총점은 100점 상한). 프리랜서 희망 단가 범위와 공고 단가 범위가 겹치면 가점.
+// 한쪽이라도 월 단가로 읽을 수 없으면 0점(감점 없음)입니다.
+function scoreRate(job, profile) {
+  const j = parseMonthlyRate(job.rate);
+  const f = parseMonthlyRate(profile.rate);
+  if (!j || !f) return { score: 0, reason: null };
+  if (f.min <= j.max && j.min <= f.max) return { score: 3, reason: '희망 단가 범위 일치' };
+  return { score: 0, reason: null };
+}
+
 module.exports = {
+  parseMonthlyRate, scoreRate,
   PREF_REGIONS, PREF_WORK_TYPES, normalizeDate, normalizeRegions, parseRegions,
   jobWorkMode, jobRegion, scoreTiming, scoreWorkType, scoreRegion, scoreCerts,
 };

@@ -1310,14 +1310,15 @@ function stackTags(stack, matched){
   const hit = new Set((matched||[]).map(s=>String(s).toLowerCase()));
   return `<div class="tag-row">${(stack||[]).map(s=>`<span class="tag${hit.has(String(s).toLowerCase())?' hit':''}">${esc(s)}</span>`).join('')}</div>`;
 }
-// 추천 점수 내역: 스택(45) + 업무(15) + 등급(10) + 시기(10) + 근무(10) + 자격(5) + 평점(5)
+// 추천 점수 내역: 스택(45) + 업무(15) + 등급(10) + 시기(10) + 근무(10) + 자격(5) + 평점(5), 희망 단가 범위가 겹치면 단가 +3(총점 100 상한)
 // 근무 조건을 입력하지 않았으면 시기·근무는 중간 점수(중립)로 들어갑니다.
 // 평점은 "상대방" 평판입니다 — 기업이 보면 인재 평점, 프리랜서가 보면 기업 평점. 가산점은 ★4.0 이상일 때만.
 function recoBreakdown(b, total, ratingLabel, avg, count){
   if(!b) return '';
   const why = !count ? '리뷰 없음' : `★${Number(avg).toFixed(1)}${Number(avg) >= 4 ? '' : ', 4.0 미만'}`;
   const extra = b.timing == null ? '' : ` + <span>시기 <b>${b.timing}</b></span> + <span>근무 <b>${b.work}</b></span> + <span>자격 <b>${b.certs}</b></span>`;
-  return `<div class="reco-breakdown">점수 내역 · <span>스택 <b>${b.stack}</b></span> + <span>업무 <b>${b.duty}</b></span> + <span>등급 <b>${b.grade}</b></span>${extra} + <span>${ratingLabel} <b>${b.rating}</b><span class="why">(${why})</span></span> = <b class="total">${total}</b></div>`;
+  const rateExtra = b.rate > 0 ? ` + <span>단가 <b>${b.rate}</b></span>` : '';
+  return `<div class="reco-breakdown">점수 내역 · <span>스택 <b>${b.stack}</b></span> + <span>업무 <b>${b.duty}</b></span> + <span>등급 <b>${b.grade}</b></span>${extra} + <span>${ratingLabel} <b>${b.rating}</b><span class="why">(${why})</span></span>${rateExtra} = <b class="total">${total}</b></div>`;
 }
 // 추천 근거 칩. '기술스택 N개 일치'는 강조된 태그와 같은 초록색으로 맞춥니다.
 // '평점 ★4' 칩은 누구의 평점인지(기업/인재) 붙여서 보여줍니다.

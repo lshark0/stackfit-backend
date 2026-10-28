@@ -1,7 +1,7 @@
 const { all } = require('./db');
 const { computeMatch, matchedStack, stackCounts } = require('./match');
 const { getRatingSummaries } = require('./ratings');
-const { scoreTiming, scoreWorkType, scoreRegion, scoreCerts } = require('./workConditions');
+const { scoreTiming, scoreWorkType, scoreRegion, scoreCerts, scoreRate } = require('./workConditions');
 
 // 등급을 숫자로 환산 (인접 등급은 부분 점수를 주기 위함)
 const GRADE_LEVEL = { 초급: 1, 중급: 2, 고급: 3, 특급: 4 };
@@ -15,6 +15,7 @@ const GRADE_LEVEL = { 초급: 1, 중급: 2, 고급: 3, 특급: 4 };
 //   - 근무 형태·지역 (최대 10점): 상주/재택/혼합 선호와 근무 가능 지역
 //   - 자격증 (최대 5점): 공고 요구 자격증 보유
 //   - 평판 (최대 5점): 좋은 평가를 받은 쪽에 소폭 가점
+//   - 희망 단가 (보너스 3점): 두 쪽 단가 범위가 겹치면 가점(월 단가로 읽을 수 없으면 0점, 총점 100점 상한)
 // 근무 조건을 입력하지 않은 회원은 감점하지 않도록 중간 점수(중립)를 줍니다(src/workConditions.js).
 // 업무 일치 판정. PM·SE 같은 짧은 영문 코드는 단어 단위로만 비교합니다
 // (예전에 직접 입력한 "Senior 개발자"가 SE로 잘못 일치하지 않도록).
@@ -66,7 +67,8 @@ function scoreMatch(job, profile, rating) {
   const workType = scoreWorkType(job, profile);
   const region = scoreRegion(job, profile);
   const certs = scoreCerts(job.certs, profile.certs);
-  for (const r of [certs.reason, timing.reason, workType.reason, region.reason]) if (r) reasons.push(r);
+  const rate = scoreRate(job, profile);
+  for (const r of [certs.reason, rate.reason, timing.reason, workType.reason, region.reason]) if (r) reasons.push(r);
 
   let ratingScore = 0;
   if (rating && rating.rating_count > 0 && rating.rating_avg >= 4) {
@@ -75,11 +77,11 @@ function scoreMatch(job, profile, rating) {
   }
 
   const workScore = workType.score + region.score;
-  const total = Math.min(100, stackScore + dutyScore + gradeScore + timing.score + workScore + certs.score + ratingScore);
+  const total = Math.min(100, stackScore + dutyScore + gradeScore + timing.score + workScore + certs.score + ratingScore + rate.score);
   // 화면에 "스택 45 + 업무 15 + 등급 10 + 시기 10 + 근무 10 + 자격 5 + 평점 0"처럼 점수 내역을 보여주기 위한 값
   const breakdown = {
     stack: stackScore, duty: dutyScore, grade: gradeScore,
-    timing: timing.score, work: workScore, certs: certs.score, rating: ratingScore,
+    timing: timing.score, work: workScore, certs: certs.score, rating: ratingScore, rate: rate.score,
   };
   // 근무 조건은 중립 점수가 있으므로, 기술·업무·자격증 중 하나라도 맞아야 '접점이 있다'고 봅니다.
   const relevant = stackScore > 0 || dutyScore > 0 || certs.matched > 0;
