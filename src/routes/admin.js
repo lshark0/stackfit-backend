@@ -1,7 +1,7 @@
 const express = require('express');
 const { run, get, all } = require('../db');
 const { requireAuth } = require('../middleware/requireAuth');
-const { requireAdmin } = require('../middleware/requireAdmin');
+const { requireAdmin, isAdminEmail } = require('../middleware/requireAdmin');
 const { wrapAllRoutes } = require('../middleware/asyncHandler');
 const { addNotification, pushTo } = require('../notify');
 const { signedFileUrl } = require('../fileAccess');
@@ -336,6 +336,83 @@ router.get('/security-events', requireAuth, requireAdmin, async (req, res) => {
     },
     events,
   });
+});
+
+// 중복 의심 프리랜서 계정: 로그인 방법만 바꿔 같은 사람이 여러 번 가입한 계정을 찾아 정리합니다.
+// 휴대폰 번호가 같거나 이름이 같은 계정끼리 묶고, 각 계정의 활동량을 보여 줘 남길 계정을 고르게 합니다.
+const PROVIDER_LABEL = { google: '구글', kakao: '카카오', naver: '네이버' };
+const phoneDigits = (p) => String(p || '').replace(/\D/g, '');
+
+async function duplicateFreelancerGroups() {
+  const rows = await all(
+    `SELECT u.id, u.email, u.oauth_provider, u.created_at, f.name, f.phone, f.completion, f.resume_filename,
+       (SELECT COUNT(*) FROM applications a WHERE a.freelancer_id = u.id) AS applications,
+       (SELECT COUNT(*) FROM proposals p WHERE p.freelancer_id = u.id) AS proposals,
+       (SELECT COUNT(*) FROM projects pr WHERE pr.freelancer_id = u.id) AS projects
+     FROM users u JOIN freelancer_profiles f ON f.user_id = u.id
+     ORDER BY u.created_at ASC, u.id ASC`
+  );
+  // 같은 번호·같은 이름으로 이어진 계정을 한 묶음으로 (union-find)
+  const parent = new Map(rows.map((r) => [r.id, r.id]));
+  const find = (x) => (parent.get(x) === x ? x : (parent.set(x, find(parent.get(x))), parent.get(x)));
+  const link = (key) => {
+    const first = new Map();
+    rows.forEach((r) => {
+      const k = key(r);
+      if (!k) return;
+      if (first.has(k)) parent.set(find(r.id), find(first.get(k)));
+      else first.set(k, r.id);
+    });
+  };
+  link((r) => phoneDigits(r.phone));
+  link((r) => String(r.name || '').replace(/\s/g, ''));
+  const byRoot = new Map();
+  rows.forEach((r) => {
+    const k = find(r.id);
+    if (!byRoot.has(k)) byRoot.set(k, []);
+    byRoot.get(k).push(r);
+  });
+  return [...byRoot.values()].filter((g) => g.length > 1).map((g) => g.map((r) => {
+    const digits = phoneDigits(r.phone);
+    const samePhone = !!digits && g.some((o) => o.id !== r.id && phoneDigits(o.phone) === digits);
+    const projects = Number(r.projects);
+    // 삭제는 같은 번호의 다른 계정이 있거나, 번호를 한 번도 넣지 않은(프로필 미완성) 계정만 허용합니다.
+    // 이름만 같고 각자 번호가 있는 계정은 다른 사람일 수 있어 막고, 계약 이력이 있는 계정·관리자 계정도 막습니다.
+    let blocked = '';
+    if (isAdminEmail(r.email)) blocked = '관리자 계정';
+    else if (projects > 0) blocked = '계약 이력이 있는 계정';
+    else if (!samePhone && digits) blocked = '이름만 같고 번호가 달라 다른 사람일 수 있음';
+    return {
+      id: r.id,
+      name: r.name,
+      login: PROVIDER_LABEL[r.oauth_provider] ? `${PROVIDER_LABEL[r.oauth_provider]} 로그인` : '이메일 로그인',
+      email: /@stackfit\.local$/.test(r.email) ? '' : r.email,
+      phoneTail: digits ? digits.slice(-4) : '',
+      samePhone,
+      createdAt: r.created_at,
+      completion: Number(r.completion) || 0,
+      hasResume: !!r.resume_filename,
+      applications: Number(r.applications),
+      proposals: Number(r.proposals),
+      projects,
+      deletable: !blocked,
+      blocked,
+    };
+  }));
+}
+
+router.get('/duplicate-freelancers', requireAuth, requireAdmin, async (req, res) => {
+  res.json({ groups: await duplicateFreelancerGroups() });
+});
+
+// 중복 계정 삭제 — 회원탈퇴와 같이 users 행을 지우면 프로필·지원·제안 등 연관 데이터가 함께 삭제됩니다.
+router.delete('/duplicate-freelancers/:id', requireAuth, requireAdmin, async (req, res) => {
+  const id = Number(req.params.id);
+  const account = (await duplicateFreelancerGroups()).flat().find((a) => a.id === id);
+  if (!account) return res.status(404).json({ error: '중복 의심 계정 목록에 없는 계정이에요.' });
+  if (!account.deletable) return res.status(400).json({ error: `삭제할 수 없는 계정이에요: ${account.blocked}` });
+  await run('DELETE FROM users WHERE id = ?', [id]);
+  res.json({ ok: true });
 });
 
 module.exports = router;
