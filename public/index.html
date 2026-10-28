@@ -3593,6 +3593,19 @@ async function screenHome(){
           </div>
         </div>
       </div>
+      ${(()=>{
+        // 근무 조건(투입 가능일·선호 근무 형태·근무 가능 지역)이 비어 있으면 추천 점수가 중간값으로 계산되므로 입력을 안내합니다.
+        const miss = [];
+        if(!profile.available_from) miss.push('투입 가능일');
+        if(!profile.pref_work_type) miss.push('선호 근무 형태');
+        if(!(profile.pref_regions||[]).length) miss.push('근무 가능 지역');
+        if(!miss.length) return '';
+        return `<div class="banner light" style="margin-top:10px;" onclick="go('profileEdit')">
+          <div class="banner-eyebrow">추천 정확도</div>
+          <div class="banner-title" style="font-size:15px;">${miss.join('·')}을 입력하면 추천이 더 정확해져요</div>
+          <div style="margin-top:6px; font-size:12px; color:var(--amber-deep); font-weight:700;">탭해서 입력하기 →</div>
+        </div>`;
+      })()}
       <div class="section-label with-ic">${I.layers}바로가기</div>
       <div class="quick-grid">
         <div class="quick-item" onclick="go('jobs')"><div class="qi-ic">${I.jobs}</div><div class="qi-lbl">공고 탐색</div></div>
