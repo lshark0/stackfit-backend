@@ -54,7 +54,7 @@ const SERVICE_GUIDE = `
 - 문제가 있는 공고는 공고 상세에서 신고할 수 있습니다. 운영자가 검토해 반려/공고 마감/공고 삭제로 처리하고, 결과는 문의·신고 내역에서 확인합니다.
 - 그 밖의 문의는 왼쪽 메뉴 > 고객센터 > 문의·신고에서 문의종류·내용·답변받을 이메일을 입력해 접수합니다(파일 첨부 가능).
 - 공지사항·이벤트·혜택은 고객센터 메뉴에서 볼 수 있습니다.
-- 약관: 이용약관(/terms.html), 개인정보처리방침(/privacy.html).
+- 약관: 이용약관(/terms.html), 개인정보처리방침(/privacy.html), 요금 및 환불·취소 규정(/refund.html).
 `.trim();
 
 function buildSupportSystemPrompt(role) {

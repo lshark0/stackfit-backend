@@ -380,6 +380,24 @@ CREATE TABLE IF NOT EXISTS plan_interests (
   UNIQUE (user_id, plan_id)
 );
 
+-- 요금제 결제 주문(1개월 이용권). 전자상거래법상 거래 기록은 5년 보관하므로 회원탈퇴 때 지우지 않습니다(user_id에 FK 없음).
+-- status: ready(결제창 열기 전·중) / paid / cancelled(전액·일부 환불, 이용 종료) / failed / mismatch(금액 불일치, 관리자 확인)
+CREATE TABLE IF NOT EXISTS plan_orders (
+  id               INTEGER PRIMARY KEY AUTOINCREMENT,
+  payment_id       TEXT NOT NULL UNIQUE,
+  user_id          INTEGER NOT NULL,
+  plan_id          TEXT NOT NULL,
+  amount           INTEGER NOT NULL,
+  status           TEXT NOT NULL DEFAULT 'ready',
+  paid_at          TEXT,                    -- UTC 'YYYY-MM-DD HH:MM:SS'
+  starts_at        TEXT,
+  ends_at          TEXT,
+  cancelled_at     TEXT,
+  cancelled_amount INTEGER NOT NULL DEFAULT 0,
+  created_at       TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_plan_orders_user ON plan_orders(user_id, status, ends_at);
+
 -- 계약 체결 후 이용 경험 설문: '기존 방식보다 나아졌는가'를 비교하기 위한 기준값(이전 경로·이전 소요 일수)과 재이용 의향
 CREATE TABLE IF NOT EXISTS contract_surveys (
   id           INTEGER PRIMARY KEY AUTOINCREMENT,

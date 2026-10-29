@@ -3306,7 +3306,9 @@ async function screenOnboarding(){
       <button class="btn btn-outline" onclick="go('login','freelancer')">프리랜서로 로그인</button>
       <button class="btn btn-outline" onclick="go('login','company')">기업으로 로그인</button>
       <a href="/jobs" style="text-align:center; font-size:13.5px; font-weight:700; color:var(--slate); padding:6px 0;">로그인 없이 모집 중인 공고 둘러보기 →</a>
+      <a href="/refund.html" target="_blank" style="text-align:center; font-size:13.5px; font-weight:700; color:var(--slate); padding:0 0 6px;">요금제 안내 →</a>
     </div>
+    <div style="margin:8px 20px 18px;">${siteFooterHtml(true)}</div>
   </div>`;
 }
 
@@ -3548,16 +3550,21 @@ const JOB_INFO_REPORT_NO = '서울북부 제2026-17호 (J1205020260017)';
 // 통신판매업 신고번호와 공정위 사업자정보 확인 링크(전자상거래법상 표시 사항)
 const MAIL_ORDER_REPORT_NO = '제2026-서울성북-1329호';
 const FTC_BIZ_INFO_URL = 'https://www.ftc.go.kr/bizCommPop.do?wrkr_no=1771701535';
-// 잡코리아 스타일 홈 화면 하단 footer — 약관 링크 + 사업자 정보(접었다 펼치기)
-function siteFooterHtml(){
+// 사업장 소재지·연락처(사업자등록증과 같게, 전자상거래법·PG 심사 표시 사항)
+const BIZ_ADDRESS = '서울특별시 성북구 숭인로8길 80, 107동 1003호(길음동)';
+const BIZ_PHONE = '010-4992-6438';
+// 잡코리아 스타일 홈 화면 하단 footer — 약관 링크 + 사업자 정보(접었다 펼치기). open이면 처음부터 펼쳐 둡니다(첫 화면).
+function siteFooterHtml(open = false){
   return `<div class="site-footer">
     <div class="site-footer-links">
-      <a href="/terms.html" target="_blank">이용약관</a><span class="dot">|</span><a href="/privacy.html" target="_blank">개인정보처리방침</a>
+      <a href="/terms.html" target="_blank">이용약관</a><span class="dot">|</span><a href="/privacy.html" target="_blank">개인정보처리방침</a><span class="dot">|</span><a href="/refund.html" target="_blank">요금·환불 규정</a>
     </div>
-    <div class="site-footer-co" onclick="this.classList.toggle('open')">© 마켓리어 <span class="chev">⌄</span></div>
+    <div class="site-footer-co${open ? ' open' : ''}" onclick="this.classList.toggle('open')">© 마켓리어 <span class="chev">⌄</span></div>
     <div class="site-footer-detail">
       <div>대표: 이승학</div>
       <div>사업자등록번호: 177-17-01535</div>
+      <div>사업장 소재지: ${esc(BIZ_ADDRESS)}</div>
+      <div>연락처: <a href="tel:${BIZ_PHONE}">${esc(BIZ_PHONE)}</a></div>
       <div>통신판매업 신고번호: ${esc(MAIL_ORDER_REPORT_NO)} <a href="${FTC_BIZ_INFO_URL}" target="_blank" rel="noopener" onclick="event.stopPropagation()">사업자정보 확인</a></div>
       ${JOB_INFO_REPORT_NO ? `<div>직업정보제공사업 신고번호: ${esc(JOB_INFO_REPORT_NO)}</div>` : ''}
       <div>이메일: <a href="mailto:lshark4541@gmail.com">lshark4541@gmail.com</a></div>
@@ -5902,18 +5909,27 @@ async function submitClaimAccount(){
   }catch(e){ toast(e.message); }
 }
 
-/* ---------------- 요금제: 기업 구독 · 프리랜서 프리미엄 (출시 전 사전 신청) ---------------- */
+/* ---------------- 요금제: 기업 구독 · 프리랜서 프리미엄 (1개월 이용권 결제, 결제 설정 전에는 사전 신청) ---------------- */
 async function screenPlans(){
   const d = await apiFetch('/plans');
   const isCompany = state.role === 'company';
   const won = (n) => n.toLocaleString('ko-KR') + '원';
   const mine = new Set(d.myInterests || []);
   const terms = PLAN_TERMS.filter(t => t.role === state.role);
+  const launched = !!d.launched;
+  const active = d.active;
+  const planName = (id) => (d.plans.find(p => p.id === id) || {}).name || id;
+  const kstDate = (s) => s ? new Date(s.replace(' ', 'T') + 'Z').toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' }) : '';
   return `${statusbar()}
   <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('mypage')">${I.back}</div><div class="page-title" style="font-size:19.5px;">${isCompany ? '기업 구독' : '프리랜서 프리미엄'}</div></div></div>
   <div class="content">
-    <div class="banner light" style="cursor:default;">
-      <div class="banner-eyebrow">${isCompany ? 'Business Plan' : 'Premium'} · 출시 예정</div>
+    ${active ? `<div class="card" style="border:1.5px solid var(--amber, #F5A623);">
+      <div class="card-title" style="font-size:15px;">${I.checkCircle} ${esc(planName(active.planId))} 이용 중</div>
+      <div class="page-sub" style="margin-top:6px; line-height:1.7;">이용 기간: ${kstDate(active.startsAt)} ~ ${kstDate(active.endsAt)} · 결제 금액 ${won(active.amount)}<br>
+        자동 연장되지 않아요. 환불은 <a href="/refund.html" target="_blank" style="text-decoration:underline;">환불·취소 규정</a>을 확인한 뒤 1:1 문의로 요청해주세요.</div>
+    </div>` : ''}
+    <div class="banner light" style="cursor:default; ${active ? 'margin-top:12px;' : ''}">
+      <div class="banner-eyebrow">${isCompany ? 'Business Plan' : 'Premium'}${launched ? ' · 1개월 이용권' : ' · 출시 예정'}</div>
       <div class="banner-title">${isCompany ? '필요한 만큼 매달 묶음으로' : '기업에게 먼저 보이세요'}</div>
       <div class="banner-sub" style="color:var(--slate);">${isCompany
         ? '공고 등록·인재 검색·추천 점수는 지금처럼 <b>무료</b>예요. 구독하면 프리미엄 등록·제안권·인재풀 분석 리포트를 매달 묶음으로 더 싸게 쓸 수 있어요. 채용·계약이 성사돼도 <b>수수료는 받지 않아요.</b>'
@@ -5933,15 +5949,19 @@ async function screenPlans(){
         <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
           <div><div class="card-title" style="font-size:16px;">${esc(p.name)}${p.recommended ? ' <span class="sbadge pending" style="margin-left:4px;">추천</span>' : ''}</div>
             <div class="page-sub" style="margin-top:2px;">${esc(p.summary)}</div></div>
-          ${mine.has(p.id) ? `<span class="sbadge pass" style="flex:0 0 auto;">${I.checkCircle}신청함</span>` : ''}
+          ${launched ? '' : mine.has(p.id) ? `<span class="sbadge pass" style="flex:0 0 auto;">${I.checkCircle}신청함</span>` : ''}
         </div>
         <div style="margin-top:10px;"><span style="font-size:22px; font-weight:800;">${p.period} ${won(p.price)}</span>
-          <span class="page-sub"> · 부가세 ${p.vatIncluded ? '포함' : '별도'} · 예정 가격</span></div>
+          <span class="page-sub"> · 부가세 ${p.vatIncluded ? '포함' : '별도'}${launched ? (p.vatIncluded ? '' : ` (결제 금액 ${won(p.amount)})`) : ' · 예정 가격'}</span></div>
         <ul style="margin:10px 0 0; padding-left:18px; line-height:1.75; font-size:13.5px;">${p.features.map(f => `<li>${esc(f)}${planTermLinks(f, terms)}</li>`).join('')}</ul>
         ${planExampleHtml(p)}
-        ${mine.has(p.id)
-          ? `<button class="btn btn-outline" style="margin-top:12px;" onclick="togglePlanInterest('${p.id}', false)">사전 신청 취소</button>`
-          : `<button class="btn btn-primary" style="margin-top:12px;" onclick="togglePlanInterest('${p.id}', true)">사전 신청 · 출시 알림 받기</button>`}
+        ${launched
+          ? (active
+            ? `<button class="btn btn-outline" style="margin-top:12px;" disabled>${active.planId === p.id ? '이용 중' : '이용 기간이 끝난 뒤 구매할 수 있어요'}</button>`
+            : `<button class="btn btn-primary" style="margin-top:12px;" onclick="buyPlan('${p.id}')">1개월 이용권 구매 · ${won(p.amount)}</button>`)
+          : mine.has(p.id)
+            ? `<button class="btn btn-outline" style="margin-top:12px;" onclick="togglePlanInterest('${p.id}', false)">사전 신청 취소</button>`
+            : `<button class="btn btn-primary" style="margin-top:12px;" onclick="togglePlanInterest('${p.id}', true)">사전 신청 · 출시 알림 받기</button>`}
       </div>`).join('')}
     ${terms.length ? `<div class="section-label" style="margin-top:18px;">용어 설명</div>
     <div class="card" style="padding:4px 14px;">${terms.map((t, i) => `
@@ -5949,9 +5969,18 @@ async function screenPlans(){
         <summary style="cursor:pointer; font-weight:700; font-size:14px;">${esc(t.title)}</summary>
         <div class="page-sub" style="margin-top:6px; line-height:1.7;">${esc(t.body)}</div>
       </details>`).join('')}</div>` : ''}
+    ${(d.orders || []).length ? `<div class="section-label" style="margin-top:18px;">결제 내역</div>
+    <div class="card" style="padding:4px 14px;">${d.orders.map((o, i) => `
+      <div style="padding:10px 0; font-size:13.5px; ${i ? 'border-top:1px solid var(--line);' : ''}">
+        <b>${esc(planName(o.planId))}</b> · ${won(o.amount)} · ${kstDate(o.paidAt)}
+        <span class="page-sub"> · ${o.status === 'cancelled' ? `환불 ${won(o.cancelledAmount)}` : `~ ${kstDate(o.endsAt)}`}</span>
+      </div>`).join('')}</div>` : ''}
     <div class="page-sub" style="margin-top:14px; line-height:1.65;">
-      · 정식 출시 전이라 <b>지금은 결제되지 않아요.</b> 사전 신청하면 출시될 때 가장 먼저 알려드려요.<br>
-      · 가격과 구성은 출시 때 바뀔 수 있어요.<br>
+      ${launched
+        ? `· 결제하면 <b>바로 이용이 시작</b>되고, 이용 기간은 결제일부터 <b>1개월</b>이에요. 자동 연장(정기결제)은 없어요.<br>
+      · 결제 후 7일 이내이고 혜택을 쓰지 않았다면 전액 환불돼요. 그 뒤에는 남은 기간만큼 환불해 드려요. <a href="/refund.html" target="_blank" style="text-decoration:underline;">환불·취소 규정</a><br>`
+        : `· 정식 출시 전이라 <b>지금은 결제되지 않아요.</b> 사전 신청하면 출시될 때 가장 먼저 알려드려요.<br>
+      · 가격과 구성은 출시 때 바뀔 수 있어요.<br>`}
       · 김프리는 구인·구직 정보를 제공하는 서비스예요. 채용·계약이 성사돼도 <b>수수료를 받지 않아요.</b><br>
       · 친구 초대로 적립한 1개월 이용권으로 출시 후 ${isCompany ? '스타터를' : '프리미엄을'} 1개월씩 무료로 쓸 수 있어요. <a style="text-decoration:underline; cursor:pointer;" onclick="go('invite')">친구 초대</a>
     </div>
@@ -6027,6 +6056,57 @@ async function saveProposalLimit(){
     catch(e){ toast(e.message); }
   };
   if(n > 0) showConfirm(`무료 제안을 기업당 월 ${n}회로 제한할까요?\n바로 모든 기업에 적용돼요.`, go2); else go2();
+}
+// 1개월 이용권 결제: 서버가 금액을 정한 주문을 만들고 → 포트원(KG이니시스) 결제창 → 서버가 포트원에서 결제 내역을 다시 확인해 이용권을 켭니다.
+async function buyPlan(planId){
+  if(typeof PortOne === 'undefined'){ toast('결제 모듈을 불러오는 중이에요. 잠시 후 다시 눌러주세요'); return; }
+  let order;
+  try{ order = await apiFetch(`/plans/${planId}/order`, { method:'POST' }); }
+  catch(e){
+    if(e.code === 'NEED_CONTACT'){ showConfirm(e.message + '\n\n프로필 수정 화면으로 이동할까요?', () => go(state.role === 'company' ? 'companyProfileEdit' : 'profileEdit')); return; }
+    showConfirm(e.message, () => {}); return;
+  }
+  const msg = `${order.orderName}\n결제 금액 ${order.totalAmount.toLocaleString('ko-KR')}원(부가세 포함)\n\n· 결제하면 바로 이용이 시작되고 1개월 동안 쓸 수 있어요(자동 연장 없음).\n· 결제 후 7일 이내이고 혜택을 쓰지 않았다면 전액 환불, 그 뒤에는 남은 기간만큼 환불돼요.\n\n환불·취소 규정을 확인했고 결제에 동의합니다.`;
+  showConfirm(msg, async () => {
+    try{
+      const resp = await PortOne.requestPayment({
+        storeId: order.storeId,
+        channelKey: order.channelKey,
+        paymentId: order.paymentId,
+        orderName: order.orderName,
+        totalAmount: order.totalAmount,
+        currency: 'CURRENCY_KRW',
+        payMethod: 'CARD',
+        customer: order.customer,
+        redirectUrl: location.origin + location.pathname + '?pay_return=1',
+      });
+      if(!resp) return; // 모바일: 결제 후 redirectUrl로 돌아오면서 처리됩니다.
+      if(resp.code){ showConfirm(resp.message || '결제가 취소됐어요', () => {}); return; }
+      await completePlanPayment(resp.paymentId || order.paymentId);
+    }catch(e){ showConfirm('결제창을 열지 못했어요.\n\n' + (e.message || e), () => {}); }
+  });
+}
+async function completePlanPayment(paymentId){
+  try{
+    await apiFetch(`/plans/orders/${encodeURIComponent(paymentId)}/complete`, { method:'POST' });
+    toast('결제가 완료됐어요. 지금부터 이용할 수 있어요');
+  }catch(e){ showConfirm(e.message, () => {}); }
+  if(state.screen === 'plans') render(); else go('plans');
+}
+// 모바일은 결제 후 이 주소로 되돌아옵니다(?pay_return=1&paymentId=...&code=...).
+let pendingPayReturn = (() => {
+  try{
+    const qs = new URLSearchParams(location.search);
+    if(!qs.has('pay_return')) return null;
+    return { id: qs.get('paymentId') || '', code: qs.get('code') || '', message: qs.get('message') || '' };
+  }catch(e){ return null; }
+})();
+async function handlePayReturn(){
+  if(!pendingPayReturn) return;
+  const ret = pendingPayReturn; pendingPayReturn = null;
+  if(!state.token) return;
+  if(ret.code || !ret.id){ go('plans'); showConfirm(ret.message || '결제가 취소됐어요', () => {}); return; }
+  await completePlanPayment(ret.id);
 }
 async function togglePlanInterest(planId, on){
   try{
@@ -6692,6 +6772,7 @@ async function render(){
   history.replaceState({screen: state.screen, param: state.param}, '', location.pathname);
   await loadIdentityConfig();
   await handleIvReturn(); // 모바일 본인인증 후 돌아온 경우 가입 화면으로 복귀
+  await handlePayReturn(); // 모바일 결제 후 돌아온 경우 결제 확인
   openPendingDeepLink(); // 푸시 알림을 눌러 열었다면 해당 화면으로 이동
 })();
 

@@ -121,7 +121,7 @@ ${jsonLd ? `<script type="application/ld+json">${JSON.stringify(jsonLd).replace(
   </div>
   ${body}
   <div class="foot">
-    <a href="/jobs">전체 공고</a><a href="/company.html">사업자 정보</a><a href="/terms.html">이용약관</a><a href="/privacy.html">개인정보처리방침</a>
+    <a href="/jobs">전체 공고</a><a href="/company.html">사업자 정보</a><a href="/refund.html">요금·환불 규정</a><a href="/terms.html">이용약관</a><a href="/privacy.html">개인정보처리방침</a>
     <p>김프리는 기술스택 기반으로 IT 프리랜서와 기업의 구인·구직 정보를 제공하는 서비스입니다. © 마켓리어</p>
   </div>
 </div></body>
@@ -255,6 +255,7 @@ router.get('/sitemap.xml', async (req, res) => {
     ...jobs.map((j) => ({ loc: `${base}/jobs/${j.id}`, lastmod: dateOnly(j.created_at), changefreq: 'weekly', priority: '0.8' })),
     { loc: `${base}/company.html`, changefreq: 'yearly', priority: '0.3' },
     { loc: `${base}/terms.html`, changefreq: 'yearly', priority: '0.2' },
+    { loc: `${base}/refund.html`, changefreq: 'yearly', priority: '0.2' },
     { loc: `${base}/privacy.html`, changefreq: 'yearly', priority: '0.2' },
   ];
   res.set('Cache-Control', 'public, max-age=600');
