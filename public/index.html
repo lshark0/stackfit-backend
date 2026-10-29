@@ -1348,7 +1348,10 @@ function recoTalentCard(t){
         ${autoAvatar(t.name)}
         <div style="min-width:0;">
           <div class="card-title">${esc(t.name)} ${gradeBadge(t.grade)}</div>
-          <div style="margin-top:5px;">${dutyBadge(t.role_title)}</div>
+          <div style="margin-top:5px; display:flex; flex-wrap:wrap; gap:5px; align-items:center;">
+            ${dutyBadge(t.role_title)}
+            ${t.accept_proposals===0?`<span class="sbadge fail">제안 받지 않음</span>`:''}
+          </div>
         </div>
       </div>
       <span class="reco-badge">추천 ${t.score}점</span>
@@ -3667,7 +3670,7 @@ async function screenHome(){
     <div class="section-label with-ic reco-title">${I.badgeCheck}${recoData.job ?`"${esc(recoData.job.title)}"에 맞는 인재` : '맞춤 인재 추천'}</div>
     ${recoData.talents.length
       ? `<div class="reco-legend">· <b>추천 점수(100점)</b>: 스택(45) + 업무(15) + 등급(10) + 투입 시기(10) + 근무 형태·지역(10) + 자격증(5) + 인재 평점(5)<br>· 공고에 투입 예정일·근무 형태(상주/재택/혼합)를 적으면 더 정확해져요.<br>· <b>인재 평점</b>: 프리랜서가 받은 리뷰 평균이 ★4.0 이상이면 5점입니다.<br>· <b>스택 일치</b>: 공고가 요구하는 기술 중 인재가 보유한 기술 수입니다.</div>`
-        + [...recoData.talents].sort((a,b)=>(b.score-a.score) || ((b.match||0)-(a.match||0))).map(recoTalentCard).join('')
+        + [...recoData.talents].sort((a,b)=>((b.accept_proposals===0?0:1)-(a.accept_proposals===0?0:1)) || (b.score-a.score) || ((b.match||0)-(a.match||0))).map(recoTalentCard).join('')
       : `<div class="reco-empty">${recoData.job
           ? '아직 조건에 맞는 인재가 없어요.<br>공고의 기술스택·업무·등급을 채우면 정확도가 올라가요.'
           : '공고를 등록하면 딱 맞는 인재를<br>자동으로 추천해드려요.<br><b onclick="go(\'jobPost\')" style="color:var(--ink); text-decoration:underline; cursor:pointer;">공고 등록하러 가기</b>'}</div>`}
