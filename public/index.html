@@ -3554,9 +3554,10 @@ const JOB_INFO_REPORT_NO = '서울북부 제2026-17호 (J1205020260017)';
 // 통신판매업 신고번호와 공정위 사업자정보 확인 링크(전자상거래법상 표시 사항)
 const MAIL_ORDER_REPORT_NO = '제2026-서울성북-1329호';
 const FTC_BIZ_INFO_URL = 'https://www.ftc.go.kr/bizCommPop.do?wrkr_no=1771701535';
-// 사업장 소재지·연락처(사업자등록증과 같게, 전자상거래법·PG 심사 표시 사항)
-const BIZ_ADDRESS = '서울특별시 성북구 숭인로8길 80, 107동 1003호(길음동)';
-const BIZ_PHONE = '010-4992-6438';
+// 사업장 소재지·연락처(전자상거래법·PG 심사 표시 사항). 지금은 대표 집 주소·개인 휴대폰이라 비워 두고,
+// 유료 이용권 판매를 다시 시작할 때 채웁니다(10/30 대표 결정). 비어 있으면 표시하지 않습니다.
+const BIZ_ADDRESS = '';
+const BIZ_PHONE = '';
 // 잡코리아 스타일 홈 화면 하단 footer — 약관 링크 + 사업자 정보(접었다 펼치기). open이면 처음부터 펼쳐 둡니다(첫 화면).
 // fixed면 접을 수 없게 늘 펼쳐 둡니다(PG 심사: 결제·본인인증 페이지 하단 사업자 정보 고정 노출).
 function siteFooterHtml(open = false, fixed = false){
@@ -3568,8 +3569,8 @@ function siteFooterHtml(open = false, fixed = false){
     <div class="site-footer-detail">
       <div>대표: 이승학</div>
       <div>사업자등록번호: 177-17-01535</div>
-      <div>사업장 소재지: ${esc(BIZ_ADDRESS)}</div>
-      <div>연락처: <a href="tel:${BIZ_PHONE}">${esc(BIZ_PHONE)}</a></div>
+      ${BIZ_ADDRESS ? `<div>사업장 소재지: ${esc(BIZ_ADDRESS)}</div>` : ''}
+      ${BIZ_PHONE ? `<div>연락처: <a href="tel:${BIZ_PHONE}">${esc(BIZ_PHONE)}</a></div>` : ''}
       <div>통신판매업 신고번호: ${esc(MAIL_ORDER_REPORT_NO)} <a href="${FTC_BIZ_INFO_URL}" target="_blank" rel="noopener" onclick="event.stopPropagation()">사업자정보 확인</a></div>
       ${JOB_INFO_REPORT_NO ? `<div>직업정보제공사업 신고번호: ${esc(JOB_INFO_REPORT_NO)}</div>` : ''}
       <div>이메일: <a href="mailto:lshark4541@gmail.com">lshark4541@gmail.com</a></div>
