@@ -3307,6 +3307,7 @@ async function screenOnboarding(){
       <button class="btn btn-outline" onclick="go('login','freelancer')">프리랜서로 로그인</button>
       <button class="btn btn-outline" onclick="go('login','company')">기업으로 로그인</button>
       <a href="/jobs" style="text-align:center; font-size:13.5px; font-weight:700; color:var(--slate); padding:6px 0;">로그인 없이 모집 중인 공고 둘러보기 →</a>
+      <a href="/about.html" target="_blank" style="text-align:center; font-size:13.5px; font-weight:700; color:var(--slate); padding:0;">김프리 서비스 소개 →</a>
       <a href="/refund.html" target="_blank" style="text-align:center; font-size:13.5px; font-weight:700; color:var(--slate); padding:0 0 6px;">요금제 안내 →</a>
     </div>
     <div style="margin:8px 20px 18px;">${siteFooterHtml(true)}</div>
@@ -3414,6 +3415,7 @@ function screenSignup(){
 
     <button class="btn btn-primary" style="margin-top:18px;" onclick="doSignup()">가입하기</button>
     <div class="server-line" style="margin-top:16px;">이미 계정이 있으신가요? <b onclick="go('login')">로그인</b></div>
+    <div style="margin-top:22px;">${siteFooterHtml(true, true)}</div>
   </div>`;
 }
 
@@ -3531,6 +3533,7 @@ function screenLogin(){
       </div></div>
     <button class="btn btn-primary" onclick="doLogin()">이메일로 로그인</button>
     <div class="server-line" style="margin-top:16px;">계정이 없으신가요? <b onclick="go('signup')">회원가입</b></div>
+    <div style="margin-top:22px;">${siteFooterHtml(true, true)}</div>
   </div>`;
 }
 
@@ -3555,12 +3558,13 @@ const FTC_BIZ_INFO_URL = 'https://www.ftc.go.kr/bizCommPop.do?wrkr_no=1771701535
 const BIZ_ADDRESS = '서울특별시 성북구 숭인로8길 80, 107동 1003호(길음동)';
 const BIZ_PHONE = '010-4992-6438';
 // 잡코리아 스타일 홈 화면 하단 footer — 약관 링크 + 사업자 정보(접었다 펼치기). open이면 처음부터 펼쳐 둡니다(첫 화면).
-function siteFooterHtml(open = false){
+// fixed면 접을 수 없게 늘 펼쳐 둡니다(PG 심사: 결제·본인인증 페이지 하단 사업자 정보 고정 노출).
+function siteFooterHtml(open = false, fixed = false){
   return `<div class="site-footer">
     <div class="site-footer-links">
-      <a href="/terms.html" target="_blank">이용약관</a><span class="dot">|</span><a href="/privacy.html" target="_blank">개인정보처리방침</a><span class="dot">|</span><a href="/refund.html" target="_blank">요금·환불 규정</a>
+      <a href="/terms.html" target="_blank">이용약관</a><span class="dot">|</span><a href="/privacy.html" target="_blank">개인정보처리방침</a><span class="dot">|</span><a href="/refund.html" target="_blank">요금·환불 규정</a><span class="dot">|</span><a href="/about.html" target="_blank">서비스 소개</a>
     </div>
-    <div class="site-footer-co${open ? ' open' : ''}" onclick="this.classList.toggle('open')">© 마켓리어 <span class="chev">⌄</span></div>
+    <div class="site-footer-co${open || fixed ? ' open' : ''}"${fixed ? '' : ` onclick="this.classList.toggle('open')"`}>© 마켓리어${fixed ? '' : ' <span class="chev">⌄</span>'}</div>
     <div class="site-footer-detail">
       <div>대표: 이승학</div>
       <div>사업자등록번호: 177-17-01535</div>
@@ -5985,6 +5989,7 @@ async function screenPlans(){
       · 김프리는 구인·구직 정보를 제공하는 서비스예요. 채용·계약이 성사돼도 <b>수수료를 받지 않아요.</b><br>
       · 친구 초대로 적립한 1개월 이용권으로 출시 후 ${isCompany ? '스타터를' : '프리미엄을'} 1개월씩 무료로 쓸 수 있어요. <a style="text-decoration:underline; cursor:pointer;" onclick="go('invite')">친구 초대</a>
     </div>
+    <div style="margin-top:20px;">${siteFooterHtml(true, true)}</div>
   </div>`;
 }
 // 요금제 카드 안 '이렇게 쓰면 좋아요' 예시: 어떤 상황에서 구성품을 어떻게 쓰는지 숫자로 보여줍니다.
