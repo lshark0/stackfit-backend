@@ -14,7 +14,8 @@
 - 푸시 전 `git fetch origin main` 후 최신 `main` 위에서 작업하고, 강제 푸시(force push)는 하지 않습니다.
 
 ## AI 운영팀(예약 작업) 규칙
-- 평일 아침 개발팀(07:33)·홍보팀(08:29)·총무팀(08:31)·대표 일일 보고(08:55) 예약 작업이 순서대로 실행되고, 재무팀(지시-012)은 매주 금요일 08:37에 1회 실행됩니다. 지출 증빙·장부는 kimfree-ops의 `ops/finance/`에만 둡니다. 개발팀은 매일 앱 개선안 1건을 만들어 결재 요청합니다(지시-006, 과제 목록은 kimfree-ops의 `ops/dev-backlog.md`).
+- 예약 작업 일정(10/30 비용 절감, 지시-015): 개발팀 월·수·금 07:33, 홍보팀 월 08:29, 총무팀 월 08:31, 재무팀(지시-012) 금 08:37, 대표 보고 월·수·금 08:55. 화·목에는 예약 작업이 없습니다. 지출 증빙·장부는 kimfree-ops의 `ops/finance/`에만 둡니다. 개발팀은 근무일(월·수·금)마다 앱 개선안 1건을 만들어 결재 요청합니다(지시-006, 과제 목록은 kimfree-ops의 `ops/dev-backlog.md`).
+- 각 팀은 일지를 커밋할 때 kimfree-ops의 `ops/run-log.md`에 자기 세션 번호를 남기고, 대화창 Claude가 주간 비용 점검 때 비용을 채웁니다(지시-007).
 - 업무 기록은 **비공개 저장소 `lshark0/kimfree-ops`**(main 브랜치)의 `ops/` 폴더에 둡니다. 운영 규칙은 `ops/README.md`, 대표 지시 대장은 `ops/directives.md`, 결재 대장은 `ops/approvals.md`, 중요 알림은 `ops/alerts.md`, 팀별 일지는 `ops/logs/YYYY-MM-DD-팀.md`입니다. 이 저장소(stackfit-backend)는 공개 저장소이므로 운영 기록·메일 내용·연락처·비용 계획을 올리지 않습니다.
 - 대표가 대화창에서 "○○팀에 지시: …"라고 하면 `kimfree-ops`의 `ops/directives.md`에 다음 지시 번호(지시-NNN)로 등록하고 푸시합니다.
 - 대표 보고는 Google Drive '김프리 대표 보고함' 폴더(https://drive.google.com/drive/folders/10jGD_1tEWxZehw9fEqcm9T4VGoSaRQvU)에 날마다 새 문서로 올라갑니다. 대표는 그 문서에서 '상태: 대기'를 승인·반려·보류로 고치거나 댓글을 달아 결재합니다.
