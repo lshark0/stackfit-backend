@@ -16,9 +16,12 @@ function matchedStack(jobStack = [], profileStack = []) {
 }
 
 // 공고 요구 기술 수와 그중 프리랜서가 가진 기술 수. 화면에 "기술스택 3개 중 2개 일치"로 보여줍니다.
+// matchedStack도 함께 내려서 카드의 기술 태그 중 일치한 것을 색으로 강조합니다.
 function stackCounts(jobStack = [], profileStack = []) {
+  const matched = matchedStack(jobStack, profileStack);
   return {
-    matchCount: matchedStack(jobStack, profileStack).length,
+    matchedStack: matched,
+    matchCount: matched.length,
     matchTotal: new Set(jobStack.map((s) => s.toLowerCase())).size,
   };
 }

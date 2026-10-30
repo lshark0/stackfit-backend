@@ -1,7 +1,7 @@
 const express = require('express');
 const { run, get, all } = require('../db');
 const { signedFileUrl } = require('../fileAccess');
-const { computeMatch, stackCounts } = require('../match');
+const { computeMatch, matchedStack, stackCounts } = require('../match');
 const { requireAuth, requireRole } = require('../middleware/requireAuth');
 const { wrapAllRoutes } = require('../middleware/asyncHandler');
 const { addNotification, pushTo, notifyAdmins } = require('../notify');
@@ -128,11 +128,14 @@ router.get('/me/applications', requireAuth, requireRole('freelancer'), async (re
       projectStateById[r.application_id] = { status: project.status, stage: project.stage };
     }
   }
+  const p = await get('SELECT stack_json FROM freelancer_profiles WHERE user_id = ?', [req.user.id]);
+  const profileStack = p ? JSON.parse(p.stack_json) : [];
   res.json({
     applications: rows.map(r => ({
       ...r,
       status: r.application_status,
       stack: JSON.parse(r.stack_json),
+      matchedStack: matchedStack(JSON.parse(r.stack_json), profileStack),
       projectState: projectStateById[r.application_id] || null,
     })),
   });

@@ -1277,7 +1277,7 @@ function jobCard(j){
       </div>
       <div class="star-btn ${j.saved?'filled':''}" onclick="toggleSaveJob(${j.id}, event)">${I.star}</div>
     </div>
-    <div class="tag-row">${j.stack.map(s=>`<span class="tag">${esc(s)}</span>`).join('')}</div>
+    ${stackTags(j.stack, j.matchedStack)}
     <div class="icon-meta">
       <span class="im">${I.pin}${esc(j.location)}</span>
       <span class="im">${I.wallet}<b>${esc(j.rate)}</b></span>
@@ -3768,7 +3768,7 @@ async function screenJobDetail(){
       <div class="section-label with-ic">${I.badgeCheck}요구 자격증</div>
       <div class="tag-row">${j.certs.map(c=>`<span class="tag">${esc(c)}</span>`).join('')}</div>` : ''}
     <div class="section-label with-ic">${I.layers}요구 기술스택</div>
-    <div class="tag-row">${j.stack.map(s=>`<span class="tag">${esc(s)}</span>`).join('')}</div>
+    ${stackTags(j.stack, j.matchedStack)}
     <div class="section-label with-ic">${I.checklist}상세 내용</div>
     <div class="para">${esc(j.description) || "상세 설명이 아직 등록되지 않았어요."}</div>
     ${(!isCompany && j.similarJobs && j.similarJobs.length) ? `
@@ -4619,7 +4619,7 @@ async function screenMyApplications(){
           <div style="min-width:0;"><div class="card-title">${esc(a.title)}</div><div class="card-org">${esc(a.org||'')}</div></div>
           ${badge[a.status] || `<span class="sbadge fail">${esc(a.status)}</span>`}
         </div>
-        <div class="tag-row">${a.stack.map(s=>`<span class="tag">${esc(s)}</span>`).join('')}</div>
+        ${stackTags(a.stack, a.matchedStack)}
         <div class="icon-meta">
           <span class="im">${I.pin}${esc(a.location)}</span>
           <span class="im">${I.wallet}<b>${esc(a.rate)}</b></span>
@@ -4667,7 +4667,7 @@ async function screenAllApplicants(){
             </div>
             ${badge[a.status] || `<span class="sbadge fail">${esc(a.status)}</span>`}
           </div>
-          <div class="tag-row">${a.stack.map(s=>`<span class="tag">${esc(s)}</span>`).join('')}</div>
+          ${stackTags(a.stack, a.matchedStack)}
           ${gauge(a)}
         </div>`).join('')}
     `).join('') || emptyArt(ART.noTalents, '아직 지원자가 없어요', '인재풀에서 직접 포지션을 제안해볼 수도 있어요.')}
@@ -4702,7 +4702,7 @@ async function screenApplicants(){
           </div>
           ${badge[a.status] || `<span class="sbadge fail">${esc(a.status)}</span>`}
         </div>
-        <div class="tag-row">${a.stack.map(s=>`<span class="tag">${esc(s)}</span>`).join('')}</div>
+        ${stackTags(a.stack, a.matchedStack)}
         ${gauge(a)}
         <div class="meta-row">
           <span class="rate">${esc(a.rate)}</span>
