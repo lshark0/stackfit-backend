@@ -340,15 +340,20 @@ app.use(express.static(path.join(__dirname, 'public'), {
 
 // DB까지 실제로 쿼리해서 깨움 — Neon 같은 서버리스 DB는 유휴 상태에서 자동으로 잠들기 때문에,
 // 헬스체크가 서버만 깨우고 DB는 깨우지 않으면 로그인 시 DB 콜드스타트로 여전히 느려질 수 있음.
-app.get('/api/health', async (_req, res) => {
+// 상태 확인은 기본으로 DB를 조회하지 않습니다. 잠듦 방지 신호(GitHub Actions)·Render 상태 확인·대표 도메인 확인이
+// 몇 분마다 들어와서, DB까지 조회하면 무료 DB(Neon)가 잠들지 못해 월 컴퓨트 한도를 넘기 때문입니다.
+// DB 연결까지 확인하려면 /api/health?db=1
+app.get('/api/health', async (req, res) => {
+  if (req.query.db !== '1') return res.json({ ok: true });
   try {
     await get('SELECT 1 AS ok');
-    logDailyMetricsOnce(); // 그날 첫 호출 때 운영 지표 한 줄을 로그에 남김(응답은 기다리지 않음)
-    res.json({ ok: true }); // 내부 구성(서비스명·DB 종류)은 응답에 담지 않습니다
+    res.json({ ok: true, db: true }); // 내부 구성(서비스명·DB 종류)은 응답에 담지 않습니다
   } catch (err) {
     res.status(503).json({ ok: false, error: 'DB에 연결할 수 없어요.' });
   }
 });
+// 하루 한 번 운영 지표를 로그에 남깁니다 — 상태 확인이 아니라 실제 이용 요청(DB가 이미 깨어 있을 때)에 맞춰 계산합니다.
+app.use('/api', (_req, _res, next) => { logDailyMetricsOnce(); next(); });
 
 app.use('/api/auth/mfa', mfaRoutes);
 app.use('/api/auth', authRoutes);

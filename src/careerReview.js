@@ -204,9 +204,13 @@ async function callModel(client, content) {
 
 const nowStr = () => new Date().toISOString().slice(0, 19).replace('T', ' ');
 const reviewing = new Set();
+// 심사 대기 서류가 있을 수 있을 때만 5분마다 DB를 확인합니다(무료 DB가 잠들 수 있게).
+// 기동 직후와 새 서류가 들어왔을 때 true, 확인해서 대기 건이 없으면 false.
+let mayHavePending = true;
 
 // 검토 대기(pending) 서류 한 건을 AI로 심사합니다. 여러 번 불려도 한 건은 한 번만 처리합니다.
 async function reviewSubmission(id) {
+  mayHavePending = true;
   if (reviewing.has(id)) return null;
   reviewing.add(id);
   try {
@@ -308,8 +312,10 @@ async function notifyAdmins(row, why) {
 
 // 서버가 재시작돼 검토가 끊긴 서류를 다시 심사합니다(2분 넘게 'AI 검토 중'인 건).
 async function resumePendingReviews() {
+  if (!mayHavePending) return;
   const cutoff = new Date(Date.now() - 2 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ');
   const rows = await all("SELECT id, created_at FROM career_verifications WHERE status = 'pending' ORDER BY id ASC LIMIT 20");
+  mayHavePending = rows.length > 0;
   for (const r of rows) {
     const created = r.created_at instanceof Date ? r.created_at.toISOString().slice(0, 19).replace('T', ' ') : String(r.created_at);
     if (created <= cutoff) await reviewSubmission(r.id).catch((e) => console.warn('[AI] 경력 검증 재시도 실패:', e.message));

@@ -153,6 +153,7 @@ async function saveInterview(conv, userId, input) {
   }
   const saved = await get('SELECT * FROM interviews WHERE conversation_id = ?', [conv.id]);
   await announce(conv, userId, saved, action, action === 'updated' ? existing : null);
+  await refreshNextReminder();
   return { interview: publicView(saved) };
 }
 
@@ -162,11 +163,25 @@ async function cancelInterview(conv, userId) {
   const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
   await run("UPDATE interviews SET status='cancelled', updated_at=? WHERE id=?", [now, existing.id]);
   await announce(conv, userId, existing, 'cancelled');
+  await refreshNextReminder();
   return { interview: publicView({ ...existing, status: 'cancelled' }) };
+}
+
+// 무료 DB(Neon)는 5분 동안 조회가 없어야 잠들어 컴퓨트 시간을 아낍니다. 그래서 다음 알림 대상 인터뷰 시각을
+// 메모리에 들고 있다가, 그 시각이 1시간 안으로 다가왔을 때만 DB를 조회합니다(일정이 바뀌면 다시 계산).
+let nextReminderAt; // undefined: 아직 모름, null: 알림 보낼 인터뷰 없음
+async function refreshNextReminder() {
+  const row = await get(
+    "SELECT MIN(interview_at) AS next_at FROM interviews WHERE status = 'scheduled' AND reminded = 0 AND interview_at > ?",
+    [kstStamp()]
+  );
+  nextReminderAt = (row && row.next_at) || null;
 }
 
 // 인터뷰 1시간 전 알림: 5분마다 확인하고, 양쪽 모두에게 한 번만 보냅니다.
 async function sendInterviewReminders() {
+  if (nextReminderAt === undefined) await refreshNextReminder();
+  if (!nextReminderAt || nextReminderAt > kstStamp(60)) return;
   const rows = await all(
     `SELECT i.id, i.conversation_id, i.interview_at, i.mode, i.place, c.company_id, c.freelancer_id
      FROM interviews i JOIN conversations c ON c.id = i.conversation_id
@@ -182,6 +197,7 @@ async function sendInterviewReminders() {
       pushTo(uid, { kind: 'chat', title: '⏰ 1시간 뒤 인터뷰', body, tag: `interview-remind-${r.id}`, link: `chatRoom:${r.conversation_id}` });
     }
   }
+  await refreshNextReminder();
 }
 
 module.exports = { getInterview, saveInterview, cancelInterview, sendInterviewReminders, toInterviewAt, formatKo, kstStamp };
