@@ -47,7 +47,9 @@ const PROVIDERS = {
       const account = data.kakao_account || {};
       return {
         id: String(data.id),
-        email: account.email || `kakao_${data.id}@stackfit.local`,
+        // 이메일이 유효·인증된 경우에만 사용합니다(미인증 이메일로 기존 계정과 자동연동되지 않도록).
+        email: (account.email && account.is_email_valid !== false && account.is_email_verified === true)
+          ? account.email : `kakao_${data.id}@stackfit.local`,
         name: (account.profile && account.profile.nickname) || '', // 닉네임이 없으면 가입 화면에서 직접 입력
       };
     },
