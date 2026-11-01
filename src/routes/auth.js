@@ -10,6 +10,7 @@ const { findFreelancerByPhone, duplicatePhoneMessage } = require('../duplicateAc
 const identity = require('../identity');
 const securityLog = require('../securityLog');
 const mfa = require('../mfa');
+const emailVerify = require('../emailVerify');
 
 const router = express.Router();
 wrapAllRoutes(router);
@@ -114,7 +115,12 @@ router.post('/signup', async (req, res) => {
       return res.status(400).json({ error: '사업자등록번호 10자리를 정확히 입력해주세요.' });
     }
   }
-  if (await get('SELECT id FROM users WHERE email = ?', [email])) {
+  // 인증을 마치지 않은 채 남은 가입(본인이 아니거나 메일을 놓친 경우)은 지우고 새로 가입받습니다.
+  // 링크를 누르지 않은 계정은 로그인한 적이 없어 지워도 잃는 데이터가 없습니다.
+  const sameEmail = await get('SELECT * FROM users WHERE email = ?', [email]);
+  if (sameEmail && emailVerify.needsEmailVerification(sameEmail)) {
+    await run('DELETE FROM users WHERE id = ?', [sameEmail.id]);
+  } else if (sameEmail) {
     return res.status(409).json({ error: '이미 가입된 이메일입니다.' });
   }
   // 로그인 방법만 바꿔 같은 사람이 프리랜서 계정을 또 만들지 않도록 휴대폰 번호로 확인합니다.
@@ -131,8 +137,9 @@ router.post('/signup', async (req, res) => {
   let r;
   try {
     r = await run(
-      'INSERT INTO users (email, password_hash, password_salt, role, ci, di, identity_verified_at) VALUES (?,?,?,?,?,?,?)',
-      [email, hash, salt, role, verified ? verified.ci : null, verified ? verified.di : null, verified ? new Date().toISOString() : null]
+      'INSERT INTO users (email, password_hash, password_salt, role, ci, di, identity_verified_at, email_verify_required) VALUES (?,?,?,?,?,?,?,?)',
+      [email, hash, salt, role, verified ? verified.ci : null, verified ? verified.di : null, verified ? new Date().toISOString() : null,
+        emailVerify.emailVerifyEnabled() ? 1 : 0]
     );
   } catch (e) {
     // 동시에 같은 사람이 두 번 가입을 누른 경우 (CI 유니크 인덱스 위반)
@@ -171,8 +178,42 @@ router.post('/signup', async (req, res) => {
   await recordSignupAttribution(userId, req.body.attribution)
     .catch((e) => console.warn('[김프리] 가입 경로 기록 실패:', e.message));
 
+  // 이메일 인증을 쓰면 로그인 토큰 대신 인증 메일을 보냅니다. 메일이 실패해도 가입은 유지되고 다시 보내기로 받을 수 있습니다.
+  if (emailVerify.emailVerifyEnabled()) {
+    let mailSent = true;
+    await emailVerify.sendVerificationMail({ id: userId, email }, req).catch((e) => {
+      mailSent = false;
+      console.warn('[김프리] 인증 메일 발송 실패:', e.message);
+    });
+    return res.status(201).json({ verifyRequired: true, email, mailSent });
+  }
+
   const token = signToken({ id: userId, role, email });
   res.status(201).json({ token, user: { id: userId, email, role, isAdmin: isAdminEmail(email) } });
+});
+
+// 인증 메일의 링크(/?verify_email=…)로 들어오면 화면이 이 API를 불러 인증을 마치고 바로 로그인시킵니다.
+router.post('/verify-email', async (req, res) => {
+  const user = await emailVerify.consumeVerificationToken((req.body || {}).token);
+  if (!user) {
+    return res.status(400).json({ error: '인증 링크가 만료됐거나 이미 사용됐어요. 로그인 화면에서 인증 메일을 다시 받아주세요.' });
+  }
+  if (isAdminEmail(user.email) && mfa.isMfaEnabled(user)) {
+    return res.json({ mfaRequired: true, mfaToken: mfa.mfaLoginToken(user) });
+  }
+  await securityLog.logEvent('login_success', { email: user.email, ip: securityLog.clientIp(req), userId: user.id, detail: '이메일 인증 완료' });
+  const token = signToken({ id: user.id, role: user.role, email: user.email });
+  res.json({ token, user: { id: user.id, email: user.email, role: user.role, isAdmin: isAdminEmail(user.email) } });
+});
+
+// 인증 메일 다시 보내기. 가입 여부가 드러나지 않도록 항상 같은 응답을 줍니다.
+router.post('/resend-verification', async (req, res) => {
+  const email = typeof (req.body || {}).email === 'string' ? req.body.email.trim().toLowerCase() : '';
+  if (EMAIL_RE.test(email)) {
+    await emailVerify.resendVerificationMail(email, req)
+      .catch((e) => console.warn('[김프리] 인증 메일 재발송 실패:', e.message));
+  }
+  res.json({ ok: true });
 });
 
 router.post('/login', async (req, res) => {
@@ -202,6 +243,10 @@ router.post('/login', async (req, res) => {
   if (!verifyPassword(password, user.password_hash, user.password_salt)) {
     await securityLog.recordLoginFailure(email, ip, user.id);
     return genericError();
+  }
+  // 비밀번호가 맞아도 이메일 인증 전이면 로그인시키지 않습니다(비밀번호를 아는 사람에게만 알려 주므로 가입 여부가 새지 않음).
+  if (emailVerify.needsEmailVerification(user)) {
+    return res.status(403).json({ error: '이메일 인증을 아직 마치지 않았어요. 가입할 때 받은 메일의 링크를 눌러주세요.', code: 'EMAIL_UNVERIFIED' });
   }
 
   // 2단계 인증을 켠 관리자는 비밀번호만으로 세션을 주지 않고, OTP 코드 입력 단계로 보냅니다.

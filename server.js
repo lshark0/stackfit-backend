@@ -149,6 +149,8 @@ app.use('/api/auth/change-password', authLimiter);
 app.use('/api/auth/mfa/verify', authLimiter);
 app.use('/api/auth/mfa/enable', authLimiter);
 app.use('/api/auth/claim', authLimiter); // 계정 연결 링크 대입 방지
+app.use('/api/auth/verify-email', authLimiter); // 이메일 인증 링크 대입 방지
+app.use('/api/auth/resend-verification', authLimiter); // 인증 메일 반복 발송 방지
 // DELETE /api/auth/me(회원탈퇴)의 비밀번호 확인 무차별 대입만 제한 — GET(세션 확인)은 자주 호출되므로 제외
 app.use('/api/auth/me', (req, res, next) => (req.method === 'DELETE' ? authLimiter(req, res, next) : next()));
 

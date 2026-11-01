@@ -50,11 +50,29 @@ router.get('/:provider/callback', async (req, res) => {
   // 1) 이미 이 소셜 계정으로 가입된 사용자가 있으면 바로 로그인
   let user = await get('SELECT * FROM users WHERE oauth_provider=? AND oauth_id=?', [provider, profile.id]);
 
+  // 이메일 가입은 소문자로 저장하므로 같은 기준으로 비교합니다.
+  if (profile.email) profile.email = String(profile.email).trim().toLowerCase();
+
   // 2) 같은 이메일의 기존 계정이 있으면 소셜 로그인을 연결
   if (!user && profile.email) {
     const existing = await get('SELECT * FROM users WHERE email=?', [profile.email]);
     if (existing) {
-      await run('UPDATE users SET oauth_provider=?, oauth_id=? WHERE id=?', [provider, profile.id, existing.id]);
+      if (existing.email_verified_at) {
+        await run('UPDATE users SET oauth_provider=?, oauth_id=? WHERE id=?', [provider, profile.id, existing.id]);
+      } else {
+        // 이메일 인증을 거치지 않은 계정은 남이 이 이메일로 먼저 만들었을 수 있습니다.
+        // 소셜 업체가 이메일 주인임을 확인했으므로 인증 완료로 바꾸고, 그 비밀번호는 쓸 수 없게 무작위 값으로 바꿉니다.
+        const { hash, salt } = hashPassword(crypto.randomBytes(32).toString('hex'));
+        await run(
+          `UPDATE users SET oauth_provider=?, oauth_id=?, password_hash=?, password_salt=?,
+             email_verified_at=?, email_verify_hash=NULL, email_verify_expires=NULL WHERE id=?`,
+          [provider, profile.id, hash, salt, new Date().toISOString(), existing.id]
+        );
+        await securityLog.logEvent('oauth_link_reset_password', {
+          email: existing.email, ip: securityLog.clientIp(req), userId: existing.id,
+          detail: `${provider} 연동 — 이메일 미인증 계정의 비밀번호 폐기`,
+        });
+      }
       user = existing;
     }
   }
@@ -108,8 +126,8 @@ router.post('/finish', async (req, res) => {
   // 소셜 계정은 비밀번호 로그인을 쓰지 않으므로, 추측 불가능한 무작위 값을 채워둡니다.
   const { hash, salt } = hashPassword(crypto.randomBytes(32).toString('hex'));
   const r = await run(
-    'INSERT INTO users (email, password_hash, password_salt, role, oauth_provider, oauth_id) VALUES (?,?,?,?,?,?)',
-    [email, hash, salt, role, payload.provider, payload.oauthId]
+    'INSERT INTO users (email, password_hash, password_salt, role, oauth_provider, oauth_id, email_verified_at) VALUES (?,?,?,?,?,?,?)',
+    [email, hash, salt, role, payload.provider, payload.oauthId, payload.email ? new Date().toISOString() : null]
   );
   const userId = Number(r.lastInsertRowid);
   const safeName = String(name || '').trim().slice(0, 60);

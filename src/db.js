@@ -117,6 +117,12 @@ if (USE_POSTGRES) {
     await ensureColumnPg('users', 'claim_pending', 'INTEGER NOT NULL DEFAULT 0');
     await ensureColumnPg('users', 'claim_nonce', 'TEXT');
     await ensureColumnPg('users', 'proxy_created_by', 'INTEGER');
+    // 가입 이메일 인증(src/emailVerify.js)
+    await ensureColumnPg('users', 'email_verify_required', 'INTEGER NOT NULL DEFAULT 0');
+    await ensureColumnPg('users', 'email_verified_at', 'TEXT');
+    await ensureColumnPg('users', 'email_verify_hash', 'TEXT');
+    await ensureColumnPg('users', 'email_verify_expires', 'TEXT');
+    await ensureColumnPg('users', 'email_verify_sent_at', 'TEXT');
     // 프리랜서 연락처 + 제안 받기 설정
     await ensureColumnPg('freelancer_profiles', 'phone', "TEXT NOT NULL DEFAULT ''");
     await ensureColumnPg('freelancer_profiles', 'email', "TEXT NOT NULL DEFAULT ''");
@@ -254,6 +260,11 @@ if (USE_POSTGRES) {
     addCol('users', 'claim_pending', 'INTEGER NOT NULL DEFAULT 0');
     addCol('users', 'claim_nonce', 'TEXT');
     addCol('users', 'proxy_created_by', 'INTEGER');
+    addCol('users', 'email_verify_required', 'INTEGER NOT NULL DEFAULT 0');
+    addCol('users', 'email_verified_at', 'TEXT');
+    addCol('users', 'email_verify_hash', 'TEXT');
+    addCol('users', 'email_verify_expires', 'TEXT');
+    addCol('users', 'email_verify_sent_at', 'TEXT');
     addCol('freelancer_profiles', 'phone', "TEXT NOT NULL DEFAULT ''");
     addCol('freelancer_profiles', 'email', "TEXT NOT NULL DEFAULT ''");
     addCol('freelancer_profiles', 'accept_proposals', 'INTEGER NOT NULL DEFAULT 1');
