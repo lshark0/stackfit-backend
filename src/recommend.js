@@ -88,6 +88,8 @@ function scoreMatch(job, profile, rating) {
   return { score: total, match, matched, matchTotal, reasons, breakdown, relevant };
 }
 
+const acceptsOffers = (p) => (Number(p.accept_proposals ?? 1) === 1 ? 1 : 0);
+
 // [기업용] 특정 공고에 맞는 프리랜서를 자동 추천합니다.
 async function recommendTalentsForJob(job, limit = 5) {
   const rows = await all('SELECT * FROM freelancer_profiles');
@@ -103,7 +105,8 @@ async function recommendTalentsForJob(job, limit = 5) {
       return { ...p, ...rating, score, match, matchedStack: matched, matchCount: matched.length, matchTotal, reasons, breakdown, relevant };
     })
     .filter((p) => p.relevant) // 접점이 전혀 없는 사람은 추천하지 않음
-    .sort((a, b) => b.score - a.score)
+    // '제안 받지 않음'으로 설정한 인재는 점수와 관계없이 제안 가능한 인재 뒤로 보냅니다(목록에서 빼지는 않음).
+    .sort((a, b) => (acceptsOffers(b) - acceptsOffers(a)) || (b.score - a.score))
     .slice(0, limit);
 }
 
