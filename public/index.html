@@ -1604,11 +1604,12 @@ async function loadIdentityConfig(){
 }
 loadIdentityConfig();
 // 모바일은 인증 후 이 주소로 되돌아옵니다(?iv_return=1&identityVerificationId=...&code=...).
+// 주소에 붙은 message는 누구나 만들어 넣을 수 있으므로 화면에 그대로 보여주지 않습니다(피싱 문구 방지).
 let pendingIvReturn = (() => {
   try{
     const qs = new URLSearchParams(location.search);
     if(!qs.has('iv_return')) return null;
-    return { id: qs.get('identityVerificationId') || '', code: qs.get('code') || '', message: qs.get('message') || '' };
+    return { id: qs.get('identityVerificationId') || '', code: qs.get('code') || '' };
   }catch(e){ return null; }
 })();
 const SIGNUP_DRAFT_FIELDS = ['su-email','su-companytype','su-bizregno','su-companyname','su-ceoname','su-address','su-description','su-position','su-companyphone'];
@@ -1676,7 +1677,7 @@ async function handleIvReturn(){
   history.replaceState({screen: 'signup', param: null}, '', location.pathname);
   await render();
   restoreSignupDraft();
-  if(ret.code || !ret.id){ showConfirm(ret.message || '본인인증이 취소됐어요', () => {}); return; }
+  if(ret.code || !ret.id){ showConfirm('본인인증이 취소됐거나 완료되지 않았어요. 다시 시도해주세요.', () => {}); return; }
   await completeIdentityVerification(ret.id);
 }
 
@@ -6163,18 +6164,20 @@ async function completePlanPayment(paymentId){
   if(state.screen === 'plans') render(); else go('plans');
 }
 // 모바일은 결제 후 이 주소로 되돌아옵니다(?pay_return=1&paymentId=...&code=...).
+// 주소에 붙은 message는 누구나 만들어 넣을 수 있으므로 화면에 그대로 보여주지 않습니다(피싱 문구 방지).
+// 결제 결과도 주소 값이 아니라 서버가 포트원에서 다시 조회한 결과로만 판단합니다.
 let pendingPayReturn = (() => {
   try{
     const qs = new URLSearchParams(location.search);
     if(!qs.has('pay_return')) return null;
-    return { id: qs.get('paymentId') || '', code: qs.get('code') || '', message: qs.get('message') || '' };
+    return { id: qs.get('paymentId') || '', code: qs.get('code') || '' };
   }catch(e){ return null; }
 })();
 async function handlePayReturn(){
   if(!pendingPayReturn) return;
   const ret = pendingPayReturn; pendingPayReturn = null;
   if(!state.token) return;
-  if(ret.code || !ret.id){ go('plans'); showConfirm(ret.message || '결제가 취소됐어요', () => {}); return; }
+  if(ret.code || !ret.id){ go('plans'); showConfirm('결제가 취소됐거나 완료되지 않았어요. 다시 시도해주세요.', () => {}); return; }
   await completePlanPayment(ret.id);
 }
 async function togglePlanInterest(planId, on){
