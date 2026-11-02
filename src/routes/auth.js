@@ -126,7 +126,13 @@ router.post('/signup', async (req, res) => {
   // 로그인 방법만 바꿔 같은 사람이 프리랜서 계정을 또 만들지 않도록 휴대폰 번호로 확인합니다.
   if (role === 'freelancer') {
     const dup = await findFreelancerByPhone(normalizedPhone);
-    if (dup) return res.status(409).json({ error: duplicatePhoneMessage(dup) });
+    const dupUser = dup ? await get('SELECT * FROM users WHERE id = ?', [dup.id]) : null;
+    // 이메일 인증을 마치지 않은 가입은 로그인할 수 없으니, 같은 번호로 다시 가입하면 지우고 새로 받습니다.
+    if (dupUser && emailVerify.needsEmailVerification(dupUser)) {
+      await run('DELETE FROM users WHERE id = ?', [dupUser.id]);
+    } else if (dup) {
+      return res.status(409).json({ error: duplicatePhoneMessage(dup) });
+    }
   }
 
   if (verified && verified.ci && (await get('SELECT id FROM users WHERE ci = ?', [verified.ci]))) {
