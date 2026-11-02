@@ -110,7 +110,9 @@ router.get('/completion', requireAuth, async (req, res) => {
 
 router.get('/', requireAuth, async (req, res) => {
   // 가입 이메일은 연락용 이메일을 아직 입력하지 않았을 때 기본값으로 채워주기 위해 함께 내려줍니다.
-  const account = await get('SELECT email FROM users WHERE id = ?', [req.user.id]);
+  const account = await get('SELECT email, identity_verified_at FROM users WHERE id = ?', [req.user.id]);
+  // 본인인증으로 가입한 회원은 이름·생년월일·성별·휴대폰(기업은 담당자명·휴대폰)을 화면에서 바꿀 수 없게 잠급니다.
+  const identityVerified = !!(account && account.identity_verified_at);
   // (이메일을 제공하지 않는 소셜 계정의 임시 주소는 실제 연락처가 아니므로 제외)
   const accountEmail = account && !String(account.email).endsWith('@stackfit.local') ? account.email : '';
   if (req.user.role === 'freelancer') {
@@ -120,6 +122,7 @@ router.get('/', requireAuth, async (req, res) => {
     return res.json({
       ...rest,
       account_email: accountEmail,
+      identity_verified: identityVerified,
       stack: JSON.parse(p.stack_json),
       certs: JSON.parse(p.certs_json || '[]'),
       pref_regions: parseRegions(p.pref_regions_json),
@@ -127,8 +130,15 @@ router.get('/', requireAuth, async (req, res) => {
     });
   }
   const c = await get('SELECT * FROM companies WHERE user_id = ?', [req.user.id]);
-  res.json({ ...c, account_email: accountEmail });
+  res.json({ ...c, account_email: accountEmail, identity_verified: identityVerified });
 });
+
+// 본인인증 결과와 다른 값으로 바꾸려는 경우(화면에서는 잠겨 있으므로 요청을 조작한 경우)
+const IDENTITY_LOCKED_ERROR = '본인인증으로 확인한 이름·생년월일·성별·휴대폰 번호는 바꿀 수 없어요.';
+async function isIdentityVerified(userId) {
+  const u = await get('SELECT identity_verified_at FROM users WHERE id = ?', [userId]);
+  return !!(u && u.identity_verified_at);
+}
 
 // [프리랜서] 제안 받기 설정 — 제안 수신 여부와, 기업에게 공개할 연락 수단(휴대폰/이메일)
 router.put('/proposal-settings', requireAuth, requireRole('freelancer'), async (req, res) => {
@@ -203,6 +213,13 @@ router.put('/', requireAuth, async (req, res) => {
       if (nextBirthDate === null) return res.status(400).json({ error: '생년월일을 정확히 입력해주세요. (예: 20000131)' });
     }
     const nextGender = gender === undefined ? (current.gender || '') : (['남자', '여자'].includes(gender) ? gender : '');
+    if (await isIdentityVerified(req.user.id)) {
+      const nextName = name !== undefined ? clamp(name, 60, current.name) : current.name;
+      if (nextName !== current.name || nextPhone !== (current.phone || '')
+        || nextBirthDate !== (current.birth_date || '') || nextGender !== (current.gender || '')) {
+        return res.status(400).json({ error: IDENTITY_LOCKED_ERROR });
+      }
+    }
 
     let nextStack = Array.isArray(stack) ? stack : JSON.parse(current.stack_json);
     nextStack = nextStack
@@ -298,6 +315,12 @@ router.put('/', requireAuth, async (req, res) => {
   if (email !== undefined) {
     nextEmail = normalizeEmail(email);
     if (nextEmail === null) return res.status(400).json({ error: '이메일 형식이 올바르지 않아요.' });
+  }
+  if (await isIdentityVerified(req.user.id)) {
+    const nextPerson = contact_person !== undefined ? clamp(contact_person, 60, current.contact_person) : current.contact_person;
+    if ((nextPerson || '') !== (current.contact_person || '') || nextPhone !== (current.phone || '')) {
+      return res.status(400).json({ error: '본인인증으로 확인한 담당자명·휴대폰 번호는 바꿀 수 없어요.' });
+    }
   }
 
   await run(

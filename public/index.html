@@ -362,6 +362,7 @@
   .form-field{margin-bottom:14px;}
   .form-label{font-size:13px; font-weight:700; color:var(--ink); margin-bottom:6px; display:block;}
   .form-input{width:100%; border:1.5px solid var(--line); background:var(--card); border-radius:10px; padding:12px 13px; font-size:14.5px; font-family:var(--sans); color:var(--ink); outline:none;}
+  .form-input:disabled{background:var(--paper-dim); color:var(--slate);}
   .form-input::placeholder{color:var(--slate-light);}
   .form-input:focus{border-color:var(--purple);}
   textarea.form-input{resize:none; height:76px;}
@@ -6331,19 +6332,20 @@ async function screenProfileEdit(){
       <div style="margin-top:6px; display:flex; flex-wrap:wrap; gap:5px;">${profileMissingFields.map(f=>`<span class="reco-reason" style="border-color:var(--amber); color:var(--amber-deep);">${esc(f)}</span>`).join('')}</div>
       <div style="margin-top:6px; font-size:11.5px;">경력기술서를 올리고 AI로 자동 채우기를 쓰면 더 빨라요.</div>
     </div>` : ''}
-    <div class="form-field"><label class="form-label">이름</label><input id="pf-name" class="form-input" value="${esc(p.name)}"></div>
+    ${server.identity_verified ? `<div class="page-sub" style="margin-bottom:8px; display:flex; gap:6px; align-items:center;">${I.checkCircle}<span>휴대폰 본인인증으로 확인한 이름·생년월일·성별·휴대폰은 바꿀 수 없어요.</span></div>` : ''}
+    <div class="form-field"><label class="form-label">이름</label><input id="pf-name" class="form-input" value="${esc(p.name)}" ${server.identity_verified ? 'disabled' : ''}></div>
     <div class="form-field">
       <label class="form-label">생년월일 <span style="font-weight:400; color:var(--slate-light);">(예시: 20000131)</span></label>
       <div class="su-phone-row">
-        <input id="pf-birthdate" class="form-input" inputmode="numeric" maxlength="8" placeholder="생년월일 8자리" value="${esc((p.birth_date||'').replace(/-/g,''))}">
+        <input id="pf-birthdate" class="form-input" inputmode="numeric" maxlength="8" placeholder="생년월일 8자리" value="${esc((p.birth_date||'').replace(/-/g,''))}" ${server.identity_verified ? 'disabled' : ''}>
         <div class="su-gender-row" style="flex:0 0 auto; width:150px;">
-          <div class="chip ${profileGender==='남자'?'active':''}" id="pf-gender-male" onclick="setProfileGender('남자')">남자</div>
-          <div class="chip ${profileGender==='여자'?'active':''}" id="pf-gender-female" onclick="setProfileGender('여자')">여자</div>
+          <div class="chip ${profileGender==='남자'?'active':''}" id="pf-gender-male" ${server.identity_verified ? '' : `onclick="setProfileGender('남자')"`}>남자</div>
+          <div class="chip ${profileGender==='여자'?'active':''}" id="pf-gender-female" ${server.identity_verified ? '' : `onclick="setProfileGender('여자')"`}>여자</div>
         </div>
       </div>
     </div>
     <div class="form-field"><label class="form-label">휴대폰 <span style="color:var(--danger); font-size:11px;">(필수)</span></label>
-      <input id="pf-phone" class="form-input" type="tel" inputmode="tel" autocomplete="tel" placeholder="010-1234-5678" value="${esc(p.phone||'')}"></div>
+      <input id="pf-phone" class="form-input" type="tel" inputmode="tel" autocomplete="tel" placeholder="010-1234-5678" value="${esc(p.phone||'')}" ${server.identity_verified ? 'disabled' : ''}></div>
     <div class="form-field"><label class="form-label">이메일</label>
       <input id="pf-email" class="form-input" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" value="${esc(p.email || (profileDraftUsedEmail(p) ? '' : (p.account_email||'')))}">
       <div class="page-sub" style="margin-top:5px;">연락처를 기업에 공개할지는 MY › 제안 설정에서 정할 수 있어요.</div></div>
@@ -6539,11 +6541,12 @@ async function screenCompanyProfileEdit(){
     <div class="form-field"><label class="form-label">회사 소개</label><textarea id="cf-desc" class="form-input" placeholder="회사를 간단히 소개해주세요">${esc(c.description||'')}</textarea></div>
 
     <div class="section-label with-ic">${I.user}담당자 정보</div>
-    <div class="form-field"><label class="form-label">담당자명</label><input id="cf-person" class="form-input" value="${esc(c.contact_person||'')}"></div>
+    ${c.identity_verified ? `<div class="page-sub" style="margin-bottom:8px; display:flex; gap:6px; align-items:center;">${I.checkCircle}<span>휴대폰 본인인증으로 확인한 담당자명·휴대폰은 바꿀 수 없어요.</span></div>` : ''}
+    <div class="form-field"><label class="form-label">담당자명</label><input id="cf-person" class="form-input" value="${esc(c.contact_person||'')}" ${c.identity_verified ? 'disabled' : ''}></div>
     <div class="form-field"><label class="form-label">직책</label>
       <input id="cf-position" class="form-input" placeholder="예: 인사팀장, PM" value="${esc(c.contact_position||'')}"></div>
     <div class="form-field"><label class="form-label">휴대폰 <span style="color:var(--danger); font-size:11px;">(필수)</span></label>
-      <input id="cf-phone" class="form-input" type="tel" inputmode="tel" autocomplete="tel" placeholder="010-1234-5678" value="${esc(c.phone||'')}"></div>
+      <input id="cf-phone" class="form-input" type="tel" inputmode="tel" autocomplete="tel" placeholder="010-1234-5678" value="${esc(c.phone||'')}" ${c.identity_verified ? 'disabled' : ''}></div>
     <div class="form-field"><label class="form-label">이메일</label>
       <input id="cf-email" class="form-input" type="email" inputmode="email" autocomplete="email" placeholder="hr@company.com" value="${esc(c.email || c.account_email || '')}"></div>
     <button class="btn btn-primary" onclick="saveCompanyProfile()">저장하기</button>

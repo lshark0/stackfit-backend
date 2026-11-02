@@ -180,6 +180,12 @@ if (USE_POSTGRES) {
     await ensureColumnPg('users', 'totp_last_counter', 'BIGINT NOT NULL DEFAULT 0');
     await ensureColumnPg('users', 'totp_backup_codes', 'TEXT');
     await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_ci ON users(ci) WHERE ci IS NOT NULL');
+    // 본인인증 건 번호는 한 번만 쓸 수 있고(재사용 방지), DI로도 같은 사람의 중복 가입을 막습니다.
+    await ensureColumnPg('users', 'identity_verification_id', 'TEXT');
+    await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_ivid ON users(identity_verification_id) WHERE identity_verification_id IS NOT NULL');
+    // 예전 시험 인증으로 같은 DI가 이미 겹쳐 있으면 색인을 만들 수 없으므로, 서버 시작은 막지 않고 경고만 남깁니다(가입 때 DI 중복은 따로 확인함).
+    await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_di ON users(di) WHERE di IS NOT NULL')
+      .catch((e) => console.warn('[김프리] DI 중복 방지 색인을 만들지 못했어요:', e.message));
     await removeDemoAccounts();
     // DB가 어느 업체·지역에 있는지 확인용(개인정보처리방침의 국외 이전 고지). 접속 계정·비밀번호는 출력하지 않습니다.
     try {
@@ -318,6 +324,9 @@ if (USE_POSTGRES) {
     addCol('users', 'totp_last_counter', 'INTEGER NOT NULL DEFAULT 0');
     addCol('users', 'totp_backup_codes', 'TEXT');
     try { db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_ci ON users(ci) WHERE ci IS NOT NULL'); } catch (e) {}
+    addCol('users', 'identity_verification_id', 'TEXT');
+    try { db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_ivid ON users(identity_verification_id) WHERE identity_verification_id IS NOT NULL'); } catch (e) {}
+    try { db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_di ON users(di) WHERE di IS NOT NULL'); } catch (e) {}
     await removeDemoAccounts();
     console.log('[김프리] SQLite 로컬 DB 준비 완료 (data/stackfit.db, 로컬 개발 전용)');
   };

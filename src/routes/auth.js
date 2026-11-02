@@ -32,16 +32,25 @@ router.get('/identity/config', (req, res) => {
   res.json(identity.publicConfig());
 });
 
+// 같은 본인인증 건(1회용)이나 같은 사람(CI/DI)으로 이미 가입한 계정. 이메일 인증을 마치지 않은 가입은 다시 가입할 때 지우므로 빼고 봅니다.
+async function findIdentityDup(v) {
+  const dup = await get(
+    'SELECT * FROM users WHERE identity_verification_id = ? OR ci = ? OR di = ?',
+    [v.ivId, v.ci || null, v.di || null]
+  );
+  return dup && !emailVerify.needsEmailVerification(dup) ? dup : null;
+}
+function identityDupError(dup, v) {
+  if (dup.identity_verification_id === v.ivId) return '이미 사용한 본인인증이에요. 다시 인증해주세요.';
+  const how = dup.oauth_provider ? `${dup.oauth_provider} 소셜 로그인` : identity.maskEmail(dup.email);
+  return `이미 가입된 회원이에요. (${how})\n로그인하거나 비밀번호 찾기를 이용해주세요.`;
+}
+
 router.post('/identity/verify', async (req, res) => {
   try {
     const v = await identity.fetchVerifiedCustomer((req.body || {}).identityVerificationId);
-    if (v.ci) {
-      const dup = await get('SELECT email, oauth_provider FROM users WHERE ci = ?', [v.ci]);
-      if (dup) {
-        const how = dup.oauth_provider ? `${dup.oauth_provider} 소셜 로그인` : identity.maskEmail(dup.email);
-        return res.status(409).json({ error: `이미 가입된 회원이에요. (${how})\n로그인하거나 비밀번호 찾기를 이용해주세요.` });
-      }
-    }
+    const dup = await findIdentityDup(v);
+    if (dup) return res.status(409).json({ error: identityDupError(dup, v) });
     res.json({
       ivToken: identity.issueIvToken(v),
       name: v.name, phone: v.phone, birthDate: v.birthDate, gender: v.gender,
@@ -62,9 +71,19 @@ router.post('/signup', async (req, res) => {
   // 본인인증이 켜져 있으면, 이름·생년월일·성별·휴대폰은 포트원이 확인해준 값만 사용합니다.
   let verified = null;
   if (identity.identityEnabled()) {
-    verified = identity.readIvToken((req.body || {}).ivToken);
-    if (!verified) {
+    const ivToken = identity.readIvToken((req.body || {}).ivToken);
+    if (!ivToken) {
       return res.status(400).json({ error: '휴대폰 본인인증을 먼저 완료해주세요. (인증 후 30분이 지났다면 다시 인증해주세요)' });
+    }
+    // 화면을 거친 값은 믿지 않고, 포트원에서 같은 인증 건을 다시 조회해 인증 결과와 일치하는지 확인합니다.
+    try {
+      verified = await identity.fetchVerifiedCustomer(ivToken.ivId);
+    } catch (e) {
+      if (e instanceof identity.IdentityError) return res.status(e.status).json({ error: e.message });
+      throw e;
+    }
+    if (verified.name !== ivToken.name || verified.phone !== ivToken.phone || verified.birthDate !== ivToken.birthDate) {
+      return res.status(400).json({ error: '본인인증 정보가 일치하지 않아요. 다시 인증해주세요.' });
     }
     phone = verified.phone;
     if (role === 'freelancer') {
@@ -135,20 +154,28 @@ router.post('/signup', async (req, res) => {
     }
   }
 
-  if (verified && verified.ci && (await get('SELECT id FROM users WHERE ci = ?', [verified.ci]))) {
-    return res.status(409).json({ error: '이미 본인인증으로 가입된 회원이에요.' });
+  if (verified) {
+    const pending = await get(
+      'SELECT * FROM users WHERE identity_verification_id = ? OR ci = ? OR di = ?',
+      [verified.ivId, verified.ci || null, verified.di || null]
+    );
+    if (pending && emailVerify.needsEmailVerification(pending)) {
+      await run('DELETE FROM users WHERE id = ?', [pending.id]);
+    } else if (pending) {
+      return res.status(409).json({ error: identityDupError(pending, verified) });
+    }
   }
 
   const { hash, salt } = hashPassword(password);
   let r;
   try {
     r = await run(
-      'INSERT INTO users (email, password_hash, password_salt, role, ci, di, identity_verified_at, email_verify_required) VALUES (?,?,?,?,?,?,?,?)',
+      'INSERT INTO users (email, password_hash, password_salt, role, ci, di, identity_verified_at, identity_verification_id, email_verify_required) VALUES (?,?,?,?,?,?,?,?,?)',
       [email, hash, salt, role, verified ? verified.ci : null, verified ? verified.di : null, verified ? new Date().toISOString() : null,
-        emailVerify.emailVerifyEnabled() ? 1 : 0]
+        verified ? verified.ivId : null, emailVerify.emailVerifyEnabled() ? 1 : 0]
     );
   } catch (e) {
-    // 동시에 같은 사람이 두 번 가입을 누른 경우 (CI 유니크 인덱스 위반)
+    // 동시에 같은 사람이 두 번 가입을 누른 경우 (CI·DI·인증 건 번호 유니크 인덱스 위반)
     if (e && (e.code === '23505' || /UNIQUE/i.test(e.message || ''))) {
       return res.status(409).json({ error: '이미 가입된 회원이에요.' });
     }

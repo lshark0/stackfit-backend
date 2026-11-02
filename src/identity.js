@@ -49,6 +49,11 @@ async function fetchVerifiedCustomer(identityVerificationId) {
   if (data.status !== 'VERIFIED' || !data.verifiedCustomer) {
     throw new IdentityError(400, '본인인증이 완료되지 않았어요. 다시 인증해주세요.');
   }
+  // 오래전에 끝난 인증 결과를 다시 가져와 쓰지 못하게 합니다(인증 후 30분 이내만 인정).
+  const verifiedAt = Date.parse(data.verifiedAt || data.statusChangedAt || '');
+  if (Number.isFinite(verifiedAt) && Date.now() - verifiedAt > IV_TOKEN_TTL_SEC * 1000) {
+    throw new IdentityError(400, '본인인증 유효시간(30분)이 지났어요. 다시 인증해주세요.');
+  }
   const c = data.verifiedCustomer;
   const name = String(c.name || '').trim().slice(0, 60);
   const phone = normalizeMobile(c.phoneNumber);
@@ -63,10 +68,15 @@ async function fetchVerifiedCustomer(identityVerificationId) {
   return { ivId: identityVerificationId, name, phone, birthDate, gender, ci: c.ci || null, di: c.di || null };
 }
 
-const issueIvToken = (v) => signToken({ typ: 'iv', ...v }, IV_TOKEN_TTL_SEC);
+// 화면에 돌려주는 토큰에는 CI/DI를 넣지 않습니다(토큰 내용은 이용자에게 보임).
+// 가입할 때 서버가 포트원에서 같은 인증 건을 다시 조회해 CI/DI와 이름·번호를 확인합니다.
+const issueIvToken = (v) => signToken(
+  { typ: 'iv', ivId: v.ivId, name: v.name, phone: v.phone, birthDate: v.birthDate, gender: v.gender },
+  IV_TOKEN_TTL_SEC
+);
 function readIvToken(token) {
   const p = verifyToken(token);
-  if (!p || p.typ !== 'iv' || !p.name || !p.phone) return null;
+  if (!p || p.typ !== 'iv' || !p.ivId || !p.name || !p.phone) return null;
   return p;
 }
 
