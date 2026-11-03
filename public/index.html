@@ -3621,6 +3621,7 @@ const FTC_BIZ_INFO_URL = 'https://www.ftc.go.kr/bizCommPop.do?wrkr_no=1771701535
 // 소재지는 대표 집 주소라 유료 이용권 판매를 다시 시작할 때 채우고(10/30 대표 결정), 연락처는 유선 대표번호를 씁니다(11/2).
 const BIZ_ADDRESS = '';
 const BIZ_PHONE = '070-8983-6425';
+const BIZ_HOURS = '평일 09:00~18:00, 주말·공휴일 휴무'; // 고객센터 상담 시간(11/3 대표 결정)
 // 잡코리아 스타일 홈 화면 하단 footer — 약관 링크 + 사업자 정보(접었다 펼치기). open이면 처음부터 펼쳐 둡니다(첫 화면).
 // fixed면 접을 수 없게 늘 펼쳐 둡니다(PG 심사: 결제·본인인증 페이지 하단 사업자 정보 고정 노출).
 function siteFooterHtml(open = false, fixed = false){
@@ -3633,7 +3634,7 @@ function siteFooterHtml(open = false, fixed = false){
       <div>대표: 이승학</div>
       <div>사업자등록번호: 177-17-01535</div>
       ${BIZ_ADDRESS ? `<div>사업장 소재지: ${esc(BIZ_ADDRESS)}</div>` : ''}
-      ${BIZ_PHONE ? `<div>연락처: <a href="tel:${BIZ_PHONE}">${esc(BIZ_PHONE)}</a></div>` : ''}
+      ${BIZ_PHONE ? `<div>연락처: <a href="tel:${BIZ_PHONE}">${esc(BIZ_PHONE)}</a> (상담 ${esc(BIZ_HOURS)})</div>` : ''}
       <div>통신판매업 신고번호: ${esc(MAIL_ORDER_REPORT_NO)} <a href="${FTC_BIZ_INFO_URL}" target="_blank" rel="noopener" onclick="event.stopPropagation()">사업자정보 확인</a></div>
       ${JOB_INFO_REPORT_NO ? `<div>직업정보제공사업 신고번호: ${esc(JOB_INFO_REPORT_NO)}</div>` : ''}
       <div>이메일: <a href="mailto:lshark4541@gmail.com">lshark4541@gmail.com</a></div>
