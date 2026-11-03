@@ -5,9 +5,13 @@
 //     프리랜서가 일했던 회사를 초대하면 그 회사가 첫 공고를 올릴 때 초대한 프리랜서에게 먼저 알립니다.
 const { get, all, run } = require('./db');
 const { addNotification, pushTo } = require('./notify');
-const { pairScore } = require('./recommend');
+const { pairDetail } = require('./recommend');
 
 const MATCH_MIN_SCORE = 70;      // 이 점수 이상인 프리랜서에게만 알림
+// 스택(배점 45)이 75% 이상 맞는데 업무·등급이 달라 70점에 못 미치는 경우도 놓치지 않도록 하는 보조 기준.
+// 새 배점에서는 스택 4/4 일치여도 업무·등급이 다르면 64점이라 알림이 가지 않았습니다.
+const MATCH_STACK_MIN = 34;      // 스택 점수(45점 만점)가 이 이상이고
+const MATCH_STACK_MIN_SCORE = 60; // 총점이 이 이상이면 알림
 const MATCH_MAX_PER_JOB = 50;    // 공고 하나당 알림을 받는 최대 인원(점수 높은 순)
 const DAILY_CAP = 5;             // 프리랜서 한 명이 하루에 받는 새 공고 알림 최대 수(스팸 방지)
 
@@ -32,8 +36,11 @@ async function notifyNewJob(jobId) {
     "SELECT user_id, stack_json, certs_json, role_title, grade, available_from, pref_work_type, pref_regions_json FROM freelancer_profiles WHERE COALESCE(job_alerts, 1) = 1 AND stack_json IS NOT NULL AND stack_json <> '[]' LIMIT 5000"
   );
   const scored = profiles
-    .map((p) => ({ id: p.user_id, score: pairScore(job, p) }))
-    .filter((p) => p.score !== null && p.score >= MATCH_MIN_SCORE)
+    .map((p) => {
+      const d = pairDetail(job, p);
+      return { id: p.user_id, score: d ? d.score : null, stack: d ? d.breakdown.stack : 0 };
+    })
+    .filter((p) => p.score !== null && (p.score >= MATCH_MIN_SCORE || (p.stack >= MATCH_STACK_MIN && p.score >= MATCH_STACK_MIN_SCORE)))
     .sort((a, b) => b.score - a.score)
     .slice(0, MATCH_MAX_PER_JOB);
   for (const p of scored) {

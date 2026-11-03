@@ -162,13 +162,17 @@ async function recommendJobsForProfile(profile, limit = 5) {
 
 // 공고 행·프리랜서 프로필 행(DB 원본)으로 바로 추천 점수를 계산합니다. 공고가 없으면 null.
 // 지원·제안 시점에 저장해 두고, 성과 지표에서 '추천 점수별 계약 성사율'을 보는 데 씁니다.
-function pairScore(jobRow, profileRow) {
+function pairDetail(jobRow, profileRow) {
   if (!jobRow || !profileRow) return null;
   return scoreMatch(
     { ...jobRow, stack: parseList(jobRow.stack_json), certs: parseList(jobRow.certs_json) },
     { ...profileRow, stack: parseList(profileRow.stack_json), certs: parseList(profileRow.certs_json) },
     null
-  ).score;
+  );
+}
+function pairScore(jobRow, profileRow) {
+  const d = pairDetail(jobRow, profileRow);
+  return d ? d.score : null;
 }
 
-module.exports = { recommendTalentsForJob, recommendJobsForProfile, scoreMatch, pairScore };
+module.exports = { recommendTalentsForJob, recommendJobsForProfile, scoreMatch, pairScore, pairDetail };
