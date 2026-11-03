@@ -399,6 +399,11 @@ async function main() {
   await dedupeAllPortfolios(); // 예전에 AI 자동 채우기로 중복 등록된 수행 프로젝트를 한 번 정리
   app.listen(PORT, () => {
     console.log(`[김프리] API 서버 실행 중 → http://localhost:${PORT} (DB: ${USE_POSTGRES ? 'PostgreSQL' : 'SQLite'})`);
+    // 외부 연동이 켜졌는지만 남깁니다(설정값 자체는 출력하지 않음). Render 로그로 설정 여부를 확인할 때 씁니다.
+    const on = (v) => (v ? '켜짐' : '꺼짐');
+    console.log(`[김프리] 연동 설정 — 휴대폰 본인인증: ${on(require('./src/identity').identityEnabled())}`
+      + ` (본인인증 채널 키 ${process.env.PORTONE_CHANNEL_KEY ? '있음' : '없음(테스트 채널)'}, API Secret ${process.env.PORTONE_API_SECRET ? '있음' : '없음'})`
+      + `, 결제: ${on(require('./src/payments').paymentEnabled())}, 가입 이메일 인증: ${on(require('./src/emailVerify').emailVerifyEnabled())}`);
   });
 
   // 마감일이 지난 공고 자동 마감 처리 + 저장한 공고 마감임박 알림: 기동 직후 한 번, 이후 6시간마다 확인합니다.
