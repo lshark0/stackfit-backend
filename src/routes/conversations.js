@@ -183,10 +183,15 @@ router.get('/:id/interview', requireAuth, async (req, res) => {
   res.json({ interview: await getInterview(conv.id) });
 });
 
-// 인터뷰 잡기·변경 (당근 '약속 잡기'처럼 대화 중 일정과 장소를 정함). 대화 참여자 누구나 잡거나 바꿀 수 있습니다.
+// 인터뷰 잡기·변경·취소는 기업만 할 수 있습니다(11/4 대표 결정). 프리랜서는 일정을 보고,
+// 바꾸거나 취소해야 하면 채팅으로 기업에 양해를 구해 기업이 바꾸도록 합니다.
+const INTERVIEW_COMPANY_ONLY = '인터뷰 일정은 기업이 잡고 바꿀 수 있어요. 일정 변경이나 취소가 필요하면 채팅으로 기업에 요청해 주세요.';
+
+// 인터뷰 잡기·변경 (당근 '약속 잡기'처럼 대화 중 일정과 장소를 정함).
 router.post('/:id/interview', requireAuth, async (req, res) => {
   const conv = await myConversation(req);
   if (!conv) return res.status(404).json({ error: '대화를 찾을 수 없습니다.' });
+  if (req.user.id !== conv.company_id) return res.status(403).json({ error: INTERVIEW_COMPANY_ONLY });
   const result = await saveInterview(conv, req.user.id, req.body || {});
   if (result.error) return res.status(400).json({ error: result.error });
   const msgs = await listMessages(conv.id);
@@ -196,6 +201,7 @@ router.post('/:id/interview', requireAuth, async (req, res) => {
 router.delete('/:id/interview', requireAuth, async (req, res) => {
   const conv = await myConversation(req);
   if (!conv) return res.status(404).json({ error: '대화를 찾을 수 없습니다.' });
+  if (req.user.id !== conv.company_id) return res.status(403).json({ error: INTERVIEW_COMPANY_ONLY });
   const result = await cancelInterview(conv, req.user.id);
   if (result.error) return res.status(400).json({ error: result.error });
   const msgs = await listMessages(conv.id);

@@ -2369,16 +2369,19 @@ function ivPlaceText(iv){
   if(iv.mode === 'phone') return '전화 인터뷰';
   return iv.place || '';
 }
+// 인터뷰 잡기·변경·취소는 기업만 합니다. 프리랜서는 일정을 보고, 바꿔야 하면 채팅으로 기업에 요청합니다.
 function interviewBarHtml(iv, convId, opener){
   const open = opener || `go('interviewForm', ${convId})`;
+  const isCompany = state.role === 'company';
   if(!iv || iv.status !== 'scheduled'){
+    if(!isCompany) return `<span class="page-sub" style="align-self:center; white-space:nowrap;">${I.calendar} 기업이 인터뷰 일정을 잡으면 여기에 표시돼요</span>`;
     return `<button class="iv-chip strong" onclick="${open}">${I.calendar}인터뷰 잡기</button>
       <span class="page-sub" style="align-self:center; white-space:nowrap;">일정이 정해지면 날짜·장소를 남겨두세요</span>`;
   }
   const p = ivParts(iv.interview_at);
   return `<button class="iv-chip ${iv.past ? 'past' : 'strong'}" onclick="${open}">${I.calendar}${esc(p.short)}${iv.past ? ' · 지난 일정' : ''}</button>
     ${ivPlaceButton(iv, 'iv-chip')}
-    <button class="iv-chip" onclick="${open}">${iv.past ? '다시 잡기' : '일정 변경'}</button>`;
+    ${isCompany ? `<button class="iv-chip" onclick="${open}">${iv.past ? '다시 잡기' : '일정 변경'}</button>` : ''}`;
 }
 // 장소 보기(대면) / 화상 링크 열기(화상) 버튼. 사용자가 입력한 글자는 data- 속성으로만 넘깁니다.
 function ivPlaceButton(iv, cls){
@@ -2455,6 +2458,7 @@ async function screenInterviewForm(){
   const tomorrow = new Date(kst.getTime() + 86400000).toISOString().slice(0,10);
   const p = iv ? ivParts(iv.interview_at) : null;
   const upcoming = iv && !iv.past;
+  if(state.role !== 'company') return interviewViewOnlyHtml(convId, iv, p);
   return `${statusbar()}
   <div class="app-header"><div class="back-row"><div class="back-btn" onclick="ivBack(${convId})">${I.back}</div>
     <div style="min-width:0;"><div class="page-title" style="font-size:18px;">${upcoming ? '인터뷰 일정' : '인터뷰 잡기'}</div>${chatRoomInfo.counterpartName && chatRoomInfo.convId === convId ? `<div class="page-sub">${esc(chatRoomInfo.counterpartName)}님과의 인터뷰</div>` : ''}</div></div></div>
@@ -2493,6 +2497,30 @@ async function screenInterviewForm(){
       <textarea id="iv-note" class="form-input" maxlength="300" style="min-height:76px;" placeholder="예: 포트폴리오 지참, 도착하면 1층에서 연락주세요">${esc(iv ? iv.note : '')}</textarea></div>
     <button class="btn btn-primary" style="margin-top:6px;" onclick="submitInterview(${convId})">${iv ? '일정 변경하기' : '인터뷰 잡기'}</button>
     ${iv ? `<button class="btn btn-outline" style="margin-top:10px; color:var(--danger);" onclick="cancelInterviewConfirm(${convId})">인터뷰 취소</button>` : ''}
+    <div style="height:20px;"></div>
+  </div>`;
+}
+// 프리랜서용 인터뷰 화면: 일정은 보기만 하고, 변경·취소는 채팅으로 기업에 요청합니다.
+function interviewViewOnlyHtml(convId, iv, p){
+  const name = chatRoomInfo.counterpartName && chatRoomInfo.convId === convId ? chatRoomInfo.counterpartName : '';
+  return `${statusbar()}
+  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="ivBack(${convId})">${I.back}</div>
+    <div style="min-width:0;"><div class="page-title" style="font-size:18px;">인터뷰 일정</div>${name ? `<div class="page-sub">${esc(name)}님과의 인터뷰</div>` : ''}</div></div></div>
+  <div class="content">
+    ${iv ? `
+    <div class="iv-card" style="width:100%; max-width:none; margin:4px 0 16px;">
+      <div class="iv-card-hd">${iv.past ? '지난 인터뷰' : '예정된 인터뷰'}</div>
+      <div class="iv-card-bd">
+        <div><span class="k">날짜</span> ${esc(p.long)}</div><div><span class="k">시간</span> ${esc(p.time)}</div>
+        <div><span class="k">방식</span> ${esc(iv.modeLabel)}</div>
+        ${ivPlaceText(iv) ? `<div><span class="k">${iv.mode==='offline'?'장소':'안내'}</span> ${esc(ivPlaceText(iv))}</div>` : ''}
+        ${iv.note ? `<div class="iv-card-note">${esc(iv.note)}</div>` : ''}
+        ${ivPlaceButton(iv, 'iv-card-btn')}
+        ${iv.past ? '' : `<button class="iv-card-btn" onclick="addInterviewToCalendar(ivCurrent)">구글 캘린더에 추가</button>`}
+      </div>
+    </div>` : `<div class="reco-empty" style="margin-top:8px;">아직 잡힌 인터뷰가 없어요. 기업이 일정을 잡으면 대화방 위와 알림으로 알려드려요.</div>`}
+    <div class="page-sub" style="margin:4px 0 14px; line-height:1.6;">인터뷰 일정은 기업이 잡고 바꿔요. 일정 변경이나 취소가 필요하면 <b>채팅으로 기업에 양해를 구하고 요청</b>해 주세요. 기업이 바꾸면 바로 알림이 가요.</div>
+    <button class="btn btn-primary" onclick="ivBack(${convId})">채팅으로 요청하기</button>
     <div style="height:20px;"></div>
   </div>`;
 }
