@@ -766,6 +766,7 @@ function contactSourceFor(screen, id){
 }
 function go(screen, param){
   if(typeof closeQuickChat === 'function') closeQuickChat();
+  if(typeof stopChatRoomPoll === 'function' && screen !== 'chatRoom') stopChatRoomPoll();
   if(screen !== 'interviewForm') ivReturn = null;
   if(screen === 'jobDetail' || screen === 'talentDetail'){
     const same = detailSource && detailSource.screen === screen && Number(detailSource.id) === Number(param);
@@ -2689,6 +2690,44 @@ function closeQuickChat(){
   quickChat = null;
   const el = document.getElementById('qchatOverlay');
   if(el) el.remove();
+}
+// 대화방을 열어 둔 동안 상대가 보낸 메시지·인터뷰 일정 변경을 4초마다 확인해 바로 보여줍니다.
+// 화면이 가려져 있으면 건너뛰고, 다른 화면으로 가면 멈춥니다. 바뀐 게 있을 때만 다시 그립니다.
+let chatRoomPoll = null; // {convId, timer, sig, lastSeenId}
+function chatRoomSig(data){
+  return (data.messages || []).map(m => [m.id, m.edited_at || '', m.deleted_at || ''].join(':')).join('|')
+    + '#' + JSON.stringify(data.interview || null);
+}
+function stopChatRoomPoll(){
+  if(chatRoomPoll && chatRoomPoll.timer) clearInterval(chatRoomPoll.timer);
+  chatRoomPoll = null;
+}
+function startChatRoomPoll(convId, data){
+  stopChatRoomPoll();
+  const holder = { convId: String(convId), timer: null, sig: chatRoomSig(data), lastSeenId: 0 };
+  notifyInterviewChange(data.messages || [], holder, true);
+  holder.timer = setInterval(() => pollChatRoom(holder), 4000);
+  chatRoomPoll = holder;
+}
+async function pollChatRoom(holder){
+  if(chatRoomPoll !== holder) return;
+  if(state.screen !== 'chatRoom' || String(state.param) !== holder.convId){ stopChatRoomPoll(); return; }
+  if(document.hidden || !state.token) return;
+  let data;
+  try{ data = await apiFetch(`/conversations/${holder.convId}/messages`); }catch(e){ return; }
+  if(chatRoomPoll !== holder || state.screen !== 'chatRoom') return;
+  const sig = chatRoomSig(data);
+  if(sig === holder.sig) return;
+  holder.sig = sig;
+  notifyInterviewChange(data.messages, holder, false);
+  const bar = document.getElementById('ivBar');
+  if(bar) bar.innerHTML = interviewBarHtml(data.interview, holder.convId);
+  const box = document.getElementById('chatScroll');
+  const wrap = document.querySelector('#chatScroll .bubble-wrap');
+  if(!box || !wrap) return;
+  const nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+  wrap.innerHTML = chatBubblesHtml(data.messages);
+  if(nearBottom) box.scrollTop = box.scrollHeight;
 }
 function chatKeydown(ev, convId){
   if(ev.key==='Enter'){ ev.preventDefault(); sendMessage(convId); }
@@ -4814,6 +4853,7 @@ async function screenChatList(){
 async function screenChatRoom(){
   chatEditId = null;
   const data = await apiFetch('/conversations/' + state.param + '/messages');
+  startChatRoomPoll(state.param, data);
   chatRoomInfo = { convId: state.param, counterpartName: data.counterpartName || '', jobTitle: data.jobTitle || '' };
   return `${statusbar()}
   <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('chatList')">${I.back}</div>
@@ -6862,6 +6902,7 @@ setInterval(() => {
 // 다른 앱 갔다가 돌아왔을 때 즉시 갱신
 document.addEventListener('visibilitychange', () => {
   if(!document.hidden && state.token) refreshChatBadge();
+  if(!document.hidden && chatRoomPoll) pollChatRoom(chatRoomPoll); // 대화방이면 새 메시지 바로 확인
 });
 
 /* ---------------- 푸시 알림 ---------------- */
