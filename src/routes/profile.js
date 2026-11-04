@@ -221,10 +221,11 @@ router.put('/', requireAuth, async (req, res) => {
       }
     }
 
+    // 기술스택은 최대 40개(화면 선택기와 같은 한도). 경력이 긴 인프라·운영 인력은 20개를 넘기도 합니다.
     let nextStack = Array.isArray(stack) ? stack : JSON.parse(current.stack_json);
     nextStack = nextStack
       .filter((s) => typeof s === 'string' && s.trim())
-      .slice(0, 20)
+      .slice(0, 40)
       .map((s) => s.trim().slice(0, 40));
 
     // 자격증도 기술스택처럼 배열로 받아 정리합니다.
