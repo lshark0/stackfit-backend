@@ -145,11 +145,11 @@ Render.com용 `render.yaml`이 포함되어 있어 바로 배포할 수 있습�
 업로드된 이력서 PDF(`uploads/` 폴더)는 여전히 로컬 디스크에 저장되므로, 무료 플랜에서는 재배포 시 유실될 수 있습니다.
 완전한 영구 저장이 필요하면 S3 등 오브젝트 스토리지 연동을 다음 단계로 고려하세요.
 
-## 8. 콜드스타트 완화 (GitHub Actions)
+## 8. 콜드스타트 (상시 구동)
 
-`.github/workflows/keep-alive.yml`이 10분마다 `/api/health`를 호출해서 Render 무료 플랜이 잠들지 않게 합니다.
-GitHub 저장소에 push되어 있기만 하면 별도 설정 없이 자동으로 동작합니다 (Actions 탭에서 실행 기록 확인 가능).
-그래도 완전히 잠드는 걸 막지는 못할 수 있어(예: GitHub Actions 자체 지연), 100% 확실한 해결책은 유료 플랜(Starter 이상, 상시 구동)입니다.
+2026-11-04부터 Render 유료 인스턴스(Starter, 0.5 CPU·512MB)로 운영해 서버가 잠들지 않습니다.
+예전에 무료 플랜이 잠들지 않게 `/api/health`를 주기적으로 호출하던 `.github/workflows/keep-alive.yml`은 자동 실행을 끄고,
+Actions 탭에서 수동 실행(상태 확인용)만 남겨 두었습니다.
 
 ## 9. 알려진 제한사항 (다음 단계 후보)
 

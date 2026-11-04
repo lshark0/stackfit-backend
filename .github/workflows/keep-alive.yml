@@ -1,11 +1,8 @@
 name: Keep STACKFIT backend awake
 
+# 2026-11-04 Render 유료 인스턴스(Starter)로 바꿔 서버가 잠들지 않으므로 자동 실행은 껐습니다.
+# 필요하면 Actions 화면에서 수동 실행(workflow_dispatch)으로 상태만 확인할 수 있습니다.
 on:
-  schedule:
-    # GitHub Actions의 무료 스케줄러는 지연이 잦아, 3분 간격으로 넉넉히 잡아
-    # 실제로는 10~15분 안에 반드시 한 번은 실행되도록 합니다.
-    # (Render 무료 플랜은 15분 유휴 시 슬립)
-    - cron: "*/3 * * * *"
   workflow_dispatch: {}
 
 # 이전 실행이 아직 돌고 있으면 중복 실행하지 않습니다.
