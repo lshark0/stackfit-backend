@@ -2945,6 +2945,13 @@ async function settleProject(id){
     () => runProjectAction(`settle-${id}`, `/projects/${id}/settle`, '프로젝트가 완료됐어요'));
 }
 
+// 공고 목록 카드 — 기업의 '등록한 공고'는 서버가 마감된 공고를 아래로 보내므로, 그 앞에 '마감된 공고' 구분선을 넣습니다.
+function jobListHtml(jobs){
+  if(state.role !== 'company') return jobs.map(jobCard).join('');
+  const isClosed = (j) => j.status !== 'open' || j.d_day === '마감';
+  const open = jobs.filter(j => !isClosed(j)), closed = jobs.filter(isClosed);
+  return open.map(jobCard).join('') + (closed.length ? `<div class="section-label">마감된 공고 ${closed.length}건</div>${closed.map(jobCard).join('')}` : '');
+}
 /* ---- Job search / filter (partial refresh, keeps input focus) ---- */
 let jobQuery="", jobCat="전체", jobGrade="전체", jobDuty="", jobLocation="";
 async function refreshJobList(){
@@ -2959,7 +2966,7 @@ async function refreshJobList(){
     if(jobDuty) qs.set('duty', jobDuty);
     if(jobLocation) qs.set('location', jobLocation);
     const data = await apiFetch('/jobs?' + qs.toString());
-    el.innerHTML = data.jobs.length ? data.jobs.map(jobCard).join('') : emptyHtml('조건에 맞는 공고가 없어요', I.jobs);
+    el.innerHTML = data.jobs.length ? jobListHtml(data.jobs) : emptyHtml('조건에 맞는 공고가 없어요', I.jobs);
   }catch(e){ el.innerHTML = emptyHtml(e.message, I.jobs); }
 }
 const onJobSearch = debounce(v=>{ jobQuery=v; refreshJobList(); }, 350);
@@ -3883,7 +3890,7 @@ async function screenJobs(){
     <div class="section-label">최근 본 공고</div>
     <div class="hrow">${recentJobs.map(miniJobCard).join('')}</div>` : ''}
     <div class="section-label">${isCompany?"등록 현황":"매칭률 순"}</div>
-    <div id="jobList">${data.jobs.map(jobCard).join('') || emptyArt(ART.noJobs, '조건에 맞는 공고가 없어요', '검색어나 필터를 바꿔보세요.')}</div>
+    <div id="jobList">${jobListHtml(data.jobs) || emptyArt(ART.noJobs, '조건에 맞는 공고가 없어요', '검색어나 필터를 바꿔보세요.')}</div>
   </div>
   ${isCompany?`<button class="fab" onclick="go('jobPost')">${I.plus}</button>`:''}
   ${tabbar('jobs')}`;

@@ -172,6 +172,12 @@ router.get('/', optionalAuth, async (req, res) => {
   if (req.user && req.user.role === 'freelancer') {
     result.sort((a, b) => b.match - a.match);
   }
+  // 기업의 '등록한 공고'는 모집 중인 공고를 위에, 마감된 공고(직접 마감·마감일 경과)를 아래에 둡니다.
+  // 각 묶음 안에서는 기존 순서(최신 등록순)를 유지합니다.
+  if (req.user && req.user.role === 'company') {
+    const isClosed = (j) => j.status !== 'open' || j.d_day === '마감';
+    result.sort((a, b) => Number(isClosed(a)) - Number(isClosed(b)));
+  }
 
   let finalResult = req.query.saved === 'true' ? result.filter(j => j.saved) : result;
   // 공고 탐색(매칭률 순) 목록에서는 마감된 공고를 제외합니다.
