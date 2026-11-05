@@ -6722,10 +6722,10 @@ async function markAllAlertsRead(){
 // 공고 원문 → 공고 자동 채우기: 요청서·메일·공고 글을 붙여넣거나 파일을 올리면 AI가 입력값을 제안하고,
 // 기업이 고른 항목만 입력란에 반영합니다. (등록은 '공고 등록하기'를 눌러야 이루어집니다)
 let jobAiSuggestion = null;
-function jobAiBoxHtml(){
+function jobAiBoxHtml(isEdit){
   return `<div class="ai-fill-box" style="margin-top:0; margin-bottom:16px;">
     <div class="ai-fill-tt">${I.sparkle}AI로 자동 채우기</div>
-    <div class="page-sub" style="margin-top:4px;">받은 요청서·메일·다른 곳에 올린 공고 글을 붙여넣거나 파일(PDF·Word·PPT)을 올리면 AI가 아래 항목을 채워드려요.</div>
+    <div class="page-sub" style="margin-top:4px;">받은 요청서·메일·다른 곳에 올린 공고 글을 붙여넣거나 파일(PDF·Word·PPT)을 올리면 AI가 아래 항목을 채워드려요.${isEdit ? ' 이미 입력된 항목은 바꿀지 직접 고르고, 저장은 \'수정 완료\'를 눌러야 이루어져요.' : ''}</div>
     <textarea id="pj-ai-text" class="form-input" style="margin-top:10px; min-height:110px;" maxlength="20000" placeholder="예: OO사 차세대 시스템 Java/Spring 백엔드 개발자 1명, 11/3 투입, 6개월, 마곡 상주, 월 650만원, 정보처리기사 우대…"></textarea>
     <div style="display:flex; gap:8px; margin-top:8px; align-items:center;">
       <label class="chip" style="flex:0 0 auto; cursor:pointer;">파일 선택<input id="pj-ai-file" type="file" accept=".pdf,.docx,.pptx" style="display:none" onchange="jobAiFileChanged(this)"></label>
@@ -6821,7 +6821,7 @@ function applyJobAiFill(){
   jobAiSuggestion = null;
   const box = document.getElementById('jobAiResult');
   if(box) box.innerHTML = '';
-  toast('반영했어요. 내용을 확인한 뒤 공고 등록하기를 눌러주세요');
+  toast(state.param ? '반영했어요. 내용을 확인한 뒤 수정 완료를 눌러주세요' : '반영했어요. 내용을 확인한 뒤 공고 등록하기를 눌러주세요');
   document.getElementById('pj-title')?.scrollIntoView({behavior:'smooth', block:'center'});
 }
 async function screenJobPost(){
@@ -6849,7 +6849,7 @@ async function screenJobPost(){
       <div class="banner-title" style="font-size:16px;">${esc(proxyCompany.name)}의 공고를 대신 등록해요</div>
       <div class="banner-sub" style="color:var(--slate);">공고에 '김프리 대리 등록' 표시가 붙고, 기술이 맞는 프리랜서에게 새 공고 알림이 가요.</div></div>` : ''}
     ${biz.verified ? '' : bizCheckCardHtml(biz, proxy)}
-    ${isEdit ? '' : jobAiBoxHtml()}
+    ${jobAiBoxHtml(isEdit)}
     <div class="form-field"><label class="form-label">공고 제목</label><input id="pj-title" class="form-input" placeholder="예: 클라우드 전환 인프라 아키텍트" value="${job?esc(job.title):''}"></div>
     <div class="form-field">
       <label class="form-label">필요 기술스택</label>
