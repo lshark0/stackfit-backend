@@ -486,6 +486,39 @@ router.post('/:id/report', requireAuth, requireRole('freelancer'), (req, res) =>
   });
 });
 
+// 모집 마감 (기업 전용, 본인 공고만) — '채용시 마감' 공고는 사람을 뽑은 뒤 기업이 직접 마감해야
+// 공고 탐색에서 내려갑니다. 마감해도 지원자·프로젝트 기록은 그대로 남습니다.
+router.post('/:id/close', requireAuth, requireRole('company'), async (req, res) => {
+  const jobId = Number(req.params.id);
+  if (!Number.isInteger(jobId)) return res.status(400).json({ error: '올바르지 않은 공고 ID입니다.' });
+  const job = await get('SELECT * FROM jobs WHERE id = ? AND company_id = ?', [jobId, req.user.id]);
+  if (!job) return res.status(404).json({ error: '공고를 찾을 수 없거나 마감 권한이 없어요.' });
+  if (job.status === 'closed') return res.json(await withCompanyAndStack(job));
+  await run("UPDATE jobs SET status = 'closed', closed_by = 'company' WHERE id = ?", [jobId]);
+  res.json(await withCompanyAndStack(await get('SELECT * FROM jobs WHERE id = ?', [jobId])));
+});
+
+// 모집 다시 열기 (기업 전용) — 기업이 직접 마감했거나 마감일이 지나 마감된 공고만 다시 열 수 있습니다.
+// 신고 처리로 마감된 공고는 관리자 판단이 필요하므로 열 수 없습니다.
+router.post('/:id/reopen', requireAuth, requireRole('company'), async (req, res) => {
+  const jobId = Number(req.params.id);
+  if (!Number.isInteger(jobId)) return res.status(400).json({ error: '올바르지 않은 공고 ID입니다.' });
+  const job = await get('SELECT * FROM jobs WHERE id = ? AND company_id = ?', [jobId, req.user.id]);
+  if (!job) return res.status(404).json({ error: '공고를 찾을 수 없거나 권한이 없어요.' });
+  if (job.status === 'open') return res.json(await withCompanyAndStack(job));
+  // closed_by가 생기기 전에 신고로 마감된 공고도 막습니다(처리 완료된 신고가 있으면 신고 마감으로 봅니다).
+  const reportClosed = job.closed_by === 'admin' || (!job.closed_by &&
+    await get("SELECT id FROM job_reports WHERE job_id = ? AND status = 'resolved' LIMIT 1", [jobId]));
+  if (reportClosed) {
+    return res.status(403).json({ error: '신고 처리로 마감된 공고는 다시 열 수 없어요. 고객센터로 문의해주세요.' });
+  }
+  if (dDay(job.deadline) === '마감') {
+    return res.status(400).json({ error: '마감일이 지났어요. 공고 수정에서 마감일을 바꾼 뒤 다시 열어주세요.' });
+  }
+  await run("UPDATE jobs SET status = 'open', closed_by = NULL WHERE id = ?", [jobId]);
+  res.json(await withCompanyAndStack(await get('SELECT * FROM jobs WHERE id = ?', [jobId])));
+});
+
 // 공고 삭제 (기업 전용, 본인이 등록한 공고만)
 router.delete('/:id', requireAuth, requireRole('company'), async (req, res) => {
   const jobId = Number(req.params.id);

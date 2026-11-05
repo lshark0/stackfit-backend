@@ -578,7 +578,7 @@
       <div class="confirm-box">
         <div class="confirm-msg" id="confirmMsg"></div>
         <div class="confirm-actions">
-          <button class="confirm-cancel" onclick="closeConfirm()">취소</button>
+          <button class="confirm-cancel" id="confirmCancelBtn" onclick="closeConfirm()">취소</button>
           <button class="confirm-ok" id="confirmOkBtn">확인</button>
         </div>
       </div>
@@ -1420,11 +1420,19 @@ async function loginAs(role){
     go('serverSetup');
   }
 }
-function showConfirm(message, onConfirm){
+// opts: {okText, cancelText, onCancel} — 버튼 글자를 바꾸거나, 취소 버튼에도 동작을 붙일 때 씁니다.
+function showConfirm(message, onConfirm, opts){
+  opts = opts || {};
   // 줄바꿈을 반영해 표시합니다.
   document.getElementById('confirmMsg').innerHTML = esc(message).replace(/\n/g, '<br>');
   const okBtn = document.getElementById('confirmOkBtn');
+  okBtn.textContent = opts.okText || '확인';
   okBtn.onclick = () => { closeConfirm(); onConfirm(); };
+  const cancelBtn = document.getElementById('confirmCancelBtn');
+  if(cancelBtn){
+    cancelBtn.textContent = opts.cancelText || '취소';
+    cancelBtn.onclick = () => { closeConfirm(); if(opts.onCancel) opts.onCancel(); };
+  }
   document.getElementById('confirmOverlay').classList.add('open');
 }
 function closeConfirm(){
@@ -2764,9 +2772,18 @@ function chatKeydown(ev, convId){
 
 async function decideApplicant(jobId, applicationId, status){
   try{
-    await apiFetch(`/jobs/${jobId}/applicants/${applicationId}`, {method:'PATCH', body:{status}});
+    const r = await apiFetch(`/jobs/${jobId}/applicants/${applicationId}`, {method:'PATCH', body:{status}});
     if(status==='accepted'){
       // 수락하면 프로젝트가 바로 생성되므로, 프로젝트 관리 화면으로 이동해 계약을 이어서 진행할 수 있게 합니다.
+      // 모집 중인 공고면 마감할지 묻습니다('채용시 마감' 공고는 마감하지 않으면 공고 탐색에 계속 남습니다).
+      if(r && r.jobOpen){
+        showConfirm('합격 처리했어요!\n이 공고의 모집을 마감할까요?\n마감하면 공고 탐색에서 내려가고 새 지원을 받지 않아요. 더 뽑을 인원이 있으면 \'계속 모집\'을 누르세요.', async () => {
+          try{ await apiFetch(`/jobs/${jobId}/close`, {method:'POST'}); toast('모집을 마감했어요. 프로젝트 관리로 이동할게요'); }
+          catch(e){ toast(e.message); }
+          go('projects');
+        }, {okText:'모집 마감', cancelText:'계속 모집', onCancel: () => { toast('프로젝트 관리로 이동할게요'); go('projects'); }});
+        return;
+      }
       toast('합격 처리했어요! 프로젝트 관리로 이동할게요');
       go('projects');
       return;
@@ -2774,6 +2791,17 @@ async function decideApplicant(jobId, applicationId, status){
     toast(status==='submitted' ? '불합격을 취소했어요. 다시 검토중 상태예요' : '불합격 처리했어요');
     go('applicants', jobId);
   }catch(e){ toast(e.message); }
+}
+// 모집 마감·다시 열기(기업) — 마감하면 공고 탐색에서 내려가고 새 지원을 받지 않습니다. 지원자·프로젝트 기록은 그대로입니다.
+function closeJobPosting(jobId){
+  showConfirm('이 공고의 모집을 마감할까요?\n공고 탐색에서 내려가고 새 지원을 받지 않아요. 지원자·프로젝트 기록은 그대로 남고, 필요하면 다시 열 수 있어요.', async () => {
+    try{ await apiFetch(`/jobs/${jobId}/close`, {method:'POST'}); toast('모집을 마감했어요'); go('jobDetail', jobId); }
+    catch(e){ toast(e.message); }
+  }, {okText:'모집 마감'});
+}
+async function reopenJobPosting(jobId){
+  try{ await apiFetch(`/jobs/${jobId}/reopen`, {method:'POST'}); toast('모집을 다시 열었어요'); go('jobDetail', jobId); }
+  catch(e){ toast(e.message); }
 }
 // 합격 취소 — 계약이 아직 시작되지 않았을 때(계약서 동의 전)만 가능하며, 만들어졌던 프로젝트도 함께 정리됩니다.
 async function cancelAcceptance(jobId, applicationId){
@@ -3880,6 +3908,9 @@ async function screenJobDetail(){
         ${!isCompany && (j.status!=='open' || j.d_day==='마감')?`<span class="sbadge fail">${I.xCircle}마감된 공고</span>`:''}
         ${ratingBadge(j.rating_avg, j.rating_count)}
       </div>
+      ${isCompany && j.company_id===state.userId ? (j.status==='open'
+        ? `<div style="margin-top:12px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;"><span class="sbadge pass">모집 중</span><button class="btn btn-outline" style="width:auto; padding:7px 14px; font-size:12.5px;" onclick="closeJobPosting(${j.id})">모집 마감하기</button></div>`
+        : `<div style="margin-top:12px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;"><span class="sbadge fail">${I.xCircle}모집 마감</span>${j.closed_by==='admin' ? `<span class="page-sub">신고 처리로 마감된 공고예요</span>` : `<button class="btn btn-outline" style="width:auto; padding:7px 14px; font-size:12.5px;" onclick="reopenJobPosting(${j.id})">모집 다시 열기</button>`}</div>`) : ''}
     </div>
     ${!isCompany ? `
     <div class="card">

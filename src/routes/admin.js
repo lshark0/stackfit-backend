@@ -63,7 +63,7 @@ router.post('/job-reports/:id/resolve', requireAuth, requireAdmin, async (req, r
 
   if (action === 'close_job') {
     if (job.status !== 'closed') {
-      await run("UPDATE jobs SET status = 'closed' WHERE id = ?", [job.id]);
+      await run("UPDATE jobs SET status = 'closed', closed_by = 'admin' WHERE id = ?", [job.id]);
       await addNotification(job.company_id, {
         tag: '공고', title: '공고가 마감 처리됐어요',
         body: `"${job.title}" 공고가 신고 접수에 따라 마감 처리됐습니다. 문의사항은 고객센터로 연락해주세요.`,
@@ -80,7 +80,7 @@ router.post('/job-reports/:id/resolve', requireAuth, requireAdmin, async (req, r
     // 단, 마감일이 이미 지난 공고는 자연 마감이라 다시 열지 않습니다.
     const deadlineOk = !job.deadline || job.deadline >= todayStr();
     if (job.status === 'closed' && deadlineOk) {
-      await run("UPDATE jobs SET status = 'open' WHERE id = ?", [job.id]);
+      await run("UPDATE jobs SET status = 'open', closed_by = NULL WHERE id = ?", [job.id]);
       await addNotification(job.company_id, {
         tag: '공고', title: '공고가 다시 열렸어요',
         body: `"${job.title}" 공고가 신고 반려 처리에 따라 다시 게시됐습니다.`,

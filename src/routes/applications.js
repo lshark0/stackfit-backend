@@ -326,7 +326,8 @@ router.patch('/jobs/:jobId/applicants/:applicationId', requireAuth, requireRole(
   }
 
   await applyDecision(job, application, status);
-  res.json({ status });
+  // jobOpen: 합격 뒤 화면에서 '모집을 마감할까요?'를 물을지 정하는 데 씁니다.
+  res.json({ status, jobOpen: job.status === 'open' });
 });
 
 module.exports = router;

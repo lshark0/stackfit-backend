@@ -6,7 +6,7 @@ const { addNotification, pushTo } = require('./notify');
 // 보여서 실제로 마감됐는지 구분이 안 되는 문제가 있었습니다.
 async function closeExpiredJobs() {
   const todayStr = new Date().toISOString().slice(0, 10);
-  await run("UPDATE jobs SET status = 'closed' WHERE status = 'open' AND deadline IS NOT NULL AND deadline < ?", [todayStr]);
+  await run("UPDATE jobs SET status = 'closed', closed_by = 'deadline' WHERE status = 'open' AND deadline IS NOT NULL AND deadline < ?", [todayStr]);
 }
 
 // 잡코리아 스타일: 저장한(관심) 공고의 마감이 내일(D-1)로 임박하면 한 번만 알려줍니다.
