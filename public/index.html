@@ -1312,14 +1312,14 @@ function stackTags(stack, matched){
   const hit = new Set((matched||[]).map(s=>String(s).toLowerCase()));
   return `<div class="tag-row">${(stack||[]).map(s=>`<span class="tag${hit.has(String(s).toLowerCase())?' hit':''}">${esc(s)}</span>`).join('')}</div>`;
 }
-// 추천 점수 내역: 스택(45) + 업무(15) + 등급(10) + 시기(10) + 근무(10) + 자격(5) + 평점(5), 희망 단가 범위가 겹치면 단가 +3(총점 100 상한)
+// 추천 점수 내역: 스택(45) + 업무(15) + 등급(10) + 시기(10) + 근무(10) + 자격(5) + 평점(5), 희망 단가 범위가 겹치면 단가 +3, 사업자 확인 기업 공고·최근 30일 내 프로필 수정이면 신뢰 +2(총점 100 상한)
 // 근무 조건을 입력하지 않았으면 시기·근무는 중간 점수(중립)로 들어갑니다.
 // 평점은 "상대방" 평판입니다 — 기업이 보면 인재 평점, 프리랜서가 보면 기업 평점. 가산점은 ★4.0 이상일 때만.
 function recoBreakdown(b, total, ratingLabel, avg, count){
   if(!b) return '';
   const why = !count ? '리뷰 없음' : `★${Number(avg).toFixed(1)}${Number(avg) >= 4 ? '' : ', 4.0 미만'}`;
   const extra = b.timing == null ? '' : ` + <span>시기 <b>${b.timing}</b></span> + <span>근무 <b>${b.work}</b></span> + <span>자격 <b>${b.certs}</b></span>`;
-  const rateExtra = b.rate > 0 ? ` + <span>단가 <b>${b.rate}</b></span>` : '';
+  const rateExtra = (b.rate > 0 ? ` + <span>단가 <b>${b.rate}</b></span>` : '') + (b.fresh > 0 ? ` + <span>신뢰 <b>${b.fresh}</b></span>` : '');
   return `<div class="reco-breakdown">점수 내역 · <span>스택 <b>${b.stack}</b></span> + <span>업무 <b>${b.duty}</b></span> + <span>등급 <b>${b.grade}</b></span>${extra} + <span>${ratingLabel} <b>${b.rating}</b><span class="why">(${why})</span></span>${rateExtra} = <b class="total">${total}</b></div>`;
 }
 // 추천 근거 칩. '기술스택 N개 일치'는 강조된 태그와 같은 초록색으로 맞춥니다.
@@ -1407,7 +1407,7 @@ function matchBasisHtml(data, onChange){
           .map(j=>`<option value="${j.id}" ${j.id===data.matchJob.id?'selected':''}>${esc(j.title)}</option>`).join('')}
       </select>
     </div>
-    <div class="reco-legend">· <b>추천 점수(100점)</b>: 선택한 공고 기준으로 스택(45) + 업무(15) + 등급(10) + 투입 시기(10) + 근무 형태·지역(10) + 자격증(5) + 인재 평점(5)을 더한 점수예요(홈 '맞춤 인재 추천'과 같은 기준).<br>· <b>스택 일치</b>: 선택한 공고가 요구하는 기술 중 보유한 기술 수입니다.</div>`;
+    <div class="reco-legend">· <b>추천 점수(100점)</b>: 선택한 공고 기준으로 스택(45) + 업무(15) + 등급(10) + 투입 시기(10) + 근무 형태·지역(10) + 자격증(5) + 인재 평점(5)을 더한 점수예요. 보너스: 희망 단가 범위가 겹치면 +3, 최근 30일 안에 프로필을 고친 인재면 신뢰 +2(100점 상한, 홈 '맞춤 인재 추천'과 같은 기준).<br>· <b>스택 일치</b>: 선택한 공고가 요구하는 기술 중 보유한 기술 수입니다.</div>`;
 }
 
 /* ---------------- Actions ---------------- */
@@ -3806,7 +3806,7 @@ async function screenHome(){
       </div>
       <div class="section-label with-ic reco-title">${I.badgeCheck}나에게 맞는 프로젝트</div>
       ${recoData.jobs.length
-        ? `<div class="reco-legend">· <b>추천 점수(100점)</b>: 스택(45) + 업무(15) + 등급(10) + 투입 시기(10) + 근무 형태·지역(10) + 자격증(5) + 기업 평점(5)<br>· 프로필에 투입 가능일·선호 근무 형태·근무 가능 지역을 입력하면 더 정확해져요(입력하지 않으면 중간 점수).<br>· <b>기업 평점</b>: 공고를 올린 기업이 받은 리뷰 평균이 ★4.0 이상이면 5점입니다.<br>· <b>스택 일치</b>: 공고가 요구하는 기술 중 보유한 기술 수입니다.</div>`
+        ? `<div class="reco-legend">· <b>추천 점수(100점)</b>: 스택(45) + 업무(15) + 등급(10) + 투입 시기(10) + 근무 형태·지역(10) + 자격증(5) + 기업 평점(5), 보너스: 희망 단가 범위가 겹치면 +3, 사업자 확인 기업 공고면 신뢰 +2(100점 상한)<br>· 프로필에 투입 가능일·선호 근무 형태·근무 가능 지역을 입력하면 더 정확해져요(입력하지 않으면 중간 점수).<br>· <b>기업 평점</b>: 공고를 올린 기업이 받은 리뷰 평균이 ★4.0 이상이면 5점입니다.<br>· <b>스택 일치</b>: 공고가 요구하는 기술 중 보유한 기술 수입니다.</div>`
           + [...recoData.jobs].sort((a,b)=>(b.score-a.score) || ((b.match||0)-(a.match||0))).map(recoJobCard).join('')
         : (profile.completion >= 100
             ? `<div class="reco-empty">아직 조건에 맞는 새 프로젝트가 없어요.<br>이미 지원했거나 마감된 공고는 추천에서 빠져요.<br><b onclick="go('jobs')" style="color:var(--ink); text-decoration:underline; cursor:pointer;">전체 공고 보러 가기</b></div>`
@@ -3849,7 +3849,7 @@ async function screenHome(){
     </div>
     <div class="section-label with-ic reco-title">${I.badgeCheck}${recoData.job ?`"${esc(recoData.job.title)}"에 맞는 인재` : '맞춤 인재 추천'}</div>
     ${recoData.talents.length
-      ? `<div class="reco-legend">· <b>추천 점수(100점)</b>: 스택(45) + 업무(15) + 등급(10) + 투입 시기(10) + 근무 형태·지역(10) + 자격증(5) + 인재 평점(5)<br>· 공고에 투입 예정일·근무 형태(상주/재택/혼합)를 적으면 더 정확해져요.<br>· <b>인재 평점</b>: 프리랜서가 받은 리뷰 평균이 ★4.0 이상이면 5점입니다.<br>· <b>스택 일치</b>: 공고가 요구하는 기술 중 인재가 보유한 기술 수입니다.</div>`
+      ? `<div class="reco-legend">· <b>추천 점수(100점)</b>: 스택(45) + 업무(15) + 등급(10) + 투입 시기(10) + 근무 형태·지역(10) + 자격증(5) + 인재 평점(5), 보너스: 희망 단가 범위가 겹치면 +3, 최근 30일 안에 프로필을 고친 인재면 신뢰 +2(100점 상한)<br>· 공고에 투입 예정일·근무 형태(상주/재택/혼합)를 적으면 더 정확해져요.<br>· <b>인재 평점</b>: 프리랜서가 받은 리뷰 평균이 ★4.0 이상이면 5점입니다.<br>· <b>스택 일치</b>: 공고가 요구하는 기술 중 인재가 보유한 기술 수입니다.</div>`
         + [...recoData.talents].sort((a,b)=>((b.accept_proposals===0?0:1)-(a.accept_proposals===0?0:1)) || (b.score-a.score) || ((b.match||0)-(a.match||0))).map(recoTalentCard).join('')
       : `<div class="reco-empty">${recoData.job
           ? '아직 조건에 맞는 인재가 없어요.<br>공고의 기술스택·업무·등급을 채우면 정확도가 올라가요.'

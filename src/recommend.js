@@ -15,6 +15,7 @@ const GRADE_LEVEL = { 초급: 1, 중급: 2, 고급: 3, 특급: 4 };
 //   - 근무 형태·지역 (최대 10점): 상주/재택/혼합 선호와 근무 가능 지역
 //   - 자격증 (최대 5점): 공고 요구 자격증 보유
 //   - 평판 (최대 5점): 좋은 평가를 받은 쪽에 소폭 가점
+//   - 신뢰·최신성 (보너스 2점): 사업자 확인을 마친 기업의 공고, 최근 30일 안에 프로필을 고친 프리랜서에 소폭 가점
 //   - 희망 단가 (보너스 3점): 두 쪽 단가 범위가 겹치면 가점(월 단가로 읽을 수 없으면 0점, 총점 100점 상한)
 // 근무 조건을 입력하지 않은 회원은 감점하지 않도록 중간 점수(중립)를 줍니다(src/workConditions.js).
 // 업무 일치 판정. PM·SE 같은 짧은 영문 코드는 단어 단위로만 비교합니다
@@ -76,12 +77,25 @@ function scoreMatch(job, profile, rating) {
     reasons.push(`평점 ★${rating.rating_avg}`);
   }
 
+  // 신뢰·최신성 보너스(+2): 프리랜서가 보는 추천은 사업자 확인 기업(job.bizVerified), 기업이 보는 인재 추천은 최근 30일 안 수정(updated_at)
+  let freshScore = 0;
+  if (job.bizVerified) {
+    freshScore = 2;
+    reasons.push('사업자 확인 기업');
+  } else if (job.checkFreshProfile && profile.updated_at) {
+    const t = Date.parse(profile.updated_at);
+    if (!Number.isNaN(t) && Date.now() - t <= 30 * 24 * 3600 * 1000) {
+      freshScore = 2;
+      reasons.push('최근 프로필 갱신');
+    }
+  }
+
   const workScore = workType.score + region.score;
-  const total = Math.min(100, stackScore + dutyScore + gradeScore + timing.score + workScore + certs.score + ratingScore + rate.score);
+  const total = Math.min(100, freshScore + stackScore + dutyScore + gradeScore + timing.score + workScore + certs.score + ratingScore + rate.score);
   // 화면에 "스택 45 + 업무 15 + 등급 10 + 시기 10 + 근무 10 + 자격 5 + 평점 0"처럼 점수 내역을 보여주기 위한 값
   const breakdown = {
     stack: stackScore, duty: dutyScore, grade: gradeScore,
-    timing: timing.score, work: workScore, certs: certs.score, rating: ratingScore, rate: rate.score,
+    timing: timing.score, work: workScore, certs: certs.score, rating: ratingScore, rate: rate.score, fresh: freshScore,
   };
   // 근무 조건은 중립 점수가 있으므로, 기술·업무·자격증 중 하나라도 맞아야 '접점이 있다'고 봅니다.
   const relevant = stackScore > 0 || dutyScore > 0 || certs.matched > 0;
@@ -101,7 +115,7 @@ async function recommendTalentsForJob(job, limit = 5) {
   return profiles
     .map((p) => {
       const rating = ratingById[p.user_id] || { rating_avg: null, rating_count: 0 };
-      const { score, match, matched, matchTotal, reasons, breakdown, relevant } = scoreMatch(job, p, rating);
+      const { score, match, matched, matchTotal, reasons, breakdown, relevant } = scoreMatch({ ...job, checkFreshProfile: true }, p, rating);
       return { ...p, ...rating, score, match, matchedStack: matched, matchCount: matched.length, matchTotal, reasons, breakdown, relevant };
     })
     .filter((p) => p.relevant) // 접점이 전혀 없는 사람은 추천하지 않음
@@ -118,9 +132,10 @@ async function recommendJobsForProfile(profile, limit = 5) {
   const jobs = rows.map((j) => ({ ...j, stack: JSON.parse(j.stack_json), certs: parseList(j.certs_json) }));
   const companyIds = [...new Set(jobs.map((j) => j.company_id))];
   const companyRows = companyIds.length
-    ? await all(`SELECT user_id, name FROM companies WHERE user_id IN (${companyIds.map(() => '?').join(',')})`, companyIds)
+    ? await all(`SELECT user_id, name, biz_verified_at FROM companies WHERE user_id IN (${companyIds.map(() => '?').join(',')})`, companyIds)
     : [];
   const companyNameById = Object.fromEntries(companyRows.map((c) => [c.user_id, c.name]));
+  const verifiedById = Object.fromEntries(companyRows.map((c) => [c.user_id, !!c.biz_verified_at]));
   const ratingById = await getRatingSummaries(companyIds);
 
   // 이미 지원했거나 마감된 공고는 추천에서 제외합니다.
@@ -140,7 +155,7 @@ async function recommendJobsForProfile(profile, limit = 5) {
     })
     .map((j) => {
       const rating = ratingById[j.company_id] || { rating_avg: null, rating_count: 0 };
-      const { score, match, matched, matchTotal, reasons, breakdown, relevant } = scoreMatch(j, profile, rating);
+      const { score, match, matched, matchTotal, reasons, breakdown, relevant } = scoreMatch({ ...j, bizVerified: verifiedById[j.company_id] }, profile, rating);
       return {
         ...j,
         org: companyNameById[j.company_id] || '알 수 없음',
