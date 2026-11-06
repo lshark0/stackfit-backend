@@ -1,5 +1,5 @@
 const express = require('express');
-const { get } = require('../db');
+const { get, all } = require('../db');
 const { requireAuth, requireRole } = require('../middleware/requireAuth');
 const { wrapAllRoutes } = require('../middleware/asyncHandler');
 const { signedFileUrl } = require('../fileAccess');
@@ -40,12 +40,18 @@ router.get('/talents', requireAuth, requireRole('company'), async (req, res) => 
       [req.user.id]
     );
   }
-  if (!job) return res.json({ job: null, talents: [] });
+  if (!job) return res.json({ job: null, jobs: [], talents: [] });
+  // 홈에서 다른 공고 기준으로 바꿔 볼 수 있도록 모집 중인 공고 목록도 함께 내려줍니다.
+  const openJobs = await all(
+    "SELECT id, title FROM jobs WHERE company_id = ? AND status = 'open' ORDER BY created_at DESC, id DESC",
+    [req.user.id]
+  );
 
   const target = { ...job, stack: JSON.parse(job.stack_json), certs: JSON.parse(job.certs_json || '[]') };
   const talents = await recommendTalentsForJob(target, parseLimit(req.query.limit));
   res.json({
     job: { id: job.id, title: job.title },
+    jobs: openJobs.map((j) => ({ id: j.id, title: j.title })),
     talents: talents.map((t) => ({ ...publicTalent(t), resume_url: signedFileUrl(t.resume_filename) })),
   });
 });
