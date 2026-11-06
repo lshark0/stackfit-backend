@@ -8,16 +8,16 @@ const GRADE_LEVEL = { 초급: 1, 중급: 2, 고급: 3, 특급: 4 };
 
 // 공고 ↔ 프리랜서 사이의 추천 점수(0~100)와 "왜 추천되는지" 근거를 계산합니다.
 // 이랜서의 자동 매칭처럼, 기술스택만 보지 않고 업무·등급·근무 조건·평점까지 종합해 판단합니다.
-//   - 기술스택 일치도 (최대 45점): 매칭의 핵심
+//   - 기술스택 일치도 (최대 40점): 매칭의 핵심
 //   - 업무(직무) 일치 (최대 10점): DBA 공고엔 DBA를 우선
 //   - 등급 적합도 (최대 10점): 같은 등급이면 만점, 한 단계 차이면 부분 점수
 //   - 투입 시기 (최대 10점): 공고 투입 예정일까지 투입할 수 있는지
 //   - 근무 형태·지역 (최대 10점): 상주/재택/혼합 선호와 근무 가능 지역
 //   - 자격증 (최대 5점): 공고 요구 자격증 보유
-//   - 평판 (최대 5점): 좋은 평가를 받은 쪽에 소폭 가점
+//   - 평판 (최대 10점): 좋은 평가(★4.0 이상)를 받은 쪽에 가점
 //   - 보너스 (최대 5점) = 희망 단가 3점(두 쪽 단가 범위가 겹치면, 월 단가로 읽을 수 없으면 0점)
 //                       + 신뢰·최신성 2점(사업자 확인을 마친 기업의 공고, 최근 30일 안에 프로필을 고친 프리랜서)
-//   → 45 + 10 + 10 + 10 + 10 + 5 + 5 + 보너스 5 = 100점 만점(2026-11-06 대표 결정: 업무 15→10, 보너스 5)
+//   → 40 + 10 + 10 + 10 + 10 + 5 + 10 + 보너스 5 = 100점 만점(2026-11-06 대표 결정: 업무 15→10, 보너스 5, 스택 45→40, 평점 5→10)
 // 근무 조건을 입력하지 않은 회원은 감점하지 않도록 중간 점수(중립)를 줍니다(src/workConditions.js).
 // 업무 일치 판정. PM·SE 같은 짧은 영문 코드는 단어 단위로만 비교합니다
 // (예전에 직접 입력한 "Senior 개발자"가 SE로 잘못 일치하지 않도록).
@@ -38,7 +38,7 @@ function scoreMatch(job, profile, rating) {
   const reasons = [];
 
   const match = computeMatch(job.stack, profile.stack);
-  const stackScore = Math.round((match / 100) * 45);
+  const stackScore = Math.round((match / 100) * 40);
   const matched = matchedStack(job.stack, profile.stack);
   const { matchTotal } = stackCounts(job.stack, profile.stack);
   if (matched.length > 0) reasons.push(`기술스택 ${matchTotal}개 중 ${matched.length}개 일치`);
@@ -74,7 +74,7 @@ function scoreMatch(job, profile, rating) {
 
   let ratingScore = 0;
   if (rating && rating.rating_count > 0 && rating.rating_avg >= 4) {
-    ratingScore = 5;
+    ratingScore = 10;
     reasons.push(`평점 ★${rating.rating_avg}`);
   }
 
@@ -93,7 +93,7 @@ function scoreMatch(job, profile, rating) {
 
   const workScore = workType.score + region.score;
   const total = Math.min(100, freshScore + stackScore + dutyScore + gradeScore + timing.score + workScore + certs.score + ratingScore + rate.score);
-  // 화면에 "스택 45 + 업무 10 + 등급 10 + 시기 10 + 근무 10 + 자격 5 + 평점 0"처럼 점수 내역을 보여주기 위한 값
+  // 화면에 "스택 40 + 업무 10 + 등급 10 + 시기 10 + 근무 10 + 자격 5 + 평점 0"처럼 점수 내역을 보여주기 위한 값
   const breakdown = {
     stack: stackScore, duty: dutyScore, grade: gradeScore,
     timing: timing.score, work: workScore, certs: certs.score, rating: ratingScore, rate: rate.score, fresh: freshScore,

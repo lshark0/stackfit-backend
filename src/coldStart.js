@@ -8,9 +8,9 @@ const { addNotification, pushTo } = require('./notify');
 const { pairDetail } = require('./recommend');
 
 const MATCH_MIN_SCORE = 70;      // 이 점수 이상인 프리랜서에게만 알림
-// 스택(배점 45)이 75% 이상 맞는데 업무·등급이 달라 70점에 못 미치는 경우도 놓치지 않도록 하는 보조 기준.
+// 스택(배점 40)이 75% 이상 맞는데 업무·등급이 달라 70점에 못 미치는 경우도 놓치지 않도록 하는 보조 기준.
 // 새 배점에서는 스택 4/4 일치여도 업무·등급이 다르면 64점이라 알림이 가지 않았습니다.
-const MATCH_STACK_MIN = 34;      // 스택 점수(45점 만점)가 이 이상이고
+const MATCH_STACK_MIN = 30;      // 스택 점수(40점 만점, 75%)가 이 이상이고
 const MATCH_STACK_MIN_SCORE = 60; // 총점이 이 이상이면 알림
 const MATCH_MAX_PER_JOB = 50;    // 공고 하나당 알림을 받는 최대 인원(점수 높은 순)
 const DAILY_CAP = 5;             // 프리랜서 한 명이 하루에 받는 새 공고 알림 최대 수(스팸 방지)
