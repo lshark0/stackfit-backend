@@ -1277,7 +1277,10 @@ function jobCard(j){
         ${j.applied?`<div style="margin-top:6px;"><span class="sbadge applied">${I.checkCircle}지원완료</span></div>`:''}
         ${j.status==='closed'?`<div style="margin-top:6px;"><span class="sbadge fail">${I.xCircle}마감됨</span></div>`:''}
       </div>
-      <div class="star-btn ${j.saved?'filled':''}" onclick="toggleSaveJob(${j.id}, event)">${I.star}</div>
+      <div style="display:flex; align-items:center; gap:8px; flex:0 0 auto;">
+        ${state.role==='freelancer' && j.score!=null ? `<span class="reco-badge">추천 ${j.score}점</span>` : ''}
+        <div class="star-btn ${j.saved?'filled':''}" onclick="toggleSaveJob(${j.id}, event)">${I.star}</div>
+      </div>
     </div>
     ${stackTags(j.stack, j.matchedStack)}
     <div class="icon-meta">
@@ -1288,6 +1291,7 @@ function jobCard(j){
       ${state.role==='company' ? `<span class="im">${I.eyeSm}<b>${j.viewCount||0}</b>회 조회</span><span class="im">${I.usersSm}<b>${j.applicantCount||0}</b>명 지원</span>` : ''}
     </div>
     <div class="meta-row" style="margin-top:6px;">${j.status==='closed' ? '' : ddayBadge(j.d_day)}${ratingBadge(j.rating_avg, j.rating_count)}</div>
+    ${state.role==='freelancer' && j.score!=null ? recoBreakdown(j.breakdown, j.score, '기업 평점', j.rating_avg, j.rating_count) : ''}
     ${state.role==='freelancer' ? gauge(j) : ''}
   </div>`;
 }
@@ -2970,6 +2974,9 @@ async function refreshJobList(){
     if(jobDuty) qs.set('duty', jobDuty);
     if(jobLocation) qs.set('location', jobLocation);
     const data = await apiFetch('/jobs?' + qs.toString());
+    // 검색·필터를 바꾸면 머리글의 'N개의 공고'도 결과 수에 맞춰 고칩니다.
+    const sub = document.querySelector('.app-header .page-sub');
+    if(sub) sub.textContent = `${data.jobs.length}개의 공고`;
     el.innerHTML = data.jobs.length ? jobListHtml(data.jobs) : emptyHtml('조건에 맞는 공고가 없어요', I.jobs);
   }catch(e){ el.innerHTML = emptyHtml(e.message, I.jobs); }
 }
@@ -3893,7 +3900,8 @@ async function screenJobs(){
     ${recentJobs.length ? `
     <div class="section-label">최근 본 공고</div>
     <div class="hrow">${recentJobs.map(miniJobCard).join('')}</div>` : ''}
-    <div class="section-label">${isCompany?"등록 현황":"매칭률 순"}</div>
+    <div class="section-label">${isCompany?"등록 현황":(data.jobs.some(j=>j.score!=null)?"추천 점수 순":"매칭률 순")}</div>
+    ${!isCompany && data.jobs.some(j=>j.score!=null) ? `<div class="reco-legend">· <b>추천 점수(100점)</b>: 홈 '나에게 맞는 프로젝트'와 같은 기준이에요 — 스택(40) + 업무(10) + 등급(10) + 투입 시기(10) + 근무 형태·지역(10) + 자격증(5) + 기업 평점(10) + 보너스(5: 희망 단가 겹침 3, 사업자 확인 기업 2).</div>` : ''}
     <div id="jobList">${jobListHtml(data.jobs) || emptyArt(ART.noJobs, '조건에 맞는 공고가 없어요', '검색어나 필터를 바꿔보세요.')}</div>
   </div>
   ${isCompany?`<button class="fab" onclick="go('jobPost')">${I.plus}</button>`:''}

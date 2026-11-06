@@ -6,6 +6,7 @@ const { requireAuth, requireRole } = require('../middleware/requireAuth');
 const { wrapAllRoutes } = require('../middleware/asyncHandler');
 const { verifySessionToken } = require('../auth');
 const { computeMatch, stackCounts } = require('../match');
+const { scoreMatch } = require('../recommend');
 const { matchesCategory } = require('../stackCatalog');
 const { getRatingSummary, getRatingSummaries } = require('../ratings');
 const { signedFileUrl } = require('../fileAccess');
@@ -94,9 +95,10 @@ router.get('/', optionalAuth, async (req, res) => {
   // N+1 방지: 회사명/평점을 각각 한 번의 쿼리로 일괄 조회한 뒤 메모리에서 조합합니다.
   const companyIds = [...new Set(rows.map((j) => j.company_id))];
   const companyRows = companyIds.length
-    ? await all(`SELECT user_id, name FROM companies WHERE user_id IN (${companyIds.map(() => '?').join(',')})`, companyIds)
+    ? await all(`SELECT user_id, name, biz_verified_at FROM companies WHERE user_id IN (${companyIds.map(() => '?').join(',')})`, companyIds)
     : [];
   const companyNameById = Object.fromEntries(companyRows.map((c) => [c.user_id, c.name]));
+  const bizVerifiedById = Object.fromEntries(companyRows.map((c) => [c.user_id, !!c.biz_verified_at]));
   const ratingById = await getRatingSummaries(companyIds);
 
   let jobs = rows.map((j) => baseJob(j, companyNameById[j.company_id], ratingById[j.company_id] || { rating_avg: null, rating_count: 0 }));
@@ -134,11 +136,13 @@ router.get('/', optionalAuth, async (req, res) => {
   }
 
   let profileStack = [];
+  let myProfile = null; // 추천 점수 계산용(홈 '나에게 맞는 프로젝트'와 같은 기준)
   let appliedJobIds = new Set();
   let savedJobIds = new Set();
   if (req.user && req.user.role === 'freelancer') {
-    const p = await get('SELECT stack_json FROM freelancer_profiles WHERE user_id = ?', [req.user.id]);
+    const p = await get('SELECT * FROM freelancer_profiles WHERE user_id = ?', [req.user.id]);
     profileStack = p ? JSON.parse(p.stack_json) : [];
+    if (p) myProfile = { ...p, stack: profileStack, certs: JSON.parse(p.certs_json || '[]') };
     const applied = await all('SELECT job_id FROM applications WHERE freelancer_id = ?', [req.user.id]);
     const saved = await all('SELECT job_id FROM saved_jobs WHERE freelancer_id = ?', [req.user.id]);
     appliedJobIds = new Set(applied.map(a => a.job_id));
@@ -159,18 +163,31 @@ router.get('/', optionalAuth, async (req, res) => {
     viewCountByJobId = Object.fromEntries(viewCountRows.map((r) => [r.job_id, Number(r.c)]));
   }
 
-  const result = jobs.map(j => ({
-    ...j,
-    match: computeMatch(j.stack, profileStack),
-    ...stackCounts(j.stack, profileStack),
-    applied: appliedJobIds.has(j.id),
-    saved: savedJobIds.has(j.id),
-    applicantCount: applicantCountByJobId[j.id] || 0,
-    viewCount: viewCountByJobId[j.id] || 0,
-  }));
-  // 프리랜서에게는 매칭률이 높은 공고부터 보여줍니다.
+  const result = jobs.map(j => {
+    const row = {
+      ...j,
+      match: computeMatch(j.stack, profileStack),
+      ...stackCounts(j.stack, profileStack),
+      applied: appliedJobIds.has(j.id),
+      saved: savedJobIds.has(j.id),
+      applicantCount: applicantCountByJobId[j.id] || 0,
+      viewCount: viewCountByJobId[j.id] || 0,
+    };
+    // 프리랜서에게는 홈 추천과 같은 기준의 추천 점수·점수 내역을 붙입니다(기업 평점·사업자 확인 반영).
+    if (myProfile) {
+      const r = scoreMatch(
+        { ...j, bizVerified: bizVerifiedById[j.company_id] },
+        myProfile,
+        { rating_avg: j.rating_avg, rating_count: j.rating_count }
+      );
+      row.score = r.score; row.breakdown = r.breakdown; row.reasons = r.reasons;
+      row.matchedStack = r.matched;
+    }
+    return row;
+  });
+  // 프리랜서에게는 추천 점수가 높은 공고부터(같으면 스택 일치 순) 보여줍니다.
   if (req.user && req.user.role === 'freelancer') {
-    result.sort((a, b) => b.match - a.match);
+    result.sort((a, b) => ((b.score ?? -1) - (a.score ?? -1)) || (b.match - a.match));
   }
   // 기업의 '등록한 공고'는 모집 중인 공고를 위에, 마감된 공고(직접 마감·마감일 경과)를 아래에 둡니다.
   // 각 묶음 안에서는 기존 순서(최신 등록순)를 유지합니다.
