@@ -9,6 +9,7 @@ const { sortPortfoliosByPeriod } = require('../periodSort');
 const { matchesCategory } = require('../stackCatalog');
 const { publicTalent, contactFields } = require('../contact');
 const { addNotification } = require('../notify');
+const { scoreMatch } = require('../recommend');
 
 const router = express.Router();
 wrapAllRoutes(router);
@@ -18,21 +19,35 @@ wrapAllRoutes(router);
 // 기준 공고가 없으면 매치율을 계산하지 않습니다(match: null).
 async function resolveMatchJob(companyId, jobId) {
   const jobs = await all(
-    "SELECT id, title, stack_json FROM jobs WHERE company_id = ? AND status = 'open' ORDER BY created_at DESC, id DESC",
+    "SELECT * FROM jobs WHERE company_id = ? AND status = 'open' ORDER BY created_at DESC, id DESC",
     [companyId]
   );
   let job = null;
   const jid = Number(jobId);
   if (jobId && Number.isInteger(jid)) {
     job = jobs.find((j) => j.id === jid)
-      || await get('SELECT id, title, stack_json FROM jobs WHERE id = ? AND company_id = ?', [jid, companyId]);
+      || await get('SELECT * FROM jobs WHERE id = ? AND company_id = ?', [jid, companyId]);
   }
   if (!job) job = jobs[0] || null;
+  const jobStack = job ? JSON.parse(job.stack_json) : null;
   return {
     matchJob: job ? { id: job.id, title: job.title } : null,
     matchJobs: jobs.map((j) => ({ id: j.id, title: j.title })),
-    jobStack: job ? JSON.parse(job.stack_json) : null,
+    jobStack,
+    // 추천 점수 계산용(홈의 인재 추천과 같은 기준)
+    scoreJob: job ? { ...job, stack: jobStack, certs: parseList(job.certs_json), checkFreshProfile: true } : null,
   };
+}
+
+function parseList(json) {
+  try { const v = JSON.parse(json || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; }
+}
+
+// 기준 공고가 있으면 홈 '맞춤 인재 추천'과 같은 방식으로 추천 점수·점수 내역을 붙입니다.
+function recoFields(scoreJob, t, stack, rating) {
+  if (!scoreJob) return { score: null };
+  const r = scoreMatch(scoreJob, { ...t, stack, certs: parseList(t.certs_json) }, rating);
+  return { score: r.score, breakdown: r.breakdown, reasons: r.reasons };
 }
 
 router.get('/', requireAuth, requireRole('company'), async (req, res) => {
@@ -61,7 +76,7 @@ router.get('/', requireAuth, requireRole('company'), async (req, res) => {
     talents = talents.filter(t => String(t.role_title || '').toLowerCase().includes(needle));
   }
 
-  const { matchJob, matchJobs, jobStack } = await resolveMatchJob(req.user.id, jobId);
+  const { matchJob, matchJobs, jobStack, scoreJob } = await resolveMatchJob(req.user.id, jobId);
   const proposalRows = await all('SELECT freelancer_id FROM proposals WHERE company_id = ?', [req.user.id]);
   const proposedIds = new Set(proposalRows.map(p => p.freelancer_id));
   const savedRows = await all('SELECT freelancer_id FROM saved_talents WHERE company_id = ?', [req.user.id]);
@@ -69,17 +84,22 @@ router.get('/', requireAuth, requireRole('company'), async (req, res) => {
 
   // N+1 방지: 평점을 한 번의 쿼리로 일괄 조회한 뒤 메모리에서 조합합니다.
   const ratingById = await getRatingSummaries(talents.map((t) => t.user_id));
-  const result = talents.map((t) => ({
-    ...publicTalent(t),
-    match: jobStack ? computeMatch(jobStack, t.stack) : null,
-    ...(jobStack ? stackCounts(jobStack, t.stack) : {}),
-    matchedStack: jobStack ? matchedStack(jobStack, t.stack) : [],
-    proposed: proposedIds.has(t.user_id),
-    saved: savedIds.has(t.user_id),
-    ...(ratingById[t.user_id] || { rating_avg: null, rating_count: 0 }),
-  }));
+  const result = talents.map((t) => {
+    const rating = ratingById[t.user_id] || { rating_avg: null, rating_count: 0 };
+    return {
+      ...publicTalent(t),
+      match: jobStack ? computeMatch(jobStack, t.stack) : null,
+      ...(jobStack ? stackCounts(jobStack, t.stack) : {}),
+      matchedStack: jobStack ? matchedStack(jobStack, t.stack) : [],
+      proposed: proposedIds.has(t.user_id),
+      saved: savedIds.has(t.user_id),
+      ...rating,
+      ...recoFields(scoreJob, t, t.stack, rating),
+    };
+  });
 
-  result.sort((a, b) => (b.match ?? -1) - (a.match ?? -1));
+  // 기준 공고가 있으면 추천 점수 순(같으면 스택 일치 순), 없으면 스택 일치 순입니다.
+  result.sort((a, b) => ((b.score ?? -1) - (a.score ?? -1)) || ((b.match ?? -1) - (a.match ?? -1)));
   res.json({ talents: result, matchJob, matchJobs });
 });
 
@@ -125,7 +145,7 @@ router.get('/recent-views', requireAuth, requireRole('company'), async (req, res
 
 // [기업] 관심 인재 목록
 router.get('/saved', requireAuth, requireRole('company'), async (req, res) => {
-  const { matchJob, matchJobs, jobStack } = await resolveMatchJob(req.user.id, req.query.jobId);
+  const { matchJob, matchJobs, jobStack, scoreJob } = await resolveMatchJob(req.user.id, req.query.jobId);
   const rows = await all(
     `SELECT f.* FROM saved_talents s
      JOIN freelancer_profiles f ON f.user_id = s.freelancer_id
@@ -150,6 +170,7 @@ router.get('/saved', requireAuth, requireRole('company'), async (req, res) => {
         proposed: proposedIds.has(t.user_id),
         saved: true,
         ...(ratingById[t.user_id] || { rating_avg: null, rating_count: 0 }),
+        ...recoFields(scoreJob, t, stack, ratingById[t.user_id] || { rating_avg: null, rating_count: 0 }),
       };
     }),
   });

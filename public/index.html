@@ -1379,13 +1379,17 @@ function talentCard(t){
           </div>
         </div>
       </div>
-      ${state.role==='company' ? `<div class="star-btn ${t.saved?'filled':''}" title="관심 인재" onclick="toggleSaveTalent(${t.user_id}, event)">${I.star}</div>` : ''}
+      <div style="display:flex; align-items:center; gap:8px; flex:0 0 auto;">
+        ${t.score!=null ? `<span class="reco-badge">추천 ${t.score}점</span>` : ''}
+        ${state.role==='company' ? `<div class="star-btn ${t.saved?'filled':''}" title="관심 인재" onclick="toggleSaveTalent(${t.user_id}, event)">${I.star}</div>` : ''}
+      </div>
     </div>
     ${stackTags(t.stack, t.matchedStack)}
     <div class="icon-meta">
       <span class="im">${I.wallet}<b>${esc(t.rate)}</b></span>
       ${t.rating_count>0?`<span class="im">${ratingBadge(t.rating_avg, t.rating_count)}</span>`:''}
     </div>
+    ${t.score!=null ? recoBreakdown(t.breakdown, t.score, '인재 평점', t.rating_avg, t.rating_count) : ''}
     ${gauge(t)}
   </div>`;
 }
@@ -1397,13 +1401,13 @@ function matchBasisHtml(data, onChange){
     return `<div class="reco-legend">공고를 등록하면 그 공고 기준으로 <b>스택 일치</b>가 표시돼요.</div>`;
   }
   return `<div style="display:flex; align-items:center; gap:8px; margin:6px 0 4px;">
-      <span style="flex:0 0 auto; font-size:12.5px; font-weight:700; color:var(--ink);">스택 일치 기준 공고</span>
+      <span style="flex:0 0 auto; font-size:12.5px; font-weight:700; color:var(--ink);">기준 공고</span>
       <select class="form-input" style="flex:1; min-width:0; padding:9px 10px; font-size:12.5px;" onchange="talentMatchJobId=Number(this.value); ${onChange}">
         ${(data.matchJobs.some(j=>j.id===data.matchJob.id) ? data.matchJobs : [data.matchJob, ...data.matchJobs])
           .map(j=>`<option value="${j.id}" ${j.id===data.matchJob.id?'selected':''}>${esc(j.title)}</option>`).join('')}
       </select>
     </div>
-    <div class="reco-legend">· <b>스택 일치</b>: 선택한 공고가 요구하는 기술 중 보유한 기술 수입니다.</div>`;
+    <div class="reco-legend">· <b>추천 점수(100점)</b>: 선택한 공고 기준으로 스택(45) + 업무(15) + 등급(10) + 투입 시기(10) + 근무 형태·지역(10) + 자격증(5) + 인재 평점(5)을 더한 점수예요(홈 '맞춤 인재 추천'과 같은 기준).<br>· <b>스택 일치</b>: 선택한 공고가 요구하는 기술 중 보유한 기술 수입니다.</div>`;
 }
 
 /* ---------------- Actions ---------------- */
@@ -4000,7 +4004,7 @@ async function screenTalent(){
     ${recentTalents.length ? `
     <div class="section-label">최근 본 인재</div>
     <div class="hrow">${recentTalents.map(miniTalentCard).join('')}</div>` : ''}
-    <div class="section-label">매칭률 순</div>
+    <div class="section-label">${data.matchJob ? '추천 점수 순' : '매칭률 순'}</div>
     ${matchBasisHtml(data, 'render();')}
     <div id="talentList">${data.talents.map(talentCard).join('') || emptyArt(ART.noTalents, '조건에 맞는 인재가 없어요', '검색어나 등급·업무 필터를 바꿔보세요.')}</div>
   </div>${tabbar('talent')}`;
