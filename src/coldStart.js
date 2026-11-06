@@ -7,9 +7,9 @@ const { get, all, run } = require('./db');
 const { addNotification, pushTo } = require('./notify');
 const { pairDetail } = require('./recommend');
 
-const MATCH_MIN_SCORE = 70;      // 이 점수 이상인 프리랜서에게만 알림
-// 스택(배점 40)이 75% 이상 맞는데 업무·등급이 달라 70점에 못 미치는 경우도 놓치지 않도록 하는 보조 기준.
-// 새 배점에서는 스택 4/4 일치여도 업무·등급이 다르면 64점이라 알림이 가지 않았습니다.
+const MATCH_MIN_SCORE = 65;      // 이 점수 이상인 프리랜서에게만 알림(2026-11-06 대표 결정 70→65)
+// 스택(배점 40)이 75% 이상 맞는데 업무·등급이 달라 65점에 못 미치는 경우도 놓치지 않도록 하는 보조 기준.
+// (스택이 모두 맞아도 업무·등급이 다르면 총점이 기준에 못 미쳐 알림이 가지 않는 경우를 막기 위함)
 const MATCH_STACK_MIN = 30;      // 스택 점수(40점 만점, 75%)가 이 이상이고
 const MATCH_STACK_MIN_SCORE = 60; // 총점이 이 이상이면 알림
 const MATCH_MAX_PER_JOB = 50;    // 공고 하나당 알림을 받는 최대 인원(점수 높은 순)
