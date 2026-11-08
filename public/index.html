@@ -1374,7 +1374,7 @@ async function showMatchReason(btn, jobId, talentId){
   btn.disabled = true; btn.textContent = '설명을 만드는 중…';
   try{
     const r = await apiFetch('/ai/match-reason', {method:'POST', body: talentId ? {job_id:jobId, talent_id:talentId} : {job_id:jobId}});
-    box.textContent = r.reason; box.style.display = 'block'; btn.style.display = 'none';
+    box.textContent = 'AI가 작성한 설명 · ' + r.reason; box.style.display = 'block'; btn.style.display = 'none';
   }catch(e){
     box.textContent = e.message || 'AI 설명을 만들지 못했어요.'; box.style.display = 'block';
     btn.disabled = false; btn.textContent = '✨ 다시 시도';
