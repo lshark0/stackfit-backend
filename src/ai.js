@@ -21,6 +21,7 @@ const DAILY_LIMITS = {
   profile_from_resume: Number(process.env.AI_PROFILE_DAILY_LIMIT) || 5,
   career_verify: Number(process.env.AI_CAREER_DAILY_LIMIT) || 3,
   job_from_text: Number(process.env.AI_JOB_DAILY_LIMIT) || 10,
+  match_reason: Number(process.env.AI_REASON_DAILY_LIMIT) || 20,
 };
 
 // 서비스 전체 1일 이용 한도. 봇이 계정을 여러 개 만들어 AI를 대신 돌리게 하는
