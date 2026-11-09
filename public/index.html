@@ -807,7 +807,7 @@ function talentDetailBack(){ goBackFrom(talentDetailReturn, 'talent'); }
 // 제스처도 그 화살표와 똑같이 항상 마이페이지로 보내도록 popstate에서 함께 처리합니다.
 let proxyCompany = null; // 관리자 공고 대리 등록 중인 기업 {id, name}
 let claimToken = null;   // 기업 계정 연결 링크로 들어온 경우
-const MYPAGE_CHILD_SCREENS = ['adminProxyJobs','proposalSettings','changePassword','deleteAccount','savedJobs','followedCompanies','adminReports','adminInquiries','adminPerformance','plans','adminCareerVerify','careerVerify','adminSignupStats','adminAiUsage','adminAiReco','adminSecurity','adminDuplicates','mfaSetup','profileViews','companyProfileEdit','profileEdit','notices','events','faq','supportInquiry'];
+const MYPAGE_CHILD_SCREENS = ['adminProxyJobs','proposalSettings','changePassword','deleteAccount','savedJobs','followedCompanies','adminReports','adminInquiries','adminPerformance','plans','adminCareerVerify','careerVerify','adminSignupStats','adminAiUsage','adminSecurity','adminDuplicates','mfaSetup','profileViews','companyProfileEdit','profileEdit','notices','events','faq','supportInquiry'];
 
 // 회원 유형별로만 열 수 있는 화면. 다른 유형의 화면이 열리려 하면(뒤로가기 기록, 예전 알림 등) 홈으로 보냅니다.
 const FREELANCER_ONLY = ['careerVerify','receivedProposals','myApplications','portfolios','portfolioEdit','savedJobs','followedCompanies','profileViews','profileEdit','proposalSettings','reportJob'];
@@ -5056,7 +5056,6 @@ async function screenMypage(){
     <div class="list-item" onclick="go('adminCareerVerify')"><div class="li-l"><div class="li-icon">${I.verified}</div><div class="li-tt">경력 검증 (AI 심사)</div></div>${I.chevR}</div>
     <div class="list-item" onclick="go('adminSignupStats')"><div class="li-l"><div class="li-icon">${I.talent}</div><div class="li-tt">가입 경로 통계</div></div>${I.chevR}</div>
     <div class="list-item" onclick="go('adminAiUsage')"><div class="li-l"><div class="li-icon">${I.sparkle}</div><div class="li-tt">AI 사용량 통계</div></div>${I.chevR}</div>
-    <div class="list-item" onclick="go('adminAiReco')"><div class="li-l"><div class="li-icon">${I.sparkle}</div><div class="li-tt">AI 추천 이유 미리보기</div></div>${I.chevR}</div>
     <div class="list-item" onclick="go('adminSecurity')"><div class="li-l"><div class="li-icon">${I.verified}</div><div class="li-tt">보안 로그</div></div>${I.chevR}</div>
     <div class="list-item" onclick="go('adminDuplicates')"><div class="li-l"><div class="li-icon">${I.talent}</div><div class="li-tt">중복 계정 정리</div></div>${I.chevR}</div>
     <div class="list-item" onclick="go('adminReports')"><div class="li-l"><div class="li-icon">${I.alertCircle}</div><div class="li-tt">신고 관리</div></div>${I.chevR}</div>
@@ -5994,52 +5993,12 @@ let adminAiDays = 30;
 function setAdminAiDays(d){ adminAiDays = d; render(); }
 const fmtNum = (n) => Number(n||0).toLocaleString('ko-KR');
 const fmtWon = (n) => `${fmtNum(n)}원`;
-// [개선-012 시험] AI 추천 이유 미리보기(관리자 전용) — 회원 화면에는 아직 보이지 않습니다.
-let adminAiRecoSide = 'company', adminAiRecoData = null;
-async function screenAdminAiReco(){
-  if(!state.isAdmin){ go('mypage'); return ''; }
-  const d = adminAiRecoData && adminAiRecoData.side === adminAiRecoSide ? adminAiRecoData : null;
-  const sides = [['company','기업 화면 기준 (공고 → 추천 인재)'],['freelancer','프리랜서 화면 기준 (프로필 → 추천 공고)']];
-  return `${statusbar()}
-  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('mypage')">${I.back}</div><div class="page-title" style="font-size:19.5px;">AI 추천 이유 미리보기</div></div></div>
-  <div class="content">
-    <div class="reco-legend">· 지금 추천(규칙 점수) 상위 결과에 AI가 '왜 맞는지' 설명을 붙여 본 결과예요. 회원은 홈 추천 카드의 <b>'✨ AI가 이유 설명'</b> 버튼으로 같은 방식의 설명을 봐요(1인 1일 20회).<br>· AI에는 이름·연락처를 보내지 않아요. 같은 내용은 다시 만들지 않아 비용이 들지 않아요(서버 재시작 전까지).<br>· 한 번에 최대 15건을 만들고, 비용은 'AI 사용량 통계'에도 기록돼요.</div>
-    <div class="chip-row" style="margin-top:10px;">${sides.map(([k,l])=>`<div class="chip ${k===adminAiRecoSide?'active':''}" onclick="adminAiRecoSide='${k}'; render();">${l}</div>`).join('')}</div>
-    <button class="btn btn-primary" id="aiRecoBtn" style="margin-top:12px;" onclick="runAdminAiReco()">${d ? '다시 만들기' : 'AI 추천 이유 만들기'}</button>
-    ${d ? `
-    <div class="kv-grid" style="margin-top:14px;">
-      <div class="kv-box"><div class="kv-lbl">만든 설명</div><div class="kv-val">${d.items.length}건${d.failed?` (실패 ${d.failed})`:''}</div></div>
-      <div class="kv-box"><div class="kv-lbl">이번 비용</div><div class="kv-val">${fmtWon(d.totalCostKrw)}</div></div>
-      <div class="kv-box"><div class="kv-lbl">1건 평균</div><div class="kv-val">${d.avgCostKrw==null ? '-' : d.avgCostKrw.toFixed(1)+'원'}</div></div>
-      <div class="kv-box"><div class="kv-lbl">평균 토큰</div><div class="kv-val" style="font-size:12.5px;">${d.avgInputTokens==null?'-':`입력 ${fmtNum(d.avgInputTokens)} · 출력 ${fmtNum(d.avgOutputTokens)}`}</div></div>
-    </div>
-    ${d.avgCostKrw!=null ? `<div class="page-sub" style="margin:6px 0 4px;">예상: 설명 1,000건 ≈ ${fmtWon(Math.round(d.avgCostKrw*1000))} (공고·프로필이 바뀔 때만 새로 만들면 회원 1명당 월 몇 건 수준)</div>` : ''}
-    ${d.items.length ? d.items.map(x=>`
-      <div class="card">
-        <div class="card-top"><div style="min-width:0;"><div class="card-title" style="font-size:14px;">${esc(x.jobTitle)}</div>
-          <div class="card-org">${esc(x.talentName||'')} · ${esc(x.talentRole||'')} ${x.talentGrade?esc(x.talentGrade):''}</div></div>
-          <span class="reco-badge">추천 ${x.score}점</span></div>
-        ${recoReasons(x.ruleReasons, adminAiRecoSide==='company' ? '인재 평점' : '기업 평점')}
-        <div style="margin-top:8px; padding:10px 12px; border-radius:10px; background:#F3EEFF; font-size:13.5px; line-height:1.6;"><b style="color:var(--purple);">✨ AI 추천 이유</b><br>${esc(x.reason)}</div>
-        <div class="page-sub" style="margin-top:6px;">${x.cached ? '이전에 만든 설명(추가 비용 없음)' : `토큰 입력 ${fmtNum(x.inputTokens)} · 출력 ${fmtNum(x.outputTokens)} · 약 ${(x.costUsd*d.krwPerUsd).toFixed(1)}원`}</div>
-      </div>`).join('') : `<div class="reco-empty">추천할 쌍이 없어요. 모집 중 공고·기술스택을 채운 프로필이 있어야 해요.</div>`}` : ''}
-    ${siteFooterHtml()}
-  </div>`;
-}
-async function runAdminAiReco(){
-  const btn = document.getElementById('aiRecoBtn');
-  if(btn){ btn.disabled = true; btn.textContent = 'AI가 설명을 만드는 중… (최대 1분)'; }
-  try{
-    adminAiRecoData = await apiFetch('/admin/ai-reco-preview', {method:'POST', body:{side: adminAiRecoSide}});
-    render();
-  }catch(e){ toast(e.message); if(btn){ btn.disabled = false; btn.textContent = 'AI 추천 이유 만들기'; } }
-}
 async function screenAdminAiUsage(){
   if(!state.isAdmin){ go('mypage'); return ''; }
   const s = await apiFetch('/admin/ai-usage?days=' + adminAiDays);
   const periods = [[7,'7일'],[30,'30일'],[90,'90일'],[3650,'전체']];
   const daily = s.daily.slice(-14);
-  const limitLabel = { support_chat: 'AI 상담', profile_from_resume: '경력기술서 자동 채우기', career_verify: '경력 검증 AI 심사', job_from_text: '공고 자동 채우기', match_reason: '추천 이유 설명', reco_reason: 'AI 추천 이유(미리보기)' };
+  const limitLabel = { support_chat: 'AI 상담', profile_from_resume: '경력기술서 자동 채우기', career_verify: '경력 검증 AI 심사', job_from_text: '공고 자동 채우기', match_reason: '추천 이유 설명', reco_reason: 'AI 추천 이유(미리보기, 종료)' };
   return `${statusbar()}
   <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('mypage')">${I.back}</div><div class="page-title" style="font-size:19.5px;">AI 사용량 통계</div></div></div>
   <div class="content">
@@ -7024,7 +6983,7 @@ async function render(){
       proposeForm: screenProposeForm, pickerScreen: screenPicker,
       reviewForm: screenReviewForm,
       adminReports: screenAdminReports, adminInquiries: screenAdminInquiries, plans: screenPlans, bizVerify: screenBizVerify, adminProxyJobs: screenAdminProxyJobs, adminProposalLimit: screenAdminProposalLimit, claimAccount: screenClaimAccount, emailVerifySent: screenEmailVerifySent, reportJob: screenReportJob,
-      invite: screenInvite, careerVerify: screenCareerVerify, adminCareerVerify: screenAdminCareerVerify, adminPerformance: screenAdminPerformance, adminSignupStats: screenAdminSignupStats, adminAiUsage: screenAdminAiUsage, adminAiReco: screenAdminAiReco, adminSecurity: screenAdminSecurity, adminDuplicates: screenAdminDuplicates, mfaVerify: screenMfaVerify, mfaSetup: screenMfaSetup,
+      invite: screenInvite, careerVerify: screenCareerVerify, adminCareerVerify: screenAdminCareerVerify, adminPerformance: screenAdminPerformance, adminSignupStats: screenAdminSignupStats, adminAiUsage: screenAdminAiUsage, adminSecurity: screenAdminSecurity, adminDuplicates: screenAdminDuplicates, mfaVerify: screenMfaVerify, mfaSetup: screenMfaSetup,
       notices: screenNotices, events: screenEvents, faq: screenFaq, aiChat: screenAiChat, supportInquiry: screenSupportInquiry,
       announcementForm: screenAnnouncementForm,
     };

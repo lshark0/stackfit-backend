@@ -9,8 +9,6 @@ const ai = require('../ai');
 const { listSecurityEvents } = require('../securityLog');
 const { computePerformance } = require('../performance');
 const proposalQuota = require('../proposalQuota');
-const { recommendTalentsForJob, recommendJobsForProfile } = require('../recommend');
-const { reasonFor } = require('../aiRecoReason');
 
 const router = express.Router();
 wrapAllRoutes(router);
@@ -251,7 +249,7 @@ router.get('/signup-stats', requireAuth, requireAdmin, async (req, res) => {
 });
 
 // AI 사용량 통계 — 기능별 호출 수·토큰·예상 비용(USD/원), 일별 추이, 많이 쓴 회원
-const AI_FEATURE_LABELS = { support_chat: 'AI 상담', profile_from_resume: '경력기술서 자동 채우기', career_verify: '경력 검증 AI 심사', job_from_text: '공고 자동 채우기', match_reason: '추천 이유 설명', reco_reason: 'AI 추천 이유(미리보기)' };
+const AI_FEATURE_LABELS = { support_chat: 'AI 상담', profile_from_resume: '경력기술서 자동 채우기', career_verify: '경력 검증 AI 심사', job_from_text: '공고 자동 채우기', match_reason: '추천 이유 설명', reco_reason: 'AI 추천 이유(미리보기, 종료)' };
 router.get('/ai-usage', requireAuth, requireAdmin, async (req, res) => {
   const days = Math.min(3650, Math.max(1, Number.parseInt(req.query.days, 10) || 30));
   const today = ai.kstDay();
@@ -322,63 +320,6 @@ router.get('/ai-usage', requireAuth, requireAdmin, async (req, res) => {
       .map((d) => ({ date: d.date, calls: d.calls, costKrw: Math.round(d.costUsd * krwPerUsd) })),
     topUsers,
   });
-});
-
-// [개선-012 시험] AI 추천 이유 미리보기 — 실제 회원 화면에는 아직 보이지 않습니다.
-// side=company: 모집 중 공고(최근 5개)마다 추천 인재 상위 3명, side=freelancer: 최근 프로필을 고친 프리랜서 5명마다 추천 공고 상위 3개.
-// 대표가 결과·비용을 보고 회원 화면 반영 여부를 정합니다. 같은 내용은 서버 메모리에 보관해 다시 비용을 쓰지 않습니다.
-router.post('/ai-reco-preview', requireAuth, requireAdmin, async (req, res) => {
-  if (!ai.aiEnabled()) return res.status(503).json({ error: 'AI 키가 설정되지 않아 미리보기를 할 수 없어요.' });
-  const side = (req.body || {}).side === 'freelancer' ? 'freelancer' : 'company';
-  if ((await ai.globalRemainingToday()) <= 0) return res.status(429).json({ error: '오늘 AI 전체 이용 한도에 도달했어요.' });
-  const release = ai.tryBegin(req.user.id, 'reco_reason');
-  if (!release) return res.status(429).json({ error: '미리보기를 만드는 중이에요. 잠시 후 다시 시도해주세요.' });
-  try {
-    const pairs = [];
-    if (side === 'company') {
-      const jobs = await all("SELECT * FROM jobs WHERE status = 'open' ORDER BY created_at DESC, id DESC LIMIT 5");
-      for (const j of jobs) {
-        const job = { ...j, stack: JSON.parse(j.stack_json), certs: JSON.parse(j.certs_json || '[]') };
-        for (const t of (await recommendTalentsForJob(job, 3)).filter((x) => Number(x.ai_reason ?? 1) !== 0)) pairs.push({ job, profile: t, score: t.score, ruleReasons: t.reasons });
-      }
-    } else {
-      const rows = await all(
-        "SELECT * FROM freelancer_profiles WHERE stack_json IS NOT NULL AND stack_json <> '[]' ORDER BY COALESCE(updated_at, '') DESC LIMIT 5"
-      );
-      for (const p of rows) {
-        const profile = { ...p, stack: JSON.parse(p.stack_json), certs: JSON.parse(p.certs_json || '[]') };
-        for (const j of await recommendJobsForProfile(profile, 3)) pairs.push({ job: j, profile, score: j.score, ruleReasons: j.reasons });
-      }
-    }
-    const items = [];
-    let failed = 0;
-    for (const pr of pairs.slice(0, 15)) {
-      try {
-        const r = await reasonFor({ viewer: side, job: pr.job, profile: pr.profile, ruleReasons: pr.ruleReasons, userId: req.user.id });
-        items.push({
-          jobTitle: pr.job.title, talentName: pr.profile.name, talentRole: pr.profile.role_title, talentGrade: pr.profile.grade,
-          score: pr.score, ruleReasons: pr.ruleReasons, reason: r.text, cached: r.cached,
-          inputTokens: r.inputTokens, outputTokens: r.outputTokens,
-          costUsd: r.cached ? 0 : ai.estimateCostUsd(r.model, r.inputTokens, r.outputTokens),
-        });
-      } catch (err) {
-        failed++;
-        console.error('[AI] 추천 이유 미리보기 실패:', err && err.status, err && err.message);
-      }
-    }
-    const krwPerUsd = Number(process.env.AI_KRW_PER_USD) || 1400;
-    const fresh = items.filter((x) => !x.cached);
-    const avgUsd = fresh.length ? fresh.reduce((a, x) => a + x.costUsd, 0) / fresh.length : null;
-    res.json({
-      side, items, failed, krwPerUsd,
-      totalCostKrw: Math.round(items.reduce((a, x) => a + x.costUsd, 0) * krwPerUsd),
-      avgCostKrw: avgUsd === null ? null : Math.round(avgUsd * krwPerUsd * 100) / 100,
-      avgInputTokens: fresh.length ? Math.round(fresh.reduce((a, x) => a + x.inputTokens, 0) / fresh.length) : null,
-      avgOutputTokens: fresh.length ? Math.round(fresh.reduce((a, x) => a + x.outputTokens, 0) / fresh.length) : null,
-    });
-  } finally {
-    release();
-  }
 });
 
 // 보안 로그 조회 — 최근 로그인 실패·잠금·관리자 작업 등 (6개월 보관)
