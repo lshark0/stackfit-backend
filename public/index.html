@@ -5544,6 +5544,7 @@ async function screenAdminSignupStats(){
     ${daily.length ? `<div class="card"><div class="card-title" style="font-size:13.5px;">일별 가입 (최근 ${daily.length}일)</div>${barChart(daily.map(d=>({label:d.date.slice(5).replace('-','/'), value:d.count})), true)}</div>` : ''}
     <div class="section-label with-ic">${I.layers}채널별 가입</div>
     ${table(s.bySource, sourceLabel)}
+    ${(s.proxyCompanies||[]).length ? `<div class="page-sub" style="margin:8px 2px 0; line-height:1.7;"><b>관리자 대리 등록(기업)</b>: ${s.proxyCompanies.map(c=>`${esc(c.name)}${c.contactPerson?` (${esc(c.contactPerson)})`:''} · ${c.claimPending?'계정 연결 전':'기업 연결됨'}`).join(' / ')} <span onclick="go('adminProxyJobs')" style="text-decoration:underline; cursor:pointer;">대리 등록 화면 ›</span></div>` : ''}
     ${s.byCampaign.length ? `<div class="section-label with-ic">${I.megaphone}캠페인별 가입</div>${table(s.byCampaign, k=>{ const [src, camp] = k.split('/'); return `${sourceLabel(src)} · ${camp}`; })}` : ''}
     <div class="section-label with-ic">${I.gift}초대왕 TOP 10</div>
     ${s.topReferrers.length ? s.topReferrers.map((r,i)=>`

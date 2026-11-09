@@ -234,8 +234,20 @@ router.get('/signup-stats', requireAuth, requireAdmin, async (req, res) => {
     }));
   }
 
+  // 관리자 대리 등록(proxy)으로 만든 기업 계정은 어떤 기업인지 바로 볼 수 있게 이름·연결 여부를 함께 내려줍니다.
+  const proxyIds = inPeriod.filter((u) => u.signup_source === 'proxy').map((u) => u.id);
+  const proxyCompanies = proxyIds.length
+    ? (await all(
+      `SELECT u.id, u.created_at, u.claim_pending, c.name, c.contact_person
+       FROM users u LEFT JOIN companies c ON c.user_id = u.id WHERE u.id IN (${proxyIds.map(() => '?').join(',')})
+       ORDER BY u.created_at DESC`,
+      proxyIds
+    )).map((r) => ({ id: r.id, name: r.name || '회사명 미입력', contactPerson: r.contact_person || '', createdAt: r.created_at, claimPending: Number(r.claim_pending) === 1 }))
+    : [];
+
   const sortDesc = (m) => Object.values(m).sort((a, b) => b.total - a.total);
   res.json({
+    proxyCompanies,
     days,
     total: inPeriod.length,
     freelancer: inPeriod.filter((u) => u.role === 'freelancer').length,
