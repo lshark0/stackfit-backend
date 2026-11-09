@@ -5053,7 +5053,7 @@ async function screenMypage(){
     <div class="section-label with-ic">${I.gear}관리자</div>
     <div class="list-item" onclick="go('mfaSetup')"><div class="li-l"><div class="li-icon">${I.verified}</div><div class="li-tt">2단계 인증 <span class="page-sub">사용 중</span></div></div>${I.chevR}</div>
     <div class="list-item" onclick="go('adminPerformance')"><div class="li-l"><div class="li-icon">${I.layers}</div><div class="li-tt">성과 지표</div></div>${I.chevR}</div>
-    <div class="list-item" onclick="go('adminCareerVerify')"><div class="li-l"><div class="li-icon">${I.verified}</div><div class="li-tt">경력 검증 (AI 심사)</div></div>${I.chevR}</div>
+    <div class="list-item" onclick="go('adminCareerVerify')"><div class="li-l"><div class="li-icon">${I.verified}</div><div class="li-tt">프리랜서 경력 검증 심사</div></div>${I.chevR}</div>
     <div class="list-item" onclick="go('adminSignupStats')"><div class="li-l"><div class="li-icon">${I.talent}</div><div class="li-tt">가입 경로 통계</div></div>${I.chevR}</div>
     <div class="list-item" onclick="go('adminAiUsage')"><div class="li-l"><div class="li-icon">${I.sparkle}</div><div class="li-tt">AI 사용량 통계</div></div>${I.chevR}</div>
     <div class="list-item" onclick="go('adminSecurity')"><div class="li-l"><div class="li-icon">${I.verified}</div><div class="li-tt">보안 로그</div></div>${I.chevR}</div>
@@ -5509,6 +5509,7 @@ const SOURCE_LABELS = {
   naver_cafe: '네이버 카페', blog: '블로그', jobpage: '공개 공고 페이지(검색 등)', instagram: '인스타그램', google_ads: '구글 광고', naver_ads: '네이버 광고',
   meta_ads: '메타(페북·인스타) 광고', email: '이메일', offline: '오프라인·명함',
   disquiet: '디스콰이엇', startup_org: '창업지원기관·커뮤니티',
+  proxy: '관리자 대리 등록(기업)',
 };
 const sourceLabel = (s) => SOURCE_LABELS[s] || s;
 let adminStatsDays = 30;
@@ -5553,7 +5554,7 @@ async function screenAdminSignupStats(){
     <div class="card">
       <div class="page-sub" style="margin-bottom:8px;">OKKY·오픈채팅 등에 글을 올릴 때 이 링크를 쓰면, 그 링크로 가입한 회원이 위 표에 채널별로 집계돼요.</div>
       <div class="form-field"><label class="form-label">채널</label>
-        <select id="lb-source" class="form-input">${Object.entries(SOURCE_LABELS).filter(([k])=>k && k!=='referral' && k!=='jobpage').map(([k,l])=>`<option value="${k}">${esc(l)}</option>`).join('')}</select></div>
+        <select id="lb-source" class="form-input">${Object.entries(SOURCE_LABELS).filter(([k])=>k && k!=='referral' && k!=='jobpage' && k!=='proxy').map(([k,l])=>`<option value="${k}">${esc(l)}</option>`).join('')}</select></div>
       <div class="form-field"><label class="form-label">캠페인 이름 <span style="font-weight:400; color:var(--slate-light);">(선택, 영문·숫자)</span></label>
         <input id="lb-campaign" class="form-input" placeholder="예: okbank_ta_1001"></div>
       <button class="btn btn-primary" onclick="buildChannelLink()">링크 만들고 복사</button>
@@ -5713,7 +5714,7 @@ async function screenAdminCareerVerify(){
   if(!state.isAdmin){ go('mypage'); return ''; }
   const d = await apiFetch('/career-verification/admin');
   return `${statusbar()}
-  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('mypage')">${I.back}</div><div class="page-title" style="font-size:19.5px;">경력 검증 (AI 심사)</div></div></div>
+  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('mypage')">${I.back}</div><div class="page-title" style="font-size:19.5px;">프리랜서 경력 검증 심사</div></div></div>
   <div class="content">
     <div class="page-sub" style="margin-bottom:10px; line-height:1.6;">AI가 먼저 심사해 승인·반려하고, 경력 기간이 프로필과 다르면 보완 서류를 바로 안내해요. 판단이 어려운 서류만 여기로 넘어와요. 확인 필요 <b>${d.pending}</b>건 · AI 검토 중 ${d.reviewing}건. 처리하면 서류 원본은 바로 삭제돼요.</div>
     ${d.items.length ? d.items.map(v=>`
@@ -5968,7 +5969,7 @@ async function screenAdminDuplicates(){
         프로필 ${a.completion}% · 경력기술서 ${a.hasResume ? '있음' : '없음'} · 지원 ${a.applications} · 받은 제안 ${a.proposals} · 계약 ${a.projects}
       </div>
       ${a.deletable
-        ? `<button class="btn btn-outline" style="margin-top:10px; color:var(--danger);" onclick="deleteDuplicateAccount(${a.id}, '${jsAttrStr(a.name || '')}')">이 계정 삭제</button>`
+        ? `${a.caution ? `<div class="page-sub" style="margin-top:8px; color:var(--amber-deep);">⚠ ${esc(a.caution)}</div>` : ''}<button class="btn btn-outline" style="margin-top:10px; color:var(--danger);" onclick="deleteDuplicateAccount(${a.id}, '${jsAttrStr(a.name || '')}', ${a.caution ? 'true' : 'false'})">이 계정 삭제</button>`
         : `<div class="page-sub" style="margin-top:8px;">삭제 불가 — ${esc(a.blocked)}</div>`}
     </div>`;
   return `${statusbar()}
@@ -5979,10 +5980,12 @@ async function screenAdminDuplicates(){
       : `<div class="reco-empty" style="margin-top:16px;">중복 의심 계정이 없어요.</div>`}
   </div>`;
 }
-async function deleteDuplicateAccount(id, name){
+async function deleteDuplicateAccount(id, name, caution){
   if(!confirm(`${name || '이 계정'} (#${id}) 계정을 삭제할까요? 프로필·지원·제안 기록이 함께 지워지고 되돌릴 수 없어요.`)) return;
+  // 번호가 달라 다른 사람일 수도 있는 계정은 한 번 더 확인합니다(본인이 잘못 입력한 중복 계정임을 관리자가 확인한 경우에만).
+  if(caution && !confirm(`휴대폰 번호가 다른 계정이에요. 같은 사람이 번호를 잘못 입력해 만든 중복 계정임을 확인하셨나요?\n확인했다면 [확인]을 눌러 삭제하세요.`)) return;
   try{
-    await apiFetch('/admin/duplicate-freelancers/' + id, {method:'DELETE'});
+    await apiFetch('/admin/duplicate-freelancers/' + id + (caution ? '?confirmDifferentPhone=1' : ''), {method:'DELETE'});
     toast('계정을 삭제했어요');
     render();
   }catch(e){ toast(e.message); }

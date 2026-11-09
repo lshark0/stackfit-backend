@@ -376,12 +376,19 @@ async function duplicateFreelancerGroups() {
     const digits = phoneDigits(r.phone);
     const samePhone = !!digits && g.some((o) => o.id !== r.id && phoneDigits(o.phone) === digits);
     const projects = Number(r.projects);
-    // 삭제는 같은 번호의 다른 계정이 있거나, 번호를 한 번도 넣지 않은(프로필 미완성) 계정만 허용합니다.
-    // 이름만 같고 각자 번호가 있는 계정은 다른 사람일 수 있어 막고, 계약 이력이 있는 계정·관리자 계정도 막습니다.
+    // 삭제는 같은 번호의 다른 계정이 있거나, 번호를 한 번도 넣지 않은(프로필 미완성) 계정이면 바로 허용합니다.
+    // 이름만 같고 번호가 다른 계정은 다른 사람일 수 있어, 활동(지원·제안·계약)이 전혀 없을 때만
+    // 관리자가 '번호를 잘못 입력한 중복 계정'임을 한 번 더 확인하고 삭제할 수 있게 합니다(caution).
+    // 계약 이력이 있는 계정·관리자 계정은 막습니다.
     let blocked = '';
+    let caution = '';
+    const activity = Number(r.applications) + Number(r.proposals) + projects;
     if (isAdminEmail(r.email)) blocked = '관리자 계정';
     else if (projects > 0) blocked = '계약 이력이 있는 계정';
-    else if (!samePhone && digits) blocked = '이름만 같고 번호가 달라 다른 사람일 수 있음';
+    else if (!samePhone && digits) {
+      if (activity > 0) blocked = '이름만 같고 번호가 달라 다른 사람일 수 있음(지원·제안 기록 있음)';
+      else caution = '이름만 같고 번호가 달라요. 같은 사람이 번호를 잘못 입력한 중복 계정일 때만 삭제하세요.';
+    }
     return {
       id: r.id,
       name: r.name,
@@ -397,6 +404,7 @@ async function duplicateFreelancerGroups() {
       projects,
       deletable: !blocked,
       blocked,
+      caution,
     };
   }));
 }
@@ -411,6 +419,9 @@ router.delete('/duplicate-freelancers/:id', requireAuth, requireAdmin, async (re
   const account = (await duplicateFreelancerGroups()).flat().find((a) => a.id === id);
   if (!account) return res.status(404).json({ error: '중복 의심 계정 목록에 없는 계정이에요.' });
   if (!account.deletable) return res.status(400).json({ error: `삭제할 수 없는 계정이에요: ${account.blocked}` });
+  if (account.caution && req.query.confirmDifferentPhone !== '1') {
+    return res.status(400).json({ error: '휴대폰 번호가 다른 계정이라 한 번 더 확인이 필요해요.', code: 'CONFIRM_DIFFERENT_PHONE' });
+  }
   await run('DELETE FROM users WHERE id = ?', [id]);
   res.json({ ok: true });
 });
