@@ -117,6 +117,40 @@ router.post('/jobs', async (req, res) => {
   res.status(201).json(await withCompanyAndStack(job));
 });
 
+// 관리자가 대신 만든 기업 계정 목록 — 공고가 없거나 삭제된 기업도 보이게 합니다(가입 경로 'proxy').
+router.get('/accounts', async (req, res) => {
+  const rows = await all(
+    `SELECT u.id, u.email, u.claim_pending, u.created_at, c.name, c.contact_person, c.biz_verified_at,
+       (SELECT COUNT(*) FROM jobs j WHERE j.company_id = u.id) AS jobs
+     FROM users u LEFT JOIN companies c ON c.user_id = u.id
+     WHERE u.role = 'company' AND (u.signup_source = 'proxy' OR u.proxy_created_by IS NOT NULL)
+     ORDER BY u.created_at DESC, u.id DESC LIMIT 100`
+  );
+  res.json({
+    accounts: rows.map((r) => ({
+      id: r.id, name: r.name || '회사명 미입력', contactPerson: r.contact_person || '', email: r.email,
+      createdAt: r.created_at, claimPending: Number(r.claim_pending) === 1, jobs: Number(r.jobs) || 0, bizVerified: !!r.biz_verified_at,
+      // 담당자가 아직 넘겨받지 않았고 공고도 없는 계정만 정리(삭제)할 수 있습니다.
+      deletable: Number(r.claim_pending) === 1 && Number(r.jobs) === 0,
+    })),
+  });
+});
+
+// 대신 만든 기업 계정 삭제 — 계정 연결 전이고 공고가 하나도 없을 때만(잘못 만들었거나 시험으로 만든 계정 정리용)
+router.delete('/accounts/:id', async (req, res) => {
+  const id = Number(req.params.id);
+  const u = await get(
+    `SELECT u.id, u.claim_pending, (SELECT COUNT(*) FROM jobs j WHERE j.company_id = u.id) AS jobs
+     FROM users u WHERE u.id = ? AND u.role = 'company' AND (u.signup_source = 'proxy' OR u.proxy_created_by IS NOT NULL)`,
+    [id]
+  );
+  if (!u) return res.status(404).json({ error: '관리자가 대신 만든 기업 계정이 아니에요.' });
+  if (Number(u.claim_pending) !== 1) return res.status(400).json({ error: '담당자가 이미 넘겨받은 계정은 삭제할 수 없어요.' });
+  if (Number(u.jobs) > 0) return res.status(400).json({ error: '공고가 있는 계정은 삭제할 수 없어요. 공고를 먼저 정리해주세요.' });
+  await run('DELETE FROM users WHERE id = ?', [id]);
+  res.json({ ok: true });
+});
+
 // 대리 등록한 공고 목록
 router.get('/jobs', async (req, res) => {
   const rows = await all(

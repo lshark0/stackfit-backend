@@ -6045,7 +6045,7 @@ async function screenAdminAiUsage(){
 let proxySearch = '', proxyResults = null, proxyConsent = false;
 async function screenAdminProxyJobs(){
   if(!state.isAdmin){ go('mypage'); return ''; }
-  const d = await apiFetch('/admin/proxy/jobs');
+  const [d, acc] = await Promise.all([apiFetch('/admin/proxy/jobs'), apiFetch('/admin/proxy/accounts').catch(()=>({accounts:[]}))]);
   return `${statusbar()}
   <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('mypage')">${I.back}</div><div class="page-title" style="font-size:19.5px;">공고 대리 등록</div></div></div>
   <div class="content">
@@ -6088,7 +6088,26 @@ async function screenAdminProxyJobs(){
           ${j.claimPending ? `<span class="sbadge pending">계정 연결 전</span>` : `<span class="sbadge pass">기업 연결됨</span>`}</div>
         ${j.claimPending ? `<button class="btn btn-outline" style="margin-top:10px; font-size:12.5px;" onclick="copyClaimLink(${j.companyId})">계정 연결 링크 복사 (담당자에게 보내기)</button>` : ''}
       </div>`).join('') : `<div class="reco-empty">아직 대리 등록한 공고가 없어요.</div>`}
+
+    <div class="section-label with-ic">${I.building}대신 만든 기업 계정 <b style="color:var(--ink); margin-left:4px;">${acc.accounts.length}곳</b></div>
+    ${acc.accounts.length ? acc.accounts.map(a=>`
+      <div class="card">
+        <div class="card-top"><div style="min-width:0;"><div class="card-title">${esc(a.name)}</div>
+          <div class="card-org" style="word-break:break-all;">${esc([a.contactPerson, a.email].filter(Boolean).join(' · '))}</div>
+          <div class="page-sub" style="margin-top:4px;">만든 날 ${esc(new Date(a.createdAt).toLocaleDateString('ko-KR'))} · 공고 ${a.jobs}건</div></div>
+          ${a.claimPending ? `<span class="sbadge pending">계정 연결 전</span>` : `<span class="sbadge pass">기업 연결됨</span>`}</div>
+        <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">
+          ${proxyConsent ? `<button class="btn btn-primary" style="width:auto; padding:7px 12px; font-size:12.5px;" onclick="startProxyPost(${a.id}, '${jsAttrStr(a.name)}', ${a.bizVerified ? 'true' : 'false'})">공고 등록</button>` : ''}
+          ${a.claimPending ? `<button class="btn btn-outline" style="width:auto; padding:7px 12px; font-size:12.5px;" onclick="copyClaimLink(${a.id})">계정 연결 링크 복사</button>` : ''}
+          ${a.deletable ? `<button class="btn btn-outline" style="width:auto; padding:7px 12px; font-size:12.5px; color:var(--danger);" onclick="deleteProxyAccount(${a.id}, '${jsAttrStr(a.name)}')">계정 삭제</button>` : ''}
+        </div>
+      </div>`).join('') : `<div class="reco-empty">대신 만든 기업 계정이 없어요.</div>`}
   </div>`;
+}
+async function deleteProxyAccount(id, name){
+  if(!confirm(`${name} 기업 계정을 삭제할까요? 담당자가 아직 넘겨받지 않았고 공고도 없는 계정이에요. 되돌릴 수 없어요.`)) return;
+  try{ await apiFetch('/admin/proxy/accounts/' + id, {method:'DELETE'}); toast('기업 계정을 삭제했어요'); render(); }
+  catch(e){ toast(e.message); }
 }
 async function searchProxyCompanies(){
   proxySearch = (document.getElementById('px-q')?.value || '').trim();
