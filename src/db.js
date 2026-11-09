@@ -182,6 +182,7 @@ if (USE_POSTGRES) {
     await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_ci ON users(ci) WHERE ci IS NOT NULL');
     // 본인인증 건 번호는 한 번만 쓸 수 있고(재사용 방지), DI로도 같은 사람의 중복 가입을 막습니다.
     await ensureColumnPg('users', 'identity_verification_id', 'TEXT');
+    await ensureColumnPg('freelancer_profiles', 'ai_reason', 'INTEGER NOT NULL DEFAULT 1'); // 기업의 'AI 추천 이유 설명'에 내 프로필 사용 허용
     await ensureColumnPg('jobs', 'closed_by', 'TEXT'); // 공고를 마감한 주체: company(기업 직접)·admin(신고 처리)·deadline(마감일 경과)
     await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_ivid ON users(identity_verification_id) WHERE identity_verification_id IS NOT NULL');
     // 예전 시험 인증으로 같은 DI가 이미 겹쳐 있으면 색인을 만들 수 없으므로, 서버 시작은 막지 않고 경고만 남깁니다(가입 때 DI 중복은 따로 확인함).
@@ -326,6 +327,7 @@ if (USE_POSTGRES) {
     addCol('users', 'totp_backup_codes', 'TEXT');
     try { db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_ci ON users(ci) WHERE ci IS NOT NULL'); } catch (e) {}
     addCol('users', 'identity_verification_id', 'TEXT');
+    addCol('freelancer_profiles', 'ai_reason', 'INTEGER NOT NULL DEFAULT 1'); // 기업의 'AI 추천 이유 설명'에 내 프로필 사용 허용
     addCol('jobs', 'closed_by', 'TEXT'); // 공고를 마감한 주체: company(기업 직접)·admin(신고 처리)·deadline(마감일 경과)
     try { db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_ivid ON users(identity_verification_id) WHERE identity_verification_id IS NOT NULL'); } catch (e) {}
     try { db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_di ON users(di) WHERE di IS NOT NULL'); } catch (e) {}

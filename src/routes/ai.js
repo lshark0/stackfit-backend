@@ -3,6 +3,7 @@
 // - POST /api/ai/support-chat           고객센터 AI 상담 (Claude Haiku 4.5)
 // - POST /api/ai/profile-from-resume    올려둔 경력기술서를 읽어 프로필 입력값을 제안 (저장은 하지 않음)
 // - POST /api/ai/job-from-text          공고 원문(붙여넣은 글·PDF/Word/PPT)을 읽어 공고 입력값을 제안 (저장은 하지 않음)
+// - POST /api/ai/match-reason           추천 카드의 '왜 맞는지' 한두 문장 설명 (점수는 건드리지 않음, 저장하지 않음)
 const express = require('express');
 const multer = require('multer');
 const { get, all } = require('../db');
@@ -15,6 +16,8 @@ const { STACK_CATALOG } = require('../stackCatalog');
 const { sameProject } = require('../portfolioDedupe');
 const { isAdminEmail } = require('../middleware/requireAdmin');
 const { normalizeDate } = require('../workConditions');
+const { pairDetail } = require('../recommend');
+const { reasonFor } = require('../aiRecoReason');
 
 const router = express.Router();
 wrapAllRoutes(router);
@@ -57,6 +60,7 @@ router.get('/status', requireAuth, async (req, res) => {
           support_chat: await ai.remainingToday(req.user.id, 'support_chat'),
           profile_from_resume: await ai.remainingToday(req.user.id, 'profile_from_resume'),
           job_from_text: await ai.remainingToday(req.user.id, 'job_from_text'),
+          match_reason: await ai.remainingToday(req.user.id, 'match_reason'),
         }
       : null,
   });
@@ -457,6 +461,66 @@ router.post('/job-from-text', requireAuth, (req, res, next) => {
       return res.status(502).json({ error: '공고 내용을 분석하지 못했어요. 잠시 후 다시 시도해주세요.' });
     }
     res.json({ suggestion: cleanJobSuggestion(parsed, today), remaining: remaining - 1 });
+  } finally {
+    release();
+  }
+});
+
+// ── 추천 이유 설명 (개선-012, 결재-025) ─────────────────────────────────────
+// 추천 점수는 정해진 배점표(src/recommend.js)로 계산하고, AI는 그 결과를 사람이 읽기 쉬운 말로 풀어 줄 뿐입니다.
+// AI에 보내는 내용·개인정보 가림·결과 보관은 src/aiRecoReason.js(관리자 미리보기와 같은 모듈)에서 합니다.
+// - 이름·연락처·생년월일은 보내지 않고, 자기소개 등 자유 입력 글은 연락처를 가리고 본인 이름을 '본인'으로 바꿉니다.
+// - 같은 공고·프로필 내용이면 6시간 동안 서버 메모리에 보관한 설명을 다시 씁니다(이용 횟수도 차감하지 않음).
+router.post('/match-reason', requireAuth, async (req, res) => {
+  if (!ai.getClient()) return res.status(503).json({ error: NOT_READY, code: 'AI_DISABLED' });
+  const body = req.body || {};
+  const role = req.user.role;
+  if (role !== 'freelancer' && role !== 'company') return res.status(403).json({ error: '이용할 수 없는 계정이에요.' });
+
+  // 프리랜서: 내 프로필 ↔ 공고(body.job_id), 기업: 내 공고(body.job_id) ↔ 인재(body.talent_id)
+  const jobId = Number(body.job_id);
+  if (!Number.isInteger(jobId)) return res.status(400).json({ error: '공고 정보가 올바르지 않아요.' });
+  let job; let profile;
+  if (role === 'freelancer') {
+    job = await get("SELECT * FROM jobs WHERE id = ? AND status = 'open'", [jobId]);
+    profile = await get('SELECT * FROM freelancer_profiles WHERE user_id = ?', [req.user.id]);
+  } else {
+    const tid = Number(body.talent_id);
+    if (!Number.isInteger(tid)) return res.status(400).json({ error: '인재 정보가 올바르지 않아요.' });
+    job = await get('SELECT * FROM jobs WHERE id = ? AND company_id = ?', [jobId, req.user.id]);
+    profile = await get('SELECT * FROM freelancer_profiles WHERE user_id = ?', [tid]);
+  }
+  if (!job) return res.status(404).json({ error: '공고를 찾을 수 없어요.' });
+  if (!profile) return res.status(404).json({ error: '프로필을 찾을 수 없어요.' });
+  // 프리랜서가 'AI 추천 이유 설명에 내 프로필 사용'을 끈 경우 기업 요청에는 AI를 부르지 않습니다.
+  if (role === 'company' && Number(profile.ai_reason ?? 1) === 0) {
+    return res.status(403).json({ error: '이 인재는 AI 추천 이유 설명을 허용하지 않았어요.', code: 'AI_REASON_OPTOUT' });
+  }
+
+  const detail = pairDetail(job, profile);
+  const release = ai.tryBegin(req.user.id, 'match_reason');
+  if (!release) return res.status(429).json(BUSY);
+  try {
+    let remaining = null;
+    const r = await reasonFor({
+      viewer: role,
+      job: { ...job, stack: JSON.parse(job.stack_json || '[]'), certs: JSON.parse(job.certs_json || '[]') },
+      profile,
+      ruleReasons: detail ? detail.reasons : [],
+      userId: req.user.id,
+      feature: 'match_reason',
+      // 보관된 설명이 없을 때만(=실제로 AI를 부를 때만) 이용 한도를 확인합니다.
+      beforeCall: async () => {
+        remaining = await ai.remainingToday(req.user.id, 'match_reason');
+        if (remaining <= 0) throw Object.assign(new Error('오늘 AI 추천 이유 설명을 모두 사용했어요. 내일 다시 이용해주세요.'), { limit: 'AI_DAILY_LIMIT' });
+        if ((await ai.globalRemainingToday()) <= 0) throw Object.assign(new Error(GLOBAL_LIMIT.error), { limit: GLOBAL_LIMIT.code });
+      },
+    });
+    if (!r.text) return res.status(502).json({ error: '설명을 만들지 못했어요. 잠시 후 다시 시도해주세요.' });
+    res.json({ reason: scrubSupportReply(r.text), cached: !!r.cached, ...(remaining !== null ? { remaining: remaining - 1 } : {}) });
+  } catch (err) {
+    if (err && err.limit) return res.status(429).json({ error: err.message, code: err.limit });
+    return res.status(502).json({ error: ai.friendlyError(err) });
   } finally {
     release();
   }

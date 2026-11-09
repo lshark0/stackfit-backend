@@ -251,7 +251,7 @@ router.get('/signup-stats', requireAuth, requireAdmin, async (req, res) => {
 });
 
 // AI 사용량 통계 — 기능별 호출 수·토큰·예상 비용(USD/원), 일별 추이, 많이 쓴 회원
-const AI_FEATURE_LABELS = { support_chat: 'AI 상담', profile_from_resume: '경력기술서 자동 채우기', career_verify: '경력 검증 AI 심사', job_from_text: '공고 자동 채우기', reco_reason: 'AI 추천 이유(미리보기)' };
+const AI_FEATURE_LABELS = { support_chat: 'AI 상담', profile_from_resume: '경력기술서 자동 채우기', career_verify: '경력 검증 AI 심사', job_from_text: '공고 자동 채우기', match_reason: '추천 이유 설명', reco_reason: 'AI 추천 이유(미리보기)' };
 router.get('/ai-usage', requireAuth, requireAdmin, async (req, res) => {
   const days = Math.min(3650, Math.max(1, Number.parseInt(req.query.days, 10) || 30));
   const today = ai.kstDay();
@@ -339,7 +339,7 @@ router.post('/ai-reco-preview', requireAuth, requireAdmin, async (req, res) => {
       const jobs = await all("SELECT * FROM jobs WHERE status = 'open' ORDER BY created_at DESC, id DESC LIMIT 5");
       for (const j of jobs) {
         const job = { ...j, stack: JSON.parse(j.stack_json), certs: JSON.parse(j.certs_json || '[]') };
-        for (const t of await recommendTalentsForJob(job, 3)) pairs.push({ job, profile: t, score: t.score, ruleReasons: t.reasons });
+        for (const t of (await recommendTalentsForJob(job, 3)).filter((x) => Number(x.ai_reason ?? 1) !== 0)) pairs.push({ job, profile: t, score: t.score, ruleReasons: t.reasons });
       }
     } else {
       const rows = await all(

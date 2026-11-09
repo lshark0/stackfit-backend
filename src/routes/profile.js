@@ -143,16 +143,17 @@ async function isIdentityVerified(userId) {
 // [프리랜서] 제안 받기 설정 — 제안 수신 여부와, 기업에게 공개할 연락 수단(휴대폰/이메일)
 router.put('/proposal-settings', requireAuth, requireRole('freelancer'), async (req, res) => {
   const current = await get(
-    'SELECT phone, email, accept_proposals, share_phone, share_email, job_alerts FROM freelancer_profiles WHERE user_id = ?',
+    'SELECT phone, email, accept_proposals, share_phone, share_email, job_alerts, ai_reason FROM freelancer_profiles WHERE user_id = ?',
     [req.user.id]
   );
-  const { accept_proposals, share_phone, share_email, job_alerts } = req.body || {};
+  const { accept_proposals, share_phone, share_email, job_alerts, ai_reason } = req.body || {};
   const flag = (v, fallback) => (v === undefined ? Number(fallback) : (v ? 1 : 0));
   const next = {
     accept_proposals: flag(accept_proposals, current.accept_proposals ?? 1),
     share_phone: flag(share_phone, current.share_phone ?? 0),
     share_email: flag(share_email, current.share_email ?? 0),
     job_alerts: flag(job_alerts, current.job_alerts ?? 1),
+    ai_reason: flag(ai_reason, current.ai_reason ?? 1),
   };
   // 등록하지 않은 연락처는 공개할 수 없습니다.
   if (next.share_phone && !current.phone) {
@@ -162,8 +163,8 @@ router.put('/proposal-settings', requireAuth, requireRole('freelancer'), async (
     return res.status(400).json({ error: '프로필 수정에서 이메일을 먼저 등록해주세요.', code: 'NO_EMAIL' });
   }
   await run(
-    'UPDATE freelancer_profiles SET accept_proposals=?, share_phone=?, share_email=?, job_alerts=? WHERE user_id=?',
-    [next.accept_proposals, next.share_phone, next.share_email, next.job_alerts, req.user.id]
+    'UPDATE freelancer_profiles SET accept_proposals=?, share_phone=?, share_email=?, job_alerts=?, ai_reason=? WHERE user_id=?',
+    [next.accept_proposals, next.share_phone, next.share_email, next.job_alerts, next.ai_reason, req.user.id]
   );
   res.json(next);
 });
