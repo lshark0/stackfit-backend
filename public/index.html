@@ -5999,10 +5999,10 @@ const fmtNum = (n) => Number(n||0).toLocaleString('ko-KR');
 const fmtWon = (n) => `${fmtNum(n)}원`;
 async function screenAdminAiUsage(){
   if(!state.isAdmin){ go('mypage'); return ''; }
-  const s = await apiFetch('/admin/ai-usage?days=' + adminAiDays);
+  const [s, ts] = await Promise.all([apiFetch('/admin/ai-usage?days=' + adminAiDays), apiFetch('/admin/tech-similarity').catch(()=>null)]);
   const periods = [[7,'7일'],[30,'30일'],[90,'90일'],[3650,'전체']];
   const daily = s.daily.slice(-14);
-  const limitLabel = { support_chat: 'AI 상담', profile_from_resume: '경력기술서 자동 채우기', career_verify: '경력 검증 AI 심사', job_from_text: '공고 자동 채우기', match_reason: '추천 이유 설명', reco_reason: 'AI 추천 이유(미리보기, 종료)' };
+  const limitLabel = { support_chat: 'AI 상담', profile_from_resume: '경력기술서 자동 채우기', career_verify: '경력 검증 AI 심사', job_from_text: '공고 자동 채우기', match_reason: '추천 이유 설명', reco_reason: 'AI 추천 이유(미리보기, 종료)', tech_similarity: '유사 기술 판정' };
   return `${statusbar()}
   <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('mypage')">${I.back}</div><div class="page-title" style="font-size:19.5px;">AI 사용량 통계</div></div></div>
   <div class="content">
@@ -6037,7 +6037,28 @@ async function screenAdminAiUsage(){
       · 모델: ${esc(s.model)} · 비용은 토큰 수로 계산한 <b>예상치</b>예요(1달러 = ${fmtNum(s.krwPerUsd)}원). 실제 청구액은 Claude Console › 사용량에서 확인하세요.<br>
       · 1인 1일 한도: ${Object.entries(s.limits).map(([k,v])=>`${limitLabel[k]||k} ${v}회`).join(', ')}
     </div>
+    ${ts ? techSimilaritySection(ts) : ''}
   </div>`;
+}
+
+// [개선-013] AI 유사 기술 판정 목록: 추천 점수의 기술스택 항목에서 '같음'은 일치로, '비슷함'은 절반으로 인정해요.
+// 판정이 틀렸으면 관리자가 고칠 수 있고, 고친 판정은 AI가 다시 바꾸지 않아요.
+const TECH_VERDICT_LABEL = { same:'같음', similar:'비슷함(절반)', different:'다름' };
+let techSimFilter = 'match';
+function setTechSimFilter(f){ techSimFilter = f; render(); }
+function techSimilaritySection(ts){
+  const items = ts.items.filter(r => techSimFilter==='all' || r.verdict !== 'different');
+  return `<div class="section-label with-ic" style="margin-top:18px;">${I.sparkle}유사 기술 판정 (AI)</div>
+    <div class="page-sub" style="margin-bottom:8px; line-height:1.6;">공고 기술과 프로필 기술의 이름이 달라도, AI가 <b>같음</b>으로 보면 일치로, <b>비슷함</b>으로 보면 절반 점수로 추천에 반영해요. 기술 이름만 AI에 보내요. ${ts.enabled ? `하루 최대 ${ts.dailyCalls}회 호출(1회 ${ts.pairsPerCall}쌍).` : '지금은 꺼져 있어요.'}</div>
+    <div class="chip-row">${[['match','같음·비슷함'],['all','전체']].map(([k,l])=>`<div class="chip ${k===techSimFilter?'active':''}" onclick="setTechSimFilter('${k}')">${l}</div>`).join('')}</div>
+    ${items.length ? `<table class="stat-table" style="margin-top:8px;"><thead><tr><th>기술 쌍</th><th>판정</th></tr></thead><tbody>
+      ${items.map(r=>`<tr><td>${esc(r.tech_a)} ↔ ${esc(r.tech_b)}${r.source==='admin'?' <span class="page-sub">(관리자 수정)</span>':''}</td>
+        <td><select onchange="setTechVerdict('${jsAttrStr(r.pair_key)}', this.value)">${Object.entries(TECH_VERDICT_LABEL).map(([v,l])=>`<option value="${v}" ${v===r.verdict?'selected':''}>${l}</option>`).join('')}</select></td></tr>`).join('')}
+    </tbody></table>` : `<div class="reco-empty">아직 판정한 기술 쌍이 없어요. 추천 화면이 열리면 처음 보는 기술 쌍부터 판정해요.</div>`}`;
+}
+async function setTechVerdict(key, verdict){
+  try{ await apiFetch('/admin/tech-similarity', {method:'PUT', body:{key, verdict}}); toast('판정을 고쳤어요'); render(); }
+  catch(e){ toast(e.message); }
 }
 
 /* ---------------- 관리자: 공고 대리 등록 ---------------- */

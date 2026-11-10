@@ -8,6 +8,7 @@ const { sendInterviewReminders } = require('./src/interviews');
 const { resumePendingReviews } = require('./src/careerReview');
 const { seedNotices } = require('./src/seedNotices');
 const { logDailyMetricsOnce } = require('./src/dailyMetrics');
+const { loadTechSimilarity } = require('./src/techSimilarity');
 
 const authRoutes = require('./src/routes/auth');
 const profileRoutes = require('./src/routes/profile');
@@ -397,6 +398,7 @@ async function main() {
   await initPush(); // 푸시 인증키 준비 (실패해도 서버는 정상 동작)
   await resetMfaFromEnv(securityLog.logEvent); // 비상시 관리자 2단계 인증 초기화 (MFA_RESET_EMAILS)
   await dedupeAllPortfolios(); // 예전에 AI 자동 채우기로 중복 등록된 수행 프로젝트를 한 번 정리
+  await loadTechSimilarity(); // [개선-013] 저장된 AI 유사 기술 판정을 메모리에 올림
   app.listen(PORT, () => {
     console.log(`[김프리] API 서버 실행 중 → http://localhost:${PORT} (DB: ${USE_POSTGRES ? 'PostgreSQL' : 'SQLite'})`);
     // 외부 연동이 켜졌는지만 남깁니다(설정값 자체는 출력하지 않음). Render 로그로 설정 여부를 확인할 때 씁니다.
