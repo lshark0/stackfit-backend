@@ -10,6 +10,7 @@ const { matchesCategory } = require('../stackCatalog');
 const { publicTalent, contactFields } = require('../contact');
 const { addNotification } = require('../notify');
 const { scoreMatch } = require('../recommend');
+const { parseEducation } = require('../education');
 
 const router = express.Router();
 wrapAllRoutes(router);
@@ -230,6 +231,7 @@ router.get('/:userId', requireAuth, requireRole('company'), async (req, res) => 
     ...publicTalent(t),
     stack: JSON.parse(t.stack_json),
     certs: JSON.parse(t.certs_json || '[]'),
+    education: parseEducation(t.education_json),
     proposed,
     saved,
     // 이 기업의 제안을 프리랜서가 실제로 수락한 경우에만 연락처를 내려줍니다.

@@ -3085,6 +3085,45 @@ function removeProfileTag(i){ pendingStack.splice(i,1); refreshTagsUI(); }
 
 // 자격증도 기술스택과 같은 방식으로 태그처럼 추가·삭제합니다.
 let pendingCerts = [];
+// 학력 — 서버 src/education.js와 같은 값
+const EDU_DEGREES = ['고등학교','전문학사','학사','석사','박사'];
+const EDU_STATUS = ['졸업','졸업예정','재학','수료','중퇴'];
+let pendingEducation = [];
+function educationRowsHtml(){
+  if(!pendingEducation.length) return `<div class="page-sub" style="margin:2px 0 6px;">등록된 학력이 없어요.</div>`;
+  return pendingEducation.map((e,i)=>`
+    <div style="border:1px solid var(--line); border-radius:12px; padding:10px; margin-bottom:8px; display:grid; gap:6px;">
+      <div style="display:flex; gap:6px;">
+        <input class="form-input" style="flex:1;" placeholder="학교명 (예: 상명대학교)" maxlength="60" value="${esc(e.school||'')}" oninput="pendingEducation[${i}].school=this.value">
+        <button class="btn btn-outline" style="width:auto; padding:0 12px; color:var(--danger);" onclick="removeEducation(${i})">삭제</button>
+      </div>
+      <div style="display:flex; gap:6px;">
+        <select class="form-input" style="flex:1;" onchange="pendingEducation[${i}].degree=this.value"><option value="">학위 선택</option>${EDU_DEGREES.map(d=>`<option ${e.degree===d?'selected':''}>${d}</option>`).join('')}</select>
+        <input class="form-input" style="flex:1;" placeholder="전공 (선택)" maxlength="60" value="${esc(e.major||'')}" oninput="pendingEducation[${i}].major=this.value">
+      </div>
+      <div style="display:flex; gap:6px;">
+        <input class="form-input" type="month" style="flex:1;" title="졸업(예정) 연월" value="${esc((e.end||'').replace('.','-'))}" onchange="pendingEducation[${i}].end=this.value">
+        <select class="form-input" style="flex:1;" onchange="pendingEducation[${i}].status=this.value">${EDU_STATUS.map(st=>`<option ${(e.status||'졸업')===st?'selected':''}>${st}</option>`).join('')}</select>
+      </div>
+    </div>`).join('');
+}
+function rerenderEducation(){ const el = document.getElementById('pf-edu'); if(el) el.innerHTML = educationRowsHtml(); }
+function addEducation(){
+  if(pendingEducation.length >= 6){ toast('학력은 6개까지 등록할 수 있어요'); return; }
+  pendingEducation.push({school:'', degree:'', major:'', end:'', status:'졸업'}); rerenderEducation();
+}
+function removeEducation(i){ pendingEducation.splice(i,1); rerenderEducation(); }
+// 인재 상세의 학력 목록 (최근 졸업 순)
+function educationListHtml(list){
+  if(!list || !list.length) return '';
+  const rows = [...list].sort((a,b)=>String(b.end||'').localeCompare(String(a.end||'')));
+  return `<div class="section-label with-ic">${I.badgeCheck}학력</div>
+    <div style="display:grid; gap:8px; margin-bottom:6px;">${rows.map(e=>`
+      <div style="display:flex; gap:14px; align-items:baseline;">
+        <span style="flex:0 0 78px; font-size:12.5px; color:var(--slate);">${e.end ? '~ ' + esc(e.end) : ''}</span>
+        <span style="font-size:14px; font-weight:700; color:var(--ink);">${esc(e.school)}${e.degree?` <span style="font-weight:500; color:var(--slate);">(${esc(e.degree)}${e.major?` · ${esc(e.major)}`:''})</span>`:(e.major?` <span style="font-weight:500; color:var(--slate);">(${esc(e.major)})</span>`:'')}${e.status && e.status!=='졸업' ? ` <span class="sbadge pending" style="font-size:10.5px;">${esc(e.status)}</span>` : ''}</span>
+      </div>`).join('')}</div>`;
+}
 /* ---- 기술스택 · 자격증 선택기 (검색 + 분류 + 직접 추가) ---- */
 // kind: 'stack' | 'cert'
 let pickerKind = 'stack';
@@ -3318,6 +3357,7 @@ async function saveProfile(){
       summary: document.getElementById('pf-summary').value.trim(),
       stack: pendingStack,
       certs: pendingCerts,
+      education: pendingEducation.filter(e=>String(e.school||'').trim()),
       available_from: document.getElementById('pf-avail').value,
       pref_work_type: profileWorkType,
       pref_regions: profileRegions,
@@ -4108,6 +4148,7 @@ async function screenTalentDetail(){
         ${t.contact_email?`<div class="meta-row" style="margin:${t.contact_phone?'8px':'0'} 0 0;"><span>✉️ 이메일</span><a href="mailto:${esc(t.contact_email)}" style="color:var(--ink); font-weight:700;">${esc(t.contact_email)}</a></div>`:''}
         <div class="page-sub" style="margin-top:8px;">프리랜서가 제안용으로 공개한 연락처예요.</div>
       </div>` : ''}
+    ${educationListHtml(t.education)}
     ${reviewSummaryHtml(reviewSum, '인재')}
     <div class="section-label with-ic">${I.checklist}수행 프로젝트 ${(t.portfolios||[]).length ? `(${t.portfolios.length}건)` : ''}</div>
     ${(t.portfolios||[]).length
@@ -6586,6 +6627,7 @@ async function screenProfileEdit(){
   if(!profileDraft){
     pendingStack = [...server.stack];
     pendingCerts = [...(server.certs || [])];
+    pendingEducation = (server.education || []).map(e=>({...e}));
     profileGender = server.gender || '';
     profileWorkType = server.pref_work_type || '';
     profileRegions = [...(server.pref_regions || [])];
@@ -6655,6 +6697,11 @@ async function screenProfileEdit(){
       <div class="tag-row" id="pf-certs">${pendingCerts.map((c,i)=>`<span class="tag on rm" onclick="removeProfileCert(${i})">${esc(c)} ${I.x}</span>`).join('')}</div>
       <button class="btn btn-outline" style="margin-top:8px; display:flex; align-items:center; justify-content:center; gap:7px;" onclick="openPicker('cert','profileEdit')">${I.search}분류에서 찾아보기 · 직접 추가</button>
       <div class="page-sub" style="margin-top:5px;">보유한 자격증을 입력하면 기업이 확인할 수 있어요.</div>
+    </div>
+    <div class="form-field">
+      <label class="form-label">학력 <span style="font-weight:400; color:var(--slate-light);">(선택, 최대 6개)</span></label>
+      <div id="pf-edu">${educationRowsHtml()}</div>
+      <button class="btn btn-outline" style="margin-top:4px;" onclick="addEducation()">+ 학력 추가</button>
     </div>
     <div class="form-field">
       <label class="form-label">자기소개</label>

@@ -186,6 +186,7 @@ if (USE_POSTGRES) {
     await ensureColumnPg('jobs', 'closed_by', 'TEXT');
     // 항목별 평가(JSON {항목: 1~5}), 재계약 의사(1/0), 강점 태그(JSON 배열)
     await ensureColumnPg('reviews', 'scores_json', 'TEXT');
+    await ensureColumnPg('freelancer_profiles', 'education_json', "TEXT NOT NULL DEFAULT '[]'"); // 학력(JSON 배열)
     await ensureColumnPg('reviews', 'again', 'INTEGER');
     await ensureColumnPg('reviews', 'tags_json', 'TEXT'); // 공고를 마감한 주체: company(기업 직접)·admin(신고 처리)·deadline(마감일 경과)
     await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_ivid ON users(identity_verification_id) WHERE identity_verification_id IS NOT NULL');
@@ -335,6 +336,7 @@ if (USE_POSTGRES) {
     addCol('jobs', 'closed_by', 'TEXT');
     // 항목별 평가(JSON {항목: 1~5}), 재계약 의사(1/0), 강점 태그(JSON 배열)
     addCol('reviews', 'scores_json', 'TEXT');
+    addCol('freelancer_profiles', 'education_json', "TEXT NOT NULL DEFAULT '[]'"); // 학력(JSON 배열)
     addCol('reviews', 'again', 'INTEGER');
     addCol('reviews', 'tags_json', 'TEXT'); // 공고를 마감한 주체: company(기업 직접)·admin(신고 처리)·deadline(마감일 경과)
     try { db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_ivid ON users(identity_verification_id) WHERE identity_verification_id IS NOT NULL'); } catch (e) {}

@@ -1,4 +1,5 @@
 const express = require('express');
+const { normalizeEducation, parseEducation } = require('../education');
 const crypto = require('crypto');
 const multer = require('multer');
 const { run, get, all } = require('../db');
@@ -125,6 +126,7 @@ router.get('/', requireAuth, async (req, res) => {
       identity_verified: identityVerified,
       stack: JSON.parse(p.stack_json),
       certs: JSON.parse(p.certs_json || '[]'),
+      education: parseEducation(p.education_json),
       pref_regions: parseRegions(p.pref_regions_json),
       resume_url: signedFileUrl(p.resume_filename),
     });
@@ -183,7 +185,7 @@ router.put('/business', requireAuth, requireRole('company'), async (req, res) =>
 router.put('/', requireAuth, async (req, res) => {
   if (req.user.role === 'freelancer') {
     const { name, role_title, years, rate, stack, summary, grade, certs, phone, email, birthDate, gender,
-      available_from, pref_work_type, pref_regions } = req.body || {};
+      available_from, pref_work_type, pref_regions, education } = req.body || {};
     const current = await get('SELECT * FROM freelancer_profiles WHERE user_id = ?', [req.user.id]);
 
     // 휴대폰은 필수, 이메일은 선택입니다.
@@ -249,6 +251,9 @@ router.put('/', requireAuth, async (req, res) => {
       ? parseRegions(current.pref_regions_json)
       : normalizeRegions(pref_regions);
 
+    // 학력(선택). 보내지 않으면 기존 값 유지.
+    const nextEducation = education === undefined ? parseEducation(current.education_json) : normalizeEducation(education);
+
     const GRADE_OPTIONS = ['초급', '중급', '고급', '특급'];
     const nextGrade = grade === undefined ? current.grade : (GRADE_OPTIONS.includes(grade) ? grade : null);
     const nextRoleTitle = role_title !== undefined ? clamp(role_title, 60, current.role_title) : current.role_title;
@@ -261,7 +266,7 @@ router.put('/', requireAuth, async (req, res) => {
     });
     await run(
       `UPDATE freelancer_profiles SET name=?, role_title=?, years=?, rate=?, stack_json=?, certs_json=?, summary=?, grade=?, completion=?, phone=?, email=?, birth_date=?, gender=?,
-        available_from=?, pref_work_type=?, pref_regions_json=?, updated_at=? WHERE user_id=?`,
+        available_from=?, pref_work_type=?, pref_regions_json=?, education_json=?, updated_at=? WHERE user_id=?`,
       [
         name !== undefined ? clamp(name, 60, current.name) : current.name,
         nextRoleTitle,
@@ -279,6 +284,7 @@ router.put('/', requireAuth, async (req, res) => {
         nextAvailable || null,
         nextWorkType || null,
         JSON.stringify(nextRegions),
+        JSON.stringify(nextEducation),
         nowStr(),
         req.user.id,
       ]
@@ -291,6 +297,7 @@ router.put('/', requireAuth, async (req, res) => {
     const { resume_data, ...rest } = updated;
     return res.json({
       ...rest, stack: JSON.parse(updated.stack_json), certs: JSON.parse(updated.certs_json || '[]'),
+      education: parseEducation(updated.education_json),
       pref_regions: parseRegions(updated.pref_regions_json),
     });
   }
