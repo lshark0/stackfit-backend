@@ -3087,7 +3087,6 @@ function removeProfileTag(i){ pendingStack.splice(i,1); refreshTagsUI(); }
 let pendingCerts = [];
 // 학력 — 서버 src/education.js와 같은 값
 const EDU_DEGREES = ['고등학교','전문학사','학사','석사','박사'];
-const EDU_STATUS = ['졸업','졸업예정','재학','수료','중퇴'];
 let pendingEducation = [];
 function educationRowsHtml(){
   if(!pendingEducation.length) return `<div class="page-sub" style="margin:2px 0 6px;">등록된 학력이 없어요.</div>`;
@@ -3101,9 +3100,9 @@ function educationRowsHtml(){
         <select class="form-input" style="flex:1;" onchange="pendingEducation[${i}].degree=this.value"><option value="">학위 선택</option>${EDU_DEGREES.map(d=>`<option ${e.degree===d?'selected':''}>${d}</option>`).join('')}</select>
         <input class="form-input" style="flex:1;" placeholder="전공 (선택)" maxlength="60" value="${esc(e.major||'')}" oninput="pendingEducation[${i}].major=this.value">
       </div>
-      <div style="display:flex; gap:6px;">
-        <input class="form-input" type="month" style="flex:1;" title="졸업(예정) 연월" value="${esc((e.end||'').replace('.','-'))}" onchange="pendingEducation[${i}].end=this.value">
-        <select class="form-input" style="flex:1;" onchange="pendingEducation[${i}].status=this.value">${EDU_STATUS.map(st=>`<option ${(e.status||'졸업')===st?'selected':''}>${st}</option>`).join('')}</select>
+      <div style="display:flex; gap:6px; align-items:center;">
+        <span style="flex:0 0 auto; font-size:12.5px; color:var(--slate);">졸업 연월</span>
+        <input class="form-input" type="month" style="flex:1;" title="졸업 연월" value="${esc((e.end||'').replace('.','-'))}" onchange="pendingEducation[${i}].end=this.value">
       </div>
     </div>`).join('');
 }
@@ -3121,7 +3120,7 @@ function educationListHtml(list){
     <div style="display:grid; gap:8px; margin-bottom:6px;">${rows.map(e=>`
       <div style="display:flex; gap:14px; align-items:baseline;">
         <span style="flex:0 0 78px; font-size:12.5px; color:var(--slate);">${e.end ? '~ ' + esc(e.end) : ''}</span>
-        <span style="font-size:14px; font-weight:700; color:var(--ink);">${esc(e.school)}${e.degree?` <span style="font-weight:500; color:var(--slate);">(${esc(e.degree)}${e.major?` · ${esc(e.major)}`:''})</span>`:(e.major?` <span style="font-weight:500; color:var(--slate);">(${esc(e.major)})</span>`:'')}${e.status && e.status!=='졸업' ? ` <span class="sbadge pending" style="font-size:10.5px;">${esc(e.status)}</span>` : ''}</span>
+        <span style="font-size:14px; font-weight:700; color:var(--ink);">${esc(e.school)}${e.degree?` <span style="font-weight:500; color:var(--slate);">(${esc(e.degree)}${e.major?` · ${esc(e.major)}`:''})</span>`:(e.major?` <span style="font-weight:500; color:var(--slate);">(${esc(e.major)})</span>`:'')} <span style="font-weight:500; color:var(--slate);">졸업</span></span>
       </div>`).join('')}</div>`;
 }
 /* ---- 기술스택 · 자격증 선택기 (검색 + 분류 + 직접 추가) ---- */
