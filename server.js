@@ -16,6 +16,7 @@ const applicationRoutes = require('./src/routes/applications');
 const talentRoutes = require('./src/routes/talents');
 const proposalRoutes = require('./src/routes/proposals');
 const projectRoutes = require('./src/routes/projects');
+const reviewRoutes = require('./src/routes/reviews');
 const conversationRoutes = require('./src/routes/conversations');
 const notificationRoutes = require('./src/routes/notifications');
 const companyRoutes = require('./src/routes/companies');
@@ -366,6 +367,7 @@ app.use('/api', applicationRoutes); // /api/jobs/:id/apply, /api/me/applications
 app.use('/api/talents', talentRoutes);
 app.use('/api', proposalRoutes);    // /api/talents/:userId/propose
 app.use('/api/projects', projectRoutes);
+app.use('/api/reviews', reviewRoutes); // 받은 평가 요약(항목별 평균·재계약 의사·강점 태그)
 app.use('/api/conversations', conversationRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/companies', companyRoutes);

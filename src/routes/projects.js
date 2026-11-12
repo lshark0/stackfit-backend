@@ -6,11 +6,26 @@ const crypto = require('crypto');
 const { addNotification, pushTo } = require('../notify');
 const { signedFileUrl } = require('../fileAccess');
 const { EXT_LABEL, extOf, createDocUpload, isValidDocument, fixFilenameEncoding } = require('../docUpload');
+const { criteriaFor, REVEAL_DAYS } = require('../reviewCriteria');
+const { revealCutoff } = require('../ratings');
 
 const upload = createDocUpload();
 
 const router = express.Router();
 wrapAllRoutes(router);
+
+const parseJson = (v, fb) => { try { const x = JSON.parse(v || ''); return x == null ? fb : x; } catch (e) { return fb; } };
+// 화면에 보여 줄 평가 한 건(항목별 점수에 항목 이름을 붙여서)
+function reviewOut(r, revieweeRole) {
+  const scores = parseJson(r.scores_json, {});
+  return {
+    rating: Number(r.rating),
+    comment: r.comment,
+    scores: criteriaFor(revieweeRole).criteria.filter((c) => scores[c.key]).map((c) => ({ label: c.label, score: Number(scores[c.key]) })),
+    again: r.again == null ? null : Number(r.again) === 1,
+    tags: parseJson(r.tags_json, []),
+  };
+}
 
 // 각 프로젝트에 내가 이미 리뷰를 남겼는지, 그리고 상대방이 나에게 남긴 평가도 함께 내려줍니다.
 // 프로젝트 수만큼 쿼리를 반복하지 않도록, 관련된 리뷰를 한 번에 가져와 메모리에서 매칭합니다.
@@ -24,15 +39,20 @@ async function attachReviews(rows, userId) {
     mySurveys = await all(`SELECT project_id FROM contract_surveys WHERE user_id = ? AND project_id IN (${placeholders})`, [userId, ...projectIds]);
   }
   const surveyed = new Set(mySurveys.map((s) => s.project_id));
+  const cutoff = revealCutoff();
   return rows.map((p) => {
     const mine = allReviews.find((r) => r.project_id === p.id && r.reviewer_id === userId);
-    const received = allReviews.find((r) => r.project_id === p.id && r.reviewee_id === userId);
+    const receivedRaw = allReviews.find((r) => r.project_id === p.id && r.reviewee_id === userId);
+    // 블라인드 상호 평가: 내가 평가했거나 14일이 지나야 받은 평가 내용을 보여 줍니다.
+    const revealed = receivedRaw && (mine || String(receivedRaw.created_at).replace('T', ' ').slice(0, 19) <= cutoff);
+    const received = revealed ? receivedRaw : null;
     const { contract_data, ...rest } = p; // 파일 내용 자체는 목록에 담지 않습니다.
     return {
       ...rest,
       contract_url: signedFileUrl(p.contract_filename),
       myReview: mine ? { rating: mine.rating } : null,
-      receivedReview: received ? { rating: received.rating, comment: received.comment } : null,
+      receivedReview: received ? reviewOut(received, p.company_id === received.reviewee_id ? 'company' : 'freelancer') : null,
+      receivedHidden: !!(receivedRaw && !received), // 상대가 평가를 남겼지만 내가 아직 평가하지 않아 가려진 상태
       mySurveyDone: surveyed.has(p.id),
     };
   });
@@ -298,6 +318,8 @@ router.post('/:id/settle', requireAuth, async (req, res) => {
 });
 
 // 완료된 프로젝트에 대해 상대방(기업↔프리랜서)을 리뷰/평점
+// 리뷰 작성 — 항목별 별점(1~5)·재계약 의사·강점 태그(최대 3개)·후기.
+// 예전 화면처럼 rating(1~5)만 보내도 받아 줍니다(항목 점수 없이 종합 평점만 저장).
 router.post('/:id/review', requireAuth, async (req, res) => {
   const project = await get('SELECT * FROM projects WHERE id = ?', [req.params.id]);
   if (!project) return res.status(404).json({ error: '프로젝트를 찾을 수 없습니다.' });
@@ -308,31 +330,63 @@ router.post('/:id/review', requireAuth, async (req, res) => {
     return res.status(400).json({ error: '완료된 프로젝트만 리뷰를 남길 수 있어요.' });
   }
 
-  const { rating, comment } = req.body || {};
-  const r = Number(rating);
-  if (!Number.isInteger(r) || r < 1 || r > 5) {
-    return res.status(400).json({ error: '평점은 1~5 사이의 정수여야 해요.' });
-  }
-  const safeComment = typeof comment === 'string' ? comment.trim().slice(0, 500) : '';
   const revieweeId = req.user.id === project.company_id ? project.freelancer_id : project.company_id;
+  const revieweeRole = req.user.id === project.company_id ? 'freelancer' : 'company';
+  const { criteria, tags: allowedTags } = criteriaFor(revieweeRole);
+  const body = req.body || {};
+
+  // 항목별 점수
+  const scores = {};
+  const raw = body.scores && typeof body.scores === 'object' ? body.scores : {};
+  for (const c of criteria) {
+    const v = Number(raw[c.key]);
+    if (raw[c.key] !== undefined) {
+      if (!Number.isInteger(v) || v < 1 || v > 5) return res.status(400).json({ error: '항목별 별점은 1~5 사이로 골라주세요.' });
+      scores[c.key] = v;
+    }
+  }
+  let r;
+  if (Object.keys(scores).length) {
+    if (Object.keys(scores).length !== criteria.length) return res.status(400).json({ error: '모든 항목에 별점을 골라주세요.' });
+    const mean = Object.values(scores).reduce((a, v) => a + v, 0) / criteria.length;
+    r = Math.min(5, Math.max(1, Math.round(mean)));
+  } else {
+    r = Number(body.rating);
+    if (!Number.isInteger(r) || r < 1 || r > 5) return res.status(400).json({ error: '평점은 1~5 사이의 정수여야 해요.' });
+  }
+  const again = body.again === true ? 1 : body.again === false ? 0 : null;
+  const tags = Array.isArray(body.tags) ? [...new Set(body.tags.filter((t) => allowedTags.includes(t)))].slice(0, 3) : [];
+  const safeComment = typeof body.comment === 'string' ? body.comment.trim().slice(0, 500) : '';
 
   const existing = await get('SELECT id FROM reviews WHERE project_id=? AND reviewer_id=?', [project.id, req.user.id]);
   if (existing) return res.status(409).json({ error: '이미 이 프로젝트에 리뷰를 남겼어요.' });
 
   await run(
-    'INSERT INTO reviews (project_id, reviewer_id, reviewee_id, rating, comment) VALUES (?,?,?,?,?)',
-    [project.id, req.user.id, revieweeId, r, safeComment]
+    'INSERT INTO reviews (project_id, reviewer_id, reviewee_id, rating, comment, scores_json, again, tags_json) VALUES (?,?,?,?,?,?,?,?)',
+    [project.id, req.user.id, revieweeId, r, safeComment, Object.keys(scores).length ? JSON.stringify(scores) : null, again, JSON.stringify(tags)]
   );
-  await addNotification(revieweeId, {
-    tag: '리뷰', title: '새 리뷰가 도착했어요',
-    body: `"${project.title}" 프로젝트에 대한 리뷰(★${r})가 등록됐습니다.`,
-    link: 'projects',
-  });
 
-  res.status(201).json({ ok: true });
+  // 블라인드 상호 평가: 상대가 아직 평가하지 않았으면 내용은 숨기고 '평가가 도착했다'고만 알립니다.
+  const counterpart = await get('SELECT id FROM reviews WHERE project_id=? AND reviewer_id=?', [project.id, revieweeId]);
+  if (counterpart) {
+    for (const uid of [revieweeId, req.user.id]) {
+      await addNotification(uid, {
+        tag: '리뷰', title: '서로의 평가가 공개됐어요',
+        body: `"${project.title}" 프로젝트의 상호 평가가 모두 등록돼 공개됐어요.`,
+        link: 'projects',
+      });
+    }
+  } else {
+    await addNotification(revieweeId, {
+      tag: '리뷰', title: '상대방이 평가를 남겼어요',
+      body: `"${project.title}" 프로젝트 평가가 도착했어요. 나도 평가를 남기면 서로 공개돼요(${REVEAL_DAYS}일이 지나면 자동 공개).`,
+      link: 'projects',
+    });
+  }
+
+  res.status(201).json({ ok: true, revealed: !!counterpart });
 });
 
-// 이 프로젝트에서 내가 쓴 리뷰 / 상대방이 나에게 남긴 리뷰 조회
 router.get('/:id/review', requireAuth, async (req, res) => {
   const project = await get('SELECT * FROM projects WHERE id = ?', [req.params.id]);
   if (!project) return res.status(404).json({ error: '프로젝트를 찾을 수 없습니다.' });
@@ -340,9 +394,17 @@ router.get('/:id/review', requireAuth, async (req, res) => {
     return res.status(403).json({ error: '이 프로젝트에 대한 권한이 없습니다.' });
   }
   const rows = await all('SELECT * FROM reviews WHERE project_id = ?', [project.id]);
-  const myReview = rows.find((r) => r.reviewer_id === req.user.id) || null;
-  const receivedReview = rows.find((r) => r.reviewee_id === req.user.id) || null;
-  res.json({ myReview, receivedReview });
+  const mine = rows.find((r) => r.reviewer_id === req.user.id) || null;
+  const receivedRaw = rows.find((r) => r.reviewee_id === req.user.id) || null;
+  const revealed = receivedRaw && (mine || String(receivedRaw.created_at).replace('T', ' ').slice(0, 19) <= revealCutoff());
+  const revieweeRole = req.user.id === project.company_id ? 'freelancer' : 'company';
+  res.json({
+    revieweeRole,
+    criteria: criteriaFor(revieweeRole),
+    myReview: mine ? reviewOut(mine, revieweeRole) : null,
+    receivedReview: revealed ? reviewOut(receivedRaw, revieweeRole === 'company' ? 'freelancer' : 'company') : null,
+    receivedHidden: !!(receivedRaw && !revealed),
+  });
 });
 
 module.exports = router;

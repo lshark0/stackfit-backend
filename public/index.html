@@ -3959,6 +3959,8 @@ async function screenJobDetail(){
     apiFetch('/jobs/' + state.param),
     isCompany ? Promise.resolve(null) : apiFetch('/profile').catch(()=>null),
   ]);
+  // 프리랜서에게는 공고를 올린 기업이 받은 평가(항목별·재계약 의사·강점)를 보여 줍니다.
+  const companyReviews = !isCompany && j.company_id ? await apiFetch('/reviews/' + j.company_id + '/summary').catch(()=>null) : null;
   return `${statusbar()}
   <div class="content" style="padding-top:14px;">
     <div class="back-row" style="padding:0 0 10px;"><div class="back-btn" onclick="jobDetailBack()">${I.back}</div><div class="page-sub">공고 상세</div></div>
@@ -4005,6 +4007,7 @@ async function screenJobDetail(){
     ${stackTags(j.stack, j.matchedStack)}
     <div class="section-label with-ic">${I.checklist}상세 내용</div>
     <div class="para">${esc(j.description) || "상세 설명이 아직 등록되지 않았어요."}</div>
+    ${!isCompany ? reviewSummaryHtml(companyReviews, '기업') : ''}
     ${(!isCompany && j.similarJobs && j.similarJobs.length) ? `
     <div class="section-label">비슷한 공고</div>
     <div class="hrow">${j.similarJobs.map(miniJobCard).join('')}</div>` : ''}
@@ -4064,7 +4067,10 @@ async function screenTalent(){
 }
 
 async function screenTalentDetail(){
-  const t = await apiFetch('/talents/' + state.param);
+  const [t, reviewSum] = await Promise.all([
+    apiFetch('/talents/' + state.param),
+    apiFetch('/reviews/' + state.param + '/summary').catch(()=>null),
+  ]);
   return `${statusbar()}
   <div class="content" style="padding-top:14px;">
     <div class="back-row" style="padding:0 0 10px;"><div class="back-btn" onclick="talentDetailBack()">${I.back}</div><div class="page-sub">프로필 상세</div></div>
@@ -4102,6 +4108,7 @@ async function screenTalentDetail(){
         ${t.contact_email?`<div class="meta-row" style="margin:${t.contact_phone?'8px':'0'} 0 0;"><span>✉️ 이메일</span><a href="mailto:${esc(t.contact_email)}" style="color:var(--ink); font-weight:700;">${esc(t.contact_email)}</a></div>`:''}
         <div class="page-sub" style="margin-top:8px;">프리랜서가 제안용으로 공개한 연락처예요.</div>
       </div>` : ''}
+    ${reviewSummaryHtml(reviewSum, '인재')}
     <div class="section-label with-ic">${I.checklist}수행 프로젝트 ${(t.portfolios||[]).length ? `(${t.portfolios.length}건)` : ''}</div>
     ${(t.portfolios||[]).length
       ? t.portfolios.map(p=>`
@@ -4220,12 +4227,7 @@ async function screenProjects(){
         ${stepsGraphic(p.status==='완료' ? 4 : p.stage, steps)}
         ${projectActionHtml(p, isCompany)}
         ${p.contracted_at && !p.mySurveyDone ? contractSurveyHtml(p, isCompany) : ''}
-        ${p.receivedReview? `
-          <div style="margin-top:10px; padding:12px; background:var(--card); border:1px solid var(--line); border-radius:12px;">
-            <div style="font-size:11.5px; font-weight:700; color:var(--slate); margin-bottom:4px;">상대방이 남긴 평가</div>
-            <div style="color:var(--amber-deep); font-size:14px;">${'★'.repeat(p.receivedReview.rating)}${'☆'.repeat(5-p.receivedReview.rating)}</div>
-            ${p.receivedReview.comment? `<div class="page-sub" style="margin-top:6px; line-height:1.6;">${esc(p.receivedReview.comment)}</div>` : ''}
-          </div>` : (p.status==='완료'? `<div class="page-sub" style="margin-top:10px;">아직 상대방의 평가가 등록되지 않았어요.</div>` : '')}
+        ${p.status==='완료' || p.receivedReview ? receivedReviewHtml(p) : ''}
         ${p.status==='완료' ? projectArchiveButtons(p.id, false) : ''}
       </div>`).join('') || (isCompany
         ? `${emptyArt(ART.noProjects, '아직 계약된 프로젝트가 없어요', myJobs.jobs.length
@@ -4284,47 +4286,116 @@ async function screenProjectArchive(){
         ${p.myReview
           ? `<div class="page-sub" style="margin-top:10px;">내가 남긴 평점: ${'★'.repeat(p.myReview.rating)}${'☆'.repeat(5-p.myReview.rating)}</div>`
           : `<button class="btn btn-primary" style="margin-top:10px;" onclick="go('reviewForm', ${p.id})">리뷰 남기기</button>`}
-        ${p.receivedReview? `
-          <div style="margin-top:10px; padding:12px; background:var(--card); border:1px solid var(--line); border-radius:12px;">
-            <div style="font-size:11.5px; font-weight:700; color:var(--slate); margin-bottom:4px;">상대방이 남긴 평가</div>
-            <div style="color:var(--amber-deep); font-size:14px;">${'★'.repeat(p.receivedReview.rating)}${'☆'.repeat(5-p.receivedReview.rating)}</div>
-            ${p.receivedReview.comment? `<div class="page-sub" style="margin-top:6px; line-height:1.6;">${esc(p.receivedReview.comment)}</div>` : ''}
-          </div>` : `<div class="page-sub" style="margin-top:10px;">아직 상대방의 평가가 등록되지 않았어요.</div>`}
+        ${receivedReviewHtml(p)}
         ${projectArchiveButtons(p.id, true)}
       </div>`).join('') || emptyArt(ART.noProjects, '보관된 완료 프로젝트가 없어요', '완료된 프로젝트의 "보관함으로 이동" 버튼을 누르면<br>여기로 옮겨져 진행 목록이 깔끔해져요.')}
     <div style="height:20px;"></div>
   </div>`;
 }
 
-let pendingRating = 0;
-function setPendingRating(n){
-  pendingRating = n;
-  const el = document.getElementById('star-picker');
-  if(el) el.innerHTML = starPickerHtml();
+// ---- 평가(리뷰) ----
+// 서버 src/reviewCriteria.js와 같은 항목입니다. 키는 평가받는 쪽 역할(freelancer|company).
+const REVIEW_CRITERIA = {
+  freelancer: {
+    criteria: [['schedule','일정을 잘 지켜요'],['communication','소통이 빠르고 정확해요'],['expertise','기술 전문성이 높아요'],['documentation','문서화·인수인계가 꼼꼼해요'],['ownership','책임감 있게 일해요']],
+    tags: ['장애 대응이 빨라요','문서를 잘 남겨요','신기술 습득이 빨라요','고객 응대가 능숙해요','설계·아키텍처에 강해요','성능 튜닝을 잘해요','보안을 꼼꼼히 챙겨요','일정 관리가 철저해요'],
+    again: '이 프리랜서와 다시 함께 일하고 싶어요',
+  },
+  company: {
+    criteria: [['clarity','요구사항이 명확해요'],['communication','소통이 원활해요'],['environment','근무 환경이 좋아요'],['payment','대금을 약속대로 지급해요'],['respect','프리랜서를 존중해요']],
+    tags: ['대금 지급이 빨라요','야근을 강요하지 않아요','장비·환경 지원이 좋아요','범위 변경을 합리적으로 조정해요','담당자가 친절해요','계약 조건을 잘 지켜요','업무 인수인계가 잘 돼 있어요'],
+    again: '이 기업과 다시 함께 일하고 싶어요',
+  },
+};
+const starsText = (n) => '★'.repeat(Math.round(n)) + '☆'.repeat(5 - Math.round(n));
+
+// 프로젝트 카드의 '상대방이 남긴 평가' 칸 (블라인드: 내가 평가하기 전에는 내용을 가립니다)
+function receivedReviewHtml(p){
+  if(p.receivedHidden){
+    return `<div class="reco-empty" style="margin-top:10px; text-align:left;">🔒 상대방이 평가를 남겼어요. <b>나도 평가를 남기면</b> 서로의 평가가 공개돼요(14일이 지나면 자동 공개).</div>`;
+  }
+  const r = p.receivedReview;
+  if(!r) return p.status==='완료' ? `<div class="page-sub" style="margin-top:10px;">아직 상대방의 평가가 등록되지 않았어요.</div>` : '';
+  return `<div style="margin-top:10px; padding:12px; background:var(--card); border:1px solid var(--line); border-radius:12px;">
+    <div style="font-size:11.5px; font-weight:700; color:var(--slate); margin-bottom:4px;">상대방이 남긴 평가</div>
+    <div style="color:var(--amber-deep); font-size:14px;">${starsText(r.rating)}</div>
+    ${(r.scores||[]).length ? `<div style="margin-top:6px; display:grid; gap:3px;">${r.scores.map(x=>`<div style="display:flex; justify-content:space-between; font-size:12px; color:var(--slate);"><span>${esc(x.label)}</span><b style="color:var(--ink);">${x.score}.0</b></div>`).join('')}</div>` : ''}
+    ${r.again!=null ? `<div class="page-sub" style="margin-top:6px;">${r.again ? '👍 다시 함께 일하고 싶다고 했어요' : '다시 함께 일할 의사는 없다고 했어요'}</div>` : ''}
+    ${(r.tags||[]).length ? `<div class="tag-row" style="margin-top:6px;">${r.tags.map(t=>`<span class="tag hit">${esc(t)}</span>`).join('')}</div>` : ''}
+    ${r.comment? `<div class="page-sub" style="margin-top:6px; line-height:1.6;">${esc(r.comment)}</div>` : ''}
+  </div>`;
 }
-function starPickerHtml(){
-  return [1,2,3,4,5].map(n=>`<span onclick="setPendingRating(${n})" style="cursor:pointer; font-size:34px; color:${n<=pendingRating?'var(--amber)':'var(--paper-dim)'};">★</span>`).join('');
+
+// 프로필·공고 상세의 평가 요약 (종합·항목별 평균·재계약 의사·강점 태그·최근 후기)
+function reviewSummaryHtml(s, who){
+  if(!s) return '';
+  if(!s.rating_count){
+    return `<div class="section-label with-ic">${I.star}${who} 평가</div><div class="reco-empty" style="text-align:left;">아직 공개된 평가가 없어요. 계약을 마친 프로젝트의 상호 평가만 반영돼요.</div>`;
+  }
+  const bar = (v) => `<span style="flex:1; height:6px; background:var(--paper-dim); border-radius:999px; overflow:hidden; margin:0 10px;"><span style="display:block; height:100%; width:${(v/5)*100}%; background:var(--amber);"></span></span>`;
+  return `<div class="section-label with-ic">${I.star}${who} 평가</div>
+  <div class="card">
+    <div style="display:flex; align-items:baseline; gap:10px;">
+      <div style="font-size:26px; font-weight:800; color:var(--ink);">★ ${Number(s.rating_avg).toFixed(1)}</div>
+      <div class="page-sub">계약 완료 평가 ${s.rating_count}건</div>
+    </div>
+    ${s.categories.some(c=>c.avg!=null) ? `<div style="margin-top:10px; display:grid; gap:7px;">${s.categories.filter(c=>c.avg!=null).map(c=>`
+      <div style="display:flex; align-items:center; font-size:12.5px;"><span style="flex:0 0 46%; color:var(--slate);">${esc(c.label)}</span>${bar(c.avg)}<b style="flex:0 0 auto; color:var(--amber-deep);">${c.avg.toFixed(1)}</b></div>`).join('')}</div>` : ''}
+    ${s.again ? `<div style="margin-top:12px; padding:10px 12px; border-radius:10px; background:var(--paper-dim); font-size:13px;">🔁 <b>재계약 의사 ${s.again.rate}%</b> <span class="page-sub">(${s.again.total}명 중 ${s.again.yes}명이 다시 함께 일하고 싶다고 했어요)</span></div>` : ''}
+    ${s.tags.length ? `<div style="margin-top:10px;"><div class="page-sub" style="margin-bottom:4px;">강점</div><div class="tag-row">${s.tags.map(t=>`<span class="tag hit">${esc(t.tag)} ×${t.count}</span>`).join('')}</div></div>` : ''}
+    ${s.recent.length ? `<div style="margin-top:10px; display:grid; gap:6px;">${s.recent.map(r=>`<div style="font-size:12.5px; line-height:1.6; padding:8px 10px; border:1px solid var(--line); border-radius:10px;"><span style="color:var(--amber-deep);">${starsText(r.rating)}</span> ${esc(r.comment)}</div>`).join('')}</div>` : ''}
+    <div class="page-sub" style="margin-top:8px; font-size:11.5px;">계약을 마친 상대만 평가할 수 있고, 양쪽이 모두 평가하거나 14일이 지나야 공개돼요.</div>
+  </div>`;
+}
+
+let reviewDraft = { scores:{}, again:null, tags:[] };
+function reviewTarget(){ return state.role==='company' ? 'freelancer' : 'company'; }
+function reviewFormBody(){
+  const cfg = REVIEW_CRITERIA[reviewTarget()];
+  const stars = (key) => [1,2,3,4,5].map(n=>`<span onclick="setReviewScore('${key}', ${n})" style="cursor:pointer; font-size:24px; color:${n<=(reviewDraft.scores[key]||0)?'var(--amber)':'var(--paper-dim)'};">★</span>`).join('');
+  return `
+    ${cfg.criteria.map(([k,l])=>`<div style="display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--line);"><span style="font-size:13.5px;">${esc(l)}</span><span>${stars(k)}</span></div>`).join('')}
+    <div class="form-label" style="margin-top:16px;">재계약 의사</div>
+    <div style="display:flex; gap:8px;">
+      <button class="btn ${reviewDraft.again===true?'btn-primary':'btn-outline'}" style="flex:1;" onclick="setReviewAgain(true)">👍 ${esc(cfg.again)}</button>
+      <button class="btn ${reviewDraft.again===false?'btn-primary':'btn-outline'}" style="flex:0 0 30%;" onclick="setReviewAgain(false)">아니요</button>
+    </div>
+    <div class="form-label" style="margin-top:16px;">강점 태그 <span style="font-weight:400; color:var(--slate-light);">(선택, 최대 3개)</span></div>
+    <div class="chip-row" style="flex-wrap:wrap;">${cfg.tags.map(t=>`<div class="chip ${reviewDraft.tags.includes(t)?'active':''}" onclick="toggleReviewTag('${jsAttrStr(t)}')">${esc(t)}</div>`).join('')}</div>`;
+}
+function rerenderReviewForm(){ const el = document.getElementById('review-form-body'); if(el) el.innerHTML = reviewFormBody(); }
+function setReviewScore(k, n){ reviewDraft.scores[k] = n; rerenderReviewForm(); }
+function setReviewAgain(v){ reviewDraft.again = v; rerenderReviewForm(); }
+function toggleReviewTag(t){
+  const i = reviewDraft.tags.indexOf(t);
+  if(i>=0) reviewDraft.tags.splice(i,1);
+  else if(reviewDraft.tags.length>=3){ toast('강점 태그는 3개까지 고를 수 있어요'); return; }
+  else reviewDraft.tags.push(t);
+  rerenderReviewForm();
 }
 async function screenReviewForm(){
-  pendingRating = 0;
+  reviewDraft = { scores:{}, again:null, tags:[] };
+  const who = reviewTarget()==='freelancer' ? '프리랜서' : '기업';
   return `${statusbar()}
-  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('projects')">${I.back}</div><div class="page-title" style="font-size:19.5px;">리뷰 남기기</div></div></div>
+  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('projects')">${I.back}</div><div class="page-title" style="font-size:19.5px;">${who} 평가 남기기</div></div></div>
   <div class="content">
-    <div class="page-sub" style="margin-bottom:16px;">함께한 프로젝트는 어떠셨나요? 평점과 후기는 상대방 프로필에 공개돼요.</div>
-    <div style="text-align:center; margin-bottom:20px;"><div id="star-picker">${starPickerHtml()}</div></div>
-    <div class="form-field"><label class="form-label">후기 (선택)</label><textarea id="review-comment" class="form-input" placeholder="함께 일한 경험을 남겨주세요"></textarea></div>
-    <button class="btn btn-primary" onclick="submitReview(${state.param})">리뷰 등록하기</button>
+    <div class="page-sub" style="margin-bottom:12px; line-height:1.6;">함께한 프로젝트는 어떠셨나요? 항목별 별점의 평균이 종합 평점이 돼요.<br>🔒 <b>블라인드 상호 평가</b>: 상대방도 평가를 남기거나 14일이 지나야 서로의 평가가 공개돼요.</div>
+    <div id="review-form-body">${reviewFormBody()}</div>
+    <div class="form-field" style="margin-top:16px;"><label class="form-label">후기 (선택)</label><textarea id="review-comment" class="form-input" maxlength="500" placeholder="함께 일한 경험을 남겨주세요. 상대방 프로필에 공개돼요."></textarea></div>
+    <button class="btn btn-primary" onclick="submitReview(${state.param})">평가 등록하기</button>
     <div style="height:20px;"></div>
   </div>`;
 }
 async function submitReview(projectId){
-  if(pendingRating<1){ toast('별점을 선택해주세요'); return; }
+  const cfg = REVIEW_CRITERIA[reviewTarget()];
+  if(cfg.criteria.some(([k])=>!reviewDraft.scores[k])){ toast('모든 항목에 별점을 골라주세요'); return; }
+  if(reviewDraft.again===null){ toast('재계약 의사를 골라주세요'); return; }
   try{
-    await apiFetch(`/projects/${projectId}/review`, {method:'POST', body:{
-      rating: pendingRating,
+    const r = await apiFetch(`/projects/${projectId}/review`, {method:'POST', body:{
+      scores: reviewDraft.scores, again: reviewDraft.again, tags: reviewDraft.tags,
       comment: document.getElementById('review-comment').value.trim(),
     }});
-    toast('리뷰가 등록됐어요');
+    toast(r.revealed ? '평가를 등록했어요. 서로의 평가가 공개됐어요' : '평가를 등록했어요. 상대방이 평가하면 서로 공개돼요');
     go('projects');
   }catch(e){ toast(e.message); }
 }
