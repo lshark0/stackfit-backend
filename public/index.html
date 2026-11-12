@@ -2204,10 +2204,29 @@ async function duplicateJob(id){
   }
 }
 // 제안은 '어떤 공고인지'와 '무슨 말을 전할지'를 함께 담아야 하므로 별도 화면에서 작성합니다.
-function proposeTalent(userId){ go('proposeForm', userId); }
+function proposeTalent(userId){ proposeRehire = null; go('proposeForm', userId); }
+// '다시 함께 일하기': 완료 프로젝트 카드에서 같은 프리랜서에게 다시 제안합니다(지난 프로젝트를 함께 전달).
+let proposeRehire = null; // { projectId, title, userId }
+function rehireTalent(projectId, userId, title){
+  proposeRehire = { projectId, userId, title };
+  go('proposeForm', userId);
+}
+// 완료 프로젝트 카드(기업)의 '다시 함께 일하기' 영역 — 진행 목록·보관함 공용
+function rehireHtml(p){
+  const r = p.rehire;
+  if(state.role !== 'company' || p.status !== '완료' || !r) return '';
+  if(r.status !== 'none'){
+    const label = { sent:'응답 대기', accepted:'수락', declined:'거절' }[r.status] || '';
+    return `<div class="page-sub" style="margin-top:10px;">🔁 다시 함께 일하기 제안을 보냈어요 · <b>${label}</b> <a style="color:var(--cyan); cursor:pointer;" onclick="go('sentProposals')">보낸 제안 보기</a></div>`;
+  }
+  if(!r.acceptsProposals) return `<div class="page-sub" style="margin-top:10px;">이 프리랜서는 지금 제안을 받지 않고 있어요.</div>`;
+  return `<button class="btn btn-outline" style="margin-top:10px; display:flex; align-items:center; justify-content:center; gap:7px;" onclick='rehireTalent(${p.id}, ${p.freelancer_id}, ${esc(JSON.stringify(p.title))})'>🔁 다시 함께 일하기 제안</button>
+    <div class="page-sub" style="margin-top:5px;">만족스러웠다면 새 공고나 연장 건으로 같은 분께 바로 제안해 보세요.</div>`;
+}
 
 async function screenProposeForm(){
   const userId = state.param;
+  const rehire = proposeRehire && Number(proposeRehire.userId) === Number(userId) ? proposeRehire : null;
   const [talent, jobsData, quota] = await Promise.all([
     apiFetch('/talents/' + userId),
     apiFetch('/jobs').catch(()=>({jobs:[]})),
@@ -2218,8 +2237,12 @@ async function screenProposeForm(){
   const outOfQuota = !!(quota && quota.limit && quota.remaining <= 0);
 
   return `${statusbar()}
-  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('talentDetail', ${userId})">${I.back}</div><div class="page-title">포지션 제안</div></div></div>
+  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="${rehire ? `go('projects')` : `go('talentDetail', ${userId})`}">${I.back}</div><div class="page-title">${rehire ? '다시 함께 일하기' : '포지션 제안'}</div></div></div>
   <div class="content">
+    ${rehire ? `<div class="reco-empty" style="text-align:left; margin-bottom:12px;">
+      <b style="color:var(--ink);">🔁 지난 프로젝트 "${esc(rehire.title)}"를 함께한 분께 다시 제안해요</b>
+      <div style="margin-top:5px; line-height:1.7;">상대에게 '다시 함께 일하기 제안'으로 표시돼요. 새 공고를 고르거나, 공고 없이 연장·후속 건을 말씀으로 전할 수 있어요.</div>
+    </div>` : ''}
     <div class="card">
       <div style="display:flex; gap:12px; align-items:center;">
         ${autoAvatar(talent.name)}
@@ -2238,7 +2261,7 @@ async function screenProposeForm(){
     </div>
     <div class="form-field">
       <label class="form-label">전하실 말씀</label>
-      <textarea id="pp-message" class="form-input" style="min-height:120px;" placeholder="예: 이번 클라우드 전환 프로젝트에 TA로 참여해주실 수 있을까요? 보유하신 AWS 경험이 저희 요구사항과 잘 맞아 연락드립니다."></textarea>
+      <textarea id="pp-message" class="form-input" style="min-height:120px;" placeholder="예: 이번 클라우드 전환 프로젝트에 TA로 참여해주실 수 있을까요? 보유하신 AWS 경험이 저희 요구사항과 잘 맞아 연락드립니다.">${rehire ? esc(`지난 "${rehire.title}" 프로젝트에서 함께해 주셔서 감사했습니다. 이번에도 함께 일하고 싶어 다시 연락드립니다.`) : ''}</textarea>
       <div class="page-sub" style="margin-top:5px;">왜 이분께 제안하는지 적어주면 수락 확률이 높아져요. (선택)</div>
     </div>
     ${quota && quota.limit ? (outOfQuota
@@ -2258,9 +2281,11 @@ async function sendProposal(userId){
   const jobId = jobSel ? Number(jobSel) : null;
   const message = document.getElementById('pp-message').value.trim();
   try{
-    await apiFetch(`/talents/${userId}/propose`, {method:'POST', body:{ jobId, message, source: contactSourceFor('talentDetail', userId) }});
-    toast('제안을 보냈어요');
-    go('talentDetail', userId);
+    const rehire = proposeRehire && Number(proposeRehire.userId) === Number(userId) ? proposeRehire : null;
+    await apiFetch(`/talents/${userId}/propose`, {method:'POST', body:{ jobId, message, source: contactSourceFor('talentDetail', userId), rehireProjectId: rehire ? rehire.projectId : null }});
+    proposeRehire = null;
+    toast(rehire ? '다시 함께 일하기 제안을 보냈어요' : '제안을 보냈어요');
+    if(rehire) go('projects'); else go('talentDetail', userId);
   }catch(e){
     toast(e.message);
     if(e.code === 'PROPOSAL_LIMIT') render(); // 한도 안내가 보이도록 화면을 다시 그립니다
@@ -4268,6 +4293,7 @@ async function screenProjects(){
         ${projectActionHtml(p, isCompany)}
         ${p.contracted_at && !p.mySurveyDone ? contractSurveyHtml(p, isCompany) : ''}
         ${p.status==='완료' || p.receivedReview ? receivedReviewHtml(p) : ''}
+        ${rehireHtml(p)}
         ${p.status==='완료' ? projectArchiveButtons(p.id, false) : ''}
       </div>`).join('') || (isCompany
         ? `${emptyArt(ART.noProjects, '아직 계약된 프로젝트가 없어요', myJobs.jobs.length
@@ -4327,6 +4353,7 @@ async function screenProjectArchive(){
           ? `<div class="page-sub" style="margin-top:10px;">내가 남긴 평점: ${'★'.repeat(p.myReview.rating)}${'☆'.repeat(5-p.myReview.rating)}</div>`
           : `<button class="btn btn-primary" style="margin-top:10px;" onclick="go('reviewForm', ${p.id})">리뷰 남기기</button>`}
         ${receivedReviewHtml(p)}
+        ${rehireHtml(p)}
         ${projectArchiveButtons(p.id, true)}
       </div>`).join('') || emptyArt(ART.noProjects, '보관된 완료 프로젝트가 없어요', '완료된 프로젝트의 "보관함으로 이동" 버튼을 누르면<br>여기로 옮겨져 진행 목록이 깔끔해져요.')}
     <div style="height:20px;"></div>
@@ -4455,8 +4482,9 @@ async function screenReceivedProposals(){
       <div class="card ${p.status==='sent'?'is-proposed':''}">
         <div class="card-top">
           <div style="min-width:0;">
-            <div class="card-title">${p.job_title? esc(p.job_title) : '포지션 제안'}</div>
+            <div class="card-title">${p.job_title? esc(p.job_title) : (p.rehire_project_id ? '다시 함께 일하기 제안' : '포지션 제안')}</div>
             <div class="card-org">${esc(p.company_name)}</div>
+            ${p.rehire_project_id ? `<div style="margin-top:5px;"><span class="tag on" style="border-radius:999px;">🔁 다시 함께 일하기${p.rehire_project_title ? ' · 지난 프로젝트 ' + esc(p.rehire_project_title) : ''}</span></div>` : ''}
           </div>
           ${statusBadge[p.status] || ''}
         </div>
@@ -4801,6 +4829,7 @@ async function screenSentProposals(){
         <div class="icon-meta" style="margin-top:8px;">
           <span class="im">${I.jobs}${p.job_title ? esc(p.job_title) : '공고 미지정'}</span>
           <span class="im">${I.calendar}${fmtDate(p.created_at)} 제안</span>
+          ${p.rehire_project_id ? `<span class="im">🔁 다시 함께 일하기${p.rehire_project_title ? ' · ' + esc(p.rehire_project_title) : ''}</span>` : ''}
         </div>
         ${p.message ? `<div class="page-sub" style="margin-top:8px; white-space:pre-wrap; line-height:1.6;">💬 ${esc(p.message)}</div>` : ''}
         ${p.status==='accepted' ? `

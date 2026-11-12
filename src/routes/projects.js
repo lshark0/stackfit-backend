@@ -58,6 +58,28 @@ async function attachReviews(rows, userId) {
   });
 }
 
+// 기업이 완료 프로젝트 카드에서 '다시 함께 일하기' 제안을 보낼 수 있는지와, 보냈다면 그 상태를 붙입니다.
+//  rehire: { status: 'none' | 'sent' | 'accepted' | 'declined', acceptsProposals }
+async function attachRehire(projects, user) {
+  if (user.role !== 'company') return projects;
+  const done = projects.filter((p) => p.status === '완료');
+  if (!done.length) return projects;
+  const ph = done.map(() => '?').join(',');
+  const sent = await all(
+    `SELECT rehire_project_id, status FROM proposals WHERE company_id = ? AND rehire_project_id IN (${ph})`,
+    [user.id, ...done.map((p) => p.id)]
+  );
+  const fIds = [...new Set(done.map((p) => p.freelancer_id))];
+  const fph = fIds.map(() => '?').join(',');
+  const profiles = await all(`SELECT user_id, accept_proposals FROM freelancer_profiles WHERE user_id IN (${fph})`, fIds);
+  const accepts = Object.fromEntries(profiles.map((f) => [f.user_id, Number(f.accept_proposals ?? 1) === 1]));
+  return projects.map((p) => {
+    if (p.status !== '완료') return p;
+    const mine = sent.find((x) => x.rehire_project_id === p.id);
+    return { ...p, rehire: { status: mine ? mine.status : 'none', acceptsProposals: accepts[p.freelancer_id] !== false } };
+  });
+}
+
 // 합격 처리는 됐는데(지원 상태 accepted) 어떤 이유로든 프로젝트가 만들어지지 않았거나
 // 사라진 경우를 이 화면에서도 복구합니다 (지원자 관리·내 지원 현황과 동일한 안전장치).
 // 정상 흐름에서는 수락 시점에 항상 함께 생성되므로 평소엔 아무 일도 하지 않습니다.
@@ -97,7 +119,7 @@ router.get('/', requireAuth, async (req, res) => {
      ORDER BY (CASE WHEN status = '완료' THEN 1 ELSE 0 END), created_at DESC, id DESC`,
     [req.user.id, req.user.id, req.user.id]
   );
-  res.json({ projects: await attachReviews(rows, req.user.id) });
+  res.json({ projects: await attachRehire(await attachReviews(rows, req.user.id), req.user) });
 });
 
 // 내가 보관함으로 옮긴 완료 프로젝트 목록 (다른 사람의 목록·평점에는 영향 없음)
@@ -110,7 +132,7 @@ router.get('/archived', requireAuth, async (req, res) => {
      ORDER BY completed_at DESC, id DESC`,
     [req.user.id, req.user.id, req.user.id]
   );
-  res.json({ projects: await attachReviews(rows, req.user.id) });
+  res.json({ projects: await attachRehire(await attachReviews(rows, req.user.id), req.user) });
 });
 
 // 완료된 프로젝트를 보관함으로 이동 (나에게만 적용되며, 프로젝트 자체는 지워지지 않습니다)
