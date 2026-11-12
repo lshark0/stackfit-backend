@@ -18,6 +18,7 @@ const { isAdminEmail } = require('../middleware/requireAdmin');
 const { normalizeDate } = require('../workConditions');
 const { pairDetail } = require('../recommend');
 const { reasonFor } = require('../aiRecoReason');
+const { EDU_DEGREES, normalizeEducation } = require('../education');
 
 const router = express.Router();
 wrapAllRoutes(router);
@@ -154,8 +155,22 @@ const PROFILE_SCHEMA = {
         additionalProperties: false,
       },
     },
+    education: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          school: { type: 'string' },
+          degree: { type: 'string', enum: [...EDU_DEGREES, ''] },
+          major: { type: 'string' },
+          end: { type: 'string' },
+        },
+        required: ['school', 'degree', 'major', 'end'],
+        additionalProperties: false,
+      },
+    },
   },
-  required: ['role_title', 'total_years', 'stack', 'certs', 'summary', 'projects'],
+  required: ['role_title', 'total_years', 'stack', 'certs', 'summary', 'projects', 'education'],
   additionalProperties: false,
 };
 
@@ -171,7 +186,8 @@ const PROFILE_INSTRUCTIONS = `위 문서는 IT 프리랜서의 경력기술서�
 - stack: 실제로 사용한 기술스택. 가능하면 다음 표준 표기를 그대로 쓰세요: ${CATALOG_NAMES.join(', ')}. 목록에 없는 기술은 일반적인 영문 표기로. 중요한 것부터 최대 20개.
 - certs: 보유 자격증 정식 명칭(예: 정보처리기사). 없으면 빈 배열.
 - summary: 프로필 자기소개. 경력 연수, 주요 업무·도메인, 사용 기술을 1인칭 합니다체 3~4문장(350자 이내)으로. 문서에 없는 성과·역할·수식어(예: 주도, 최적화, 능숙)는 덧붙이지 마세요. 개인 연락처·주민번호 등 개인정보는 넣지 마세요.
-- projects: 문서에 나온 수행 프로젝트를 하나도 빠짐없이 모두(최대 50개), 최근 것부터. 표·목록으로 나열된 프로젝트도 각각 하나씩 넣으세요. title(프로젝트명), client(발주처/고객사, 없으면 빈 문자열), role_title(위 업무 목록 중 하나 또는 빈 문자열), period("2024.03 ~ 2024.09" 형식, 진행 중이면 "2025.06 ~ 진행중", 모르면 빈 문자열), stack(그 프로젝트 설명에 적힌 기술만, 최대 10개), description(문서에 적힌 담당 업무를 1~2문장, 150자 이내로 요약하되 없는 내용은 덧붙이지 말 것. 문서에 프로젝트명·기간만 있으면 빈 문자열).`;
+- projects: 문서에 나온 수행 프로젝트를 하나도 빠짐없이 모두(최대 50개), 최근 것부터. 표·목록으로 나열된 프로젝트도 각각 하나씩 넣으세요. title(프로젝트명), client(발주처/고객사, 없으면 빈 문자열), role_title(위 업무 목록 중 하나 또는 빈 문자열), period("2024.03 ~ 2024.09" 형식, 진행 중이면 "2025.06 ~ 진행중", 모르면 빈 문자열), stack(그 프로젝트 설명에 적힌 기술만, 최대 10개), description(문서에 적힌 담당 업무를 1~2문장, 150자 이내로 요약하되 없는 내용은 덧붙이지 말 것. 문서에 프로젝트명·기간만 있으면 빈 문자열).
+- education: 문서에 적힌 학력(졸업한 학교)을 최근 것부터 최대 6개. school(문서에 적힌 학교명 그대로, 대학원은 "○○대학교 대학원"처럼), degree(${EDU_DEGREES.join(', ')} 중 하나, 모르면 빈 문자열. 대학원은 석사·박사, 전문대는 전문학사), major(전공, 없으면 빈 문자열), end(문서에 적힌 졸업 연월을 "YYYY.MM" 형식으로, 월이 없거나 모르면 빈 문자열). 학력이 없으면 빈 배열.`;
 
 // IT 업계에서 흔히 쓰는 학사 기준 기술자 등급(초급 → 3년 후 중급 → 6년 후 고급)을 단순 적용합니다.
 // 사용자가 저장 전에 직접 확인·수정합니다.
@@ -220,6 +236,9 @@ function cleanSuggestion(raw) {
         stack: normalizeStackList(p.stack, 10),
         description: str(scrubProfileText(p.description), 300),
       })),
+    education: normalizeEducation((Array.isArray(raw.education) ? raw.education : []).map((e) => ({
+      ...e, school: scrubProfileText(e && e.school), major: scrubProfileText(e && e.major),
+    }))),
   };
 }
 

@@ -3093,12 +3093,12 @@ function educationRowsHtml(){
   return pendingEducation.map((e,i)=>`
     <div style="border:1px solid var(--line); border-radius:12px; padding:10px; margin-bottom:8px; display:grid; gap:6px;">
       <div style="display:flex; gap:6px;">
-        <input class="form-input" style="flex:1;" placeholder="학교명 (예: 상명대학교)" maxlength="60" value="${esc(e.school||'')}" oninput="pendingEducation[${i}].school=this.value">
+        <input class="form-input" style="flex:1;" placeholder="학교명 (예: 한국대학교)" maxlength="60" value="${esc(e.school||'')}" oninput="pendingEducation[${i}].school=this.value">
         <button class="btn btn-outline" style="width:auto; padding:0 12px; color:var(--danger);" onclick="removeEducation(${i})">삭제</button>
       </div>
       <div style="display:flex; gap:6px;">
         <select class="form-input" style="flex:1;" onchange="pendingEducation[${i}].degree=this.value"><option value="">학위 선택</option>${EDU_DEGREES.map(d=>`<option ${e.degree===d?'selected':''}>${d}</option>`).join('')}</select>
-        <input class="form-input" style="flex:1;" placeholder="전공 (선택)" maxlength="60" value="${esc(e.major||'')}" oninput="pendingEducation[${i}].major=this.value">
+        <input class="form-input" style="flex:1;" placeholder="전공" maxlength="60" value="${esc(e.major||'')}" oninput="pendingEducation[${i}].major=this.value">
       </div>
       <div style="display:flex; gap:6px; align-items:center;">
         <span style="flex:0 0 auto; font-size:12.5px; color:var(--slate);">졸업 연월</span>
@@ -6755,7 +6755,7 @@ let aiFillSuggestion = null;
 function aiFillBoxHtml(){
   return `<div class="ai-fill-box">
     <div class="ai-fill-tt">${I.sparkle}AI 자동 채우기</div>
-    <div class="page-sub" style="margin-top:4px;">올린 경력기술서를 AI가 읽고 업무·등급·기술스택·자격증·자기소개·수행 프로젝트를 채워드려요.</div>
+    <div class="page-sub" style="margin-top:4px;">올린 경력기술서를 AI가 읽고 업무·등급·기술스택·자격증·학력·자기소개·수행 프로젝트를 채워드려요.</div>
     <button class="btn btn-primary" id="aiFillBtn" style="margin-top:10px;" onclick="aiFillProfile()">AI로 자동 채우기</button>
     <div id="aiFillResult"></div>
   </div>`;
@@ -6771,6 +6771,13 @@ async function aiFillProfile(){
   }catch(e){ toast(e.message); }
   finally{ if(btn){ btn.disabled = false; btn.textContent = 'AI로 다시 분석하기'; } }
 }
+// AI가 찾은 학력 중 아직 입력란에 없는 것(학교명 기준)만, 6개 한도 안에서
+function aiNewEducation(s){
+  const key = (x) => String(x||'').replace(/\s+/g,'').toLowerCase();
+  const have = new Set(pendingEducation.map(e => key(e.school)).filter(Boolean));
+  const room = 6 - pendingEducation.filter(e => key(e.school)).length;
+  return (s.education || []).filter(e => e.school && !have.has(key(e.school))).slice(0, Math.max(0, room));
+}
 function aiFillResultHtml(s){
   const row = (key, label, valueHtml, on) => `
     <label class="ai-fill-row"><input type="checkbox" data-ai-key="${key}" ${on?'checked':''}>
@@ -6784,6 +6791,8 @@ function aiFillResultHtml(s){
   if(s.grade && s.grade !== curVal('pf-grade')) rows.push(row('grade', '등급', `${esc(s.grade)} <span class="page-sub">(경력 약 ${s.years}년 기준)</span>`, true));
   if(newStack.length) rows.push(row('stack', `기술스택 ${newStack.length}개 추가`, newStack.map(x=>`<span class="tag">${esc(x)}</span>`).join(' '), true));
   if(newCerts.length) rows.push(row('certs', `자격증 ${newCerts.length}개 추가`, newCerts.map(x=>`<span class="tag">${esc(x)}</span>`).join(' '), true));
+  const newEdu = aiNewEducation(s);
+  if(newEdu.length) rows.push(row('education', `학력 ${newEdu.length}개 추가`, newEdu.map(e=>`· ${esc(e.school)}${e.degree||e.major?` <span class="page-sub">(${esc([e.degree,e.major].filter(Boolean).join(' · '))})</span>`:''}${e.end?` <span class="page-sub">${esc(e.end)} 졸업</span>`:''}`).join('<br>'), true));
   if(s.summary && s.summary !== curSummary) rows.push(row('summary', curSummary ? '자기소개 (지금 내용을 바꿔요)' : '자기소개', esc(s.summary), !curSummary));
   const newProjects = s.projects.filter(p => !p.exists);
   const dupCount = s.projects.length - newProjects.length;
@@ -6806,6 +6815,12 @@ async function applyAiFill(){
   if(on('stack')) s.stack.forEach(x => { if(!pendingStack.some(p => p.toLowerCase() === x.toLowerCase())) pendingStack.push(x); });
   if(on('certs')) s.certs.forEach(x => { if(!pendingCerts.includes(x)) pendingCerts.push(x); });
   if(on('summary')) setVal('pf-summary', s.summary);
+  if(on('education')){
+    const add = aiNewEducation(s);
+    pendingEducation = pendingEducation.filter(e => String(e.school||'').trim()); // 비어 있는 입력 줄은 정리
+    add.forEach(e => pendingEducation.push({school:e.school, degree:e.degree||'', major:e.major||'', end:e.end||'', status:'졸업'}));
+    rerenderEducation();
+  }
   refreshTagsUI(); refreshCertsUI();
   let added = 0;
   if(on('projects')){
