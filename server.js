@@ -39,10 +39,12 @@ const { resetMfaFromEnv } = require('./src/mfa');
 const { verifyToken, verifySessionToken } = require('./src/auth');
 const { dedupeAllPortfolios } = require('./src/portfolioDedupe');
 const securityLog = require('./src/securityLog');
+const { requestLog } = require('./src/requestLog');
 const { purgeOldSecurityEvents } = securityLog;
 
 const app = express();
 app.set('trust proxy', 1); // Render는 프록시 뒤에 있으므로 rate-limit이 실제 클라이언트 IP를 보게 함
+app.use(requestLog); // 실패·차단 응답만 앱 로그에 남김(지시-016, src/requestLog.js)
 
 // 대표 도메인은 kimfree.co.kr — kimfree.com(www 포함)으로 들어오면 같은 경로로 영구 이동시킵니다.
 const PRIMARY_HOST = 'kimfree.co.kr';
