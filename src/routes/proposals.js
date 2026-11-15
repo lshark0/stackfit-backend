@@ -11,10 +11,15 @@ const { quotaFor, recordSend } = require('../proposalQuota');
 const router = express.Router();
 wrapAllRoutes(router);
 
+// 제안 알림 문구 — 제안을 취소할 때 상대가 아직 읽지 않은 알림을 같은 문구로 찾아 지웁니다.
+const proposalNoticeBody = (companyName, rehire) => (rehire
+  ? `${companyName}에서 지난 프로젝트에 이어 다시 함께 일하자고 제안했습니다.`
+  : `${companyName}에서 포지션을 제안했습니다.`);
+
 router.post('/talents/:userId/propose', requireAuth, requireRole('company'), async (req, res) => {
   const freelancerId = Number(req.params.userId);
   if (!Number.isInteger(freelancerId)) return res.status(400).json({ error: '올바르지 않은 사용자 ID입니다.' });
-  const { jobId, message, source } = req.body || {};
+  const { jobId, message, source, rehireProjectId } = req.body || {};
 
   const talent = await get('SELECT * FROM freelancer_profiles WHERE user_id = ?', [freelancerId]);
   if (!talent) return res.status(404).json({ error: '프로필을 찾을 수 없습니다.' });
@@ -35,8 +40,25 @@ router.post('/talents/:userId/propose', requireAuth, requireRole('company'), asy
     proposalScore = pairScore(job, talent);
   }
 
-  const existing = await get('SELECT id FROM proposals WHERE company_id=? AND freelancer_id=?', [req.user.id, freelancerId]);
-  if (existing) return res.status(409).json({ error: '이미 제안을 보냈습니다.' });
+  // '다시 함께 일하기': 함께 계약을 끝낸(완료) 프로젝트가 있으면, 예전에 제안을 보냈던 사람에게도 다시 제안할 수 있어요.
+  // 같은 프로젝트로는 한 번만, 아직 답을 기다리는 제안이 있으면 새로 보내지 않습니다.
+  let rehire = null;
+  if (rehireProjectId !== undefined && rehireProjectId !== null && rehireProjectId !== '') {
+    const pid = Number(rehireProjectId);
+    if (!Number.isInteger(pid)) return res.status(400).json({ error: '올바르지 않은 프로젝트 ID입니다.' });
+    rehire = await get(
+      "SELECT id, title FROM projects WHERE id = ? AND company_id = ? AND freelancer_id = ? AND status = '완료'",
+      [pid, req.user.id, freelancerId]
+    );
+    if (!rehire) return res.status(404).json({ error: '함께 완료한 프로젝트를 찾을 수 없습니다.' });
+    const again = await get('SELECT id FROM proposals WHERE company_id=? AND freelancer_id=? AND rehire_project_id=?', [req.user.id, freelancerId, pid]);
+    if (again) return res.status(409).json({ error: '이 프로젝트로 이미 다시 함께 일하기 제안을 보냈어요.' });
+    const pending = await get("SELECT id FROM proposals WHERE company_id=? AND freelancer_id=? AND status='sent'", [req.user.id, freelancerId]);
+    if (pending) return res.status(409).json({ error: '아직 답을 기다리는 제안이 있어요. 응답을 받은 뒤 다시 보내 주세요.' });
+  } else {
+    const existing = await get('SELECT id FROM proposals WHERE company_id=? AND freelancer_id=?', [req.user.id, freelancerId]);
+    if (existing) return res.status(409).json({ error: '이미 제안을 보냈습니다.' });
+  }
 
   // 무료 회원 월간 제안 횟수 제한 (관리자가 한도를 정했을 때만)
   const quota = await quotaFor(req.user.id);
@@ -48,27 +70,30 @@ router.post('/talents/:userId/propose', requireAuth, requireRole('company'), asy
   }
 
   const safeMessage = typeof message === 'string' ? message.trim().slice(0, 1000) : '';
-  await run('INSERT INTO proposals (company_id, freelancer_id, job_id, message, match_score, source) VALUES (?,?,?,?,?,?)', [
-    req.user.id, freelancerId, safeJobId, safeMessage, proposalScore, normalizeSource(source),
+  await run('INSERT INTO proposals (company_id, freelancer_id, job_id, message, match_score, source, rehire_project_id) VALUES (?,?,?,?,?,?,?)', [
+    req.user.id, freelancerId, safeJobId, safeMessage, proposalScore, normalizeSource(source), rehire ? rehire.id : null,
   ]);
   await recordSend(req.user.id, freelancerId);
 
   const company = await get('SELECT name FROM companies WHERE user_id = ?', [req.user.id]);
+  const companyName = company ? company.name : '한 기업';
   await addNotification(freelancerId, {
-    tag: '제안', title: '새로운 제안이 도착했어요',
-    body: `${company ? company.name : '한 기업'}에서 포지션을 제안했습니다.`,
+    tag: '제안', title: rehire ? '다시 함께 일하자는 제안이 도착했어요' : '새로운 제안이 도착했어요',
+    body: proposalNoticeBody(companyName, !!rehire),
     link: 'receivedProposals',
   });
 
   pushTo(freelancerId, {
     kind: 'proposal',
-    title: '📨 새 포지션 제안',
-    body: `${company ? company.name : '한 기업'}에서 포지션을 제안했어요. 앱에서 확인해보세요.`,
+    title: rehire ? '🔁 다시 함께 일하기 제안' : '📨 새 포지션 제안',
+    body: rehire
+      ? `${companyName}에서 "${rehire.title}"에 이어 다시 함께 일하자고 제안했어요.`
+      : `${companyName}에서 포지션을 제안했어요. 앱에서 확인해보세요.`,
     tag: 'proposal',
     link: 'receivedProposals',
   });
 
-  res.status(201).json({ proposed: true });
+  res.status(201).json({ proposed: true, rehire: !!rehire });
 });
 
 // 이번 달 무료 제안 남은 횟수 (기업 전용)
@@ -81,7 +106,8 @@ router.delete('/talents/:userId/propose', requireAuth, requireRole('company'), a
   const freelancerId = Number(req.params.userId);
   if (!Number.isInteger(freelancerId)) return res.status(400).json({ error: '올바르지 않은 사용자 ID입니다.' });
 
-  const existing = await get('SELECT id FROM proposals WHERE company_id=? AND freelancer_id=?', [req.user.id, freelancerId]);
+  // '다시 함께 일하기'로 같은 사람에게 제안이 여러 건일 수 있어, 가장 최근 제안을 취소합니다.
+  const existing = await get('SELECT id, rehire_project_id FROM proposals WHERE company_id=? AND freelancer_id=? ORDER BY id DESC LIMIT 1', [req.user.id, freelancerId]);
   if (!existing) return res.status(404).json({ error: '보낸 제안을 찾을 수 없습니다.' });
 
   await run('DELETE FROM proposals WHERE id = ?', [existing.id]);
@@ -92,7 +118,7 @@ router.delete('/talents/:userId/propose', requireAuth, requireRole('company'), a
   const companyName = company ? company.name : '한 기업';
   await run(
     "DELETE FROM notifications WHERE user_id = ? AND tag = '제안' AND is_read = 0 AND body = ?",
-    [freelancerId, `${companyName}에서 포지션을 제안했습니다.`]
+    [freelancerId, proposalNoticeBody(companyName, !!existing.rehire_project_id)]
   );
 
   res.json({ proposed: false });
@@ -102,9 +128,10 @@ router.delete('/talents/:userId/propose', requireAuth, requireRole('company'), a
 router.get('/proposals/sent', requireAuth, requireRole('company'), async (req, res) => {
   const rows = await all(
     `SELECT p.id, p.created_at, p.job_id, p.freelancer_id, p.status, p.message, p.decline_reason, p.responded_at,
-            j.title AS job_title
+            j.title AS job_title, p.rehire_project_id, rp.title AS rehire_project_title
      FROM proposals p
      LEFT JOIN jobs j ON j.id = p.job_id
+     LEFT JOIN projects rp ON rp.id = p.rehire_project_id
      WHERE p.company_id = ?
      ORDER BY (CASE WHEN p.status = 'accepted' THEN 0 WHEN p.status = 'sent' THEN 1 ELSE 2 END),
               p.created_at DESC, p.id DESC`,
@@ -149,10 +176,12 @@ router.get('/proposals/received', requireAuth, requireRole('freelancer'), async 
     `SELECT p.id, p.created_at, p.job_id, p.company_id, p.status, p.message, p.decline_reason, p.responded_at,
             c.name AS company_name, c.description AS company_description,
             j.title AS job_title, j.stack_json, j.rate, j.period, j.work_type, j.location,
-            j.duty, j.grade, j.description AS job_description, j.deadline, j.status AS job_status
+            j.duty, j.grade, j.description AS job_description, j.deadline, j.status AS job_status,
+            p.rehire_project_id, rp.title AS rehire_project_title
      FROM proposals p
      JOIN companies c ON c.user_id = p.company_id
      LEFT JOIN jobs j ON j.id = p.job_id
+     LEFT JOIN projects rp ON rp.id = p.rehire_project_id
      WHERE p.freelancer_id = ?
      ORDER BY (CASE WHEN p.status = 'sent' THEN 0 ELSE 1 END), p.created_at DESC, p.id DESC`,
     [req.user.id]

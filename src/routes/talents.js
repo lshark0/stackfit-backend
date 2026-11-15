@@ -199,7 +199,7 @@ router.get('/:userId', requireAuth, requireRole('company'), async (req, res) => 
 
   const t = await get('SELECT * FROM freelancer_profiles WHERE user_id = ?', [freelancerId]);
   if (!t) return res.status(404).json({ error: '프로필을 찾을 수 없습니다.' });
-  const myProposal = await get('SELECT status FROM proposals WHERE company_id=? AND freelancer_id=?', [req.user.id, freelancerId]);
+  const myProposal = await get('SELECT status FROM proposals WHERE company_id=? AND freelancer_id=? ORDER BY id DESC LIMIT 1', [req.user.id, freelancerId]); // 다시 함께 일하기로 여러 건이면 최근 것
   const proposed = !!myProposal;
   const saved = !!(await get('SELECT id FROM saved_talents WHERE company_id=? AND freelancer_id=?', [req.user.id, freelancerId]));
 
@@ -235,7 +235,7 @@ router.get('/:userId', requireAuth, requireRole('company'), async (req, res) => 
     proposed,
     saved,
     // 이 기업의 제안을 프리랜서가 실제로 수락한 경우에만 연락처를 내려줍니다.
-    ...contactFields(t, myProposal && myProposal.status === 'accepted'),
+    ...contactFields(t, !!(await get("SELECT id FROM proposals WHERE company_id=? AND freelancer_id=? AND status='accepted' LIMIT 1", [req.user.id, freelancerId]))),
     resume_url: signedFileUrl(t.resume_filename),
     portfolios: sortPortfoliosByPeriod(portfolioRows).map((p) => ({ ...p, stack: JSON.parse(p.stack_json) })),
     ...rating,
