@@ -1,5 +1,6 @@
 const { all } = require('./db');
 const { computeMatch, matchedStack, stackCounts } = require('./match');
+const { similarMatches } = require('./techSimilarity');
 const { getRatingSummaries } = require('./ratings');
 const { scoreTiming, scoreWorkType, scoreRegion, scoreCerts, scoreRate } = require('./workConditions');
 
@@ -38,10 +39,19 @@ function scoreMatch(job, profile, rating) {
   const reasons = [];
 
   const match = computeMatch(job.stack, profile.stack);
-  const stackScore = Math.round((match / 100) * 40);
   const matched = matchedStack(job.stack, profile.stack);
   const { matchTotal } = stackCounts(job.stack, profile.stack);
   if (matched.length > 0) reasons.push(`기술스택 ${matchTotal}개 중 ${matched.length}개 일치`);
+  // [개선-013] 정확히 일치하지 않은 요구 기술은 AI 유사 기술 판정으로 보완합니다(src/techSimilarity.js).
+  //   같은 기술(표기만 다름)은 1개, 비슷한 계열(예: Oracle ↔ Tibero)은 0.5개로 셉니다.
+  const seen = new Set(matched);
+  const unmatched = (job.stack || []).map(String).filter((t) => { const k = t.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; });
+  const similar = matchTotal ? similarMatches(unmatched, profile.stack || []) : [];
+  const credit = matched.length + similar.reduce((n, x) => n + (x.verdict === 'same' ? 1 : 0.5), 0);
+  const stackScore = matchTotal ? Math.round(Math.min(1, credit / matchTotal) * 40) : 0;
+  if (similar.length > 0) {
+    reasons.push(`비슷한 기술 ${similar.map((x) => `${x.job}≈${x.profile}`).slice(0, 3).join(', ')}(AI 판정)`);
+  }
 
   let dutyScore = 0;
   if (job.duty && profile.role_title) {
@@ -100,7 +110,7 @@ function scoreMatch(job, profile, rating) {
   };
   // 근무 조건은 중립 점수가 있으므로, 기술·업무·자격증 중 하나라도 맞아야 '접점이 있다'고 봅니다.
   const relevant = stackScore > 0 || dutyScore > 0 || certs.matched > 0;
-  return { score: total, match, matched, matchTotal, reasons, breakdown, relevant };
+  return { score: total, match, matched, matchTotal, reasons, breakdown, relevant, similarStack: similar };
 }
 
 const acceptsOffers = (p) => (Number(p.accept_proposals ?? 1) === 1 ? 1 : 0);

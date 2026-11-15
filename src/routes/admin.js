@@ -9,6 +9,7 @@ const ai = require('../ai');
 const { listSecurityEvents } = require('../securityLog');
 const { computePerformance } = require('../performance');
 const proposalQuota = require('../proposalQuota');
+const techSimilarity = require('../techSimilarity');
 
 const router = express.Router();
 wrapAllRoutes(router);
@@ -261,7 +262,7 @@ router.get('/signup-stats', requireAuth, requireAdmin, async (req, res) => {
 });
 
 // AI 사용량 통계 — 기능별 호출 수·토큰·예상 비용(USD/원), 일별 추이, 많이 쓴 회원
-const AI_FEATURE_LABELS = { support_chat: 'AI 상담', profile_from_resume: '경력기술서 자동 채우기', career_verify: '경력 검증 AI 심사', job_from_text: '공고 자동 채우기', match_reason: '추천 이유 설명', reco_reason: 'AI 추천 이유(미리보기, 종료)' };
+const AI_FEATURE_LABELS = { support_chat: 'AI 상담', profile_from_resume: '경력기술서 자동 채우기', career_verify: '경력 검증 AI 심사', job_from_text: '공고 자동 채우기', match_reason: '추천 이유 설명', reco_reason: 'AI 추천 이유(미리보기, 종료)', tech_similarity: '유사 기술 판정' };
 router.get('/ai-usage', requireAuth, requireAdmin, async (req, res) => {
   const days = Math.min(3650, Math.max(1, Number.parseInt(req.query.days, 10) || 30));
   const today = ai.kstDay();
@@ -335,6 +336,21 @@ router.get('/ai-usage', requireAuth, requireAdmin, async (req, res) => {
 });
 
 // 보안 로그 조회 — 최근 로그인 실패·잠금·관리자 작업 등 (6개월 보관)
+// [개선-013] AI 유사 기술 판정 목록(최근 500건)과 판정 고치기. 고친 판정은 AI가 다시 덮어쓰지 않습니다.
+router.get('/tech-similarity', requireAuth, requireAdmin, async (req, res) => {
+  const rows = await techSimilarity.listJudgments();
+  res.json({ items: rows, dailyCalls: techSimilarity.DAILY_CALLS, pairsPerCall: techSimilarity.PAIRS_PER_CALL, enabled: ai.aiEnabled() && process.env.AI_TECH_SIM_OFF !== '1' });
+});
+router.put('/tech-similarity', requireAuth, requireAdmin, async (req, res) => {
+  const { key, verdict } = req.body || {};
+  try {
+    await techSimilarity.setVerdict(String(key || ''), String(verdict || ''));
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(e.status || 500).json({ error: e.status ? e.message : '판정을 저장하지 못했어요.' });
+  }
+});
+
 router.get('/security-events', requireAuth, requireAdmin, async (req, res) => {
   const events = await listSecurityEvents(Number.parseInt(req.query.limit, 10) || 200);
   const dayAgo = Date.now() - 24 * 3600 * 1000;

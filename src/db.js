@@ -31,7 +31,7 @@ if (USE_POSTGRES) {
   }
 
   // id 컬럼이 없는(다른 기본키를 쓰는) 테이블은 RETURNING id를 붙이면 안 됩니다.
-  const NO_ID_TABLES = ['freelancer_profiles', 'companies', 'app_settings'];
+  const NO_ID_TABLES = ['freelancer_profiles', 'companies', 'app_settings', 'tech_similarity'];
   function targetTable(sql) {
     const m = sql.match(/insert\s+into\s+([a-zA-Z_]+)/i);
     return m ? m[1] : null;

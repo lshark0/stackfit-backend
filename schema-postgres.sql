@@ -418,3 +418,15 @@ CREATE TABLE IF NOT EXISTS proposal_sends (
   created_at    TEXT NOT NULL              -- UTC 'YYYY-MM-DD HH:MM:SS'
 );
 CREATE INDEX IF NOT EXISTS idx_proposal_sends_company ON proposal_sends(company_id, created_at);
+
+-- [개선-013] AI 유사 기술 판정: 기술 이름 쌍(정규화해 정렬한 pair_key)마다 한 번만 판정해 저장합니다.
+-- verdict: same(같은 기술) / similar(비슷한 계열, 추천 점수 절반 인정) / different. source: ai / admin(관리자가 고침)
+CREATE TABLE IF NOT EXISTS tech_similarity (
+  pair_key   TEXT PRIMARY KEY,
+  tech_a     TEXT NOT NULL,
+  tech_b     TEXT NOT NULL,
+  verdict    TEXT NOT NULL,
+  source     TEXT NOT NULL DEFAULT 'ai',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
