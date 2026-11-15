@@ -339,7 +339,7 @@ router.get('/ai-usage', requireAuth, requireAdmin, async (req, res) => {
 // [개선-013] AI 유사 기술 판정 목록(최근 500건)과 판정 고치기. 고친 판정은 AI가 다시 덮어쓰지 않습니다.
 router.get('/tech-similarity', requireAuth, requireAdmin, async (req, res) => {
   const rows = await techSimilarity.listJudgments();
-  res.json({ items: rows, dailyCalls: techSimilarity.DAILY_CALLS, pairsPerCall: techSimilarity.PAIRS_PER_CALL, enabled: ai.aiEnabled() && process.env.AI_TECH_SIM_OFF !== '1' });
+  res.json({ items: rows, dailyCalls: techSimilarity.DAILY_CALLS, pairsPerCall: techSimilarity.PAIRS_PER_CALL, similarCredit: techSimilarity.SIMILAR_CREDIT_ON, enabled: ai.aiEnabled() && process.env.AI_TECH_SIM_OFF !== '1' });
 });
 router.put('/tech-similarity', requireAuth, requireAdmin, async (req, res) => {
   const { key, verdict } = req.body || {};

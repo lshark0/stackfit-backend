@@ -43,14 +43,17 @@ function scoreMatch(job, profile, rating) {
   const { matchTotal } = stackCounts(job.stack, profile.stack);
   if (matched.length > 0) reasons.push(`기술스택 ${matchTotal}개 중 ${matched.length}개 일치`);
   // [개선-013] 정확히 일치하지 않은 요구 기술은 AI 유사 기술 판정으로 보완합니다(src/techSimilarity.js).
-  //   같은 기술(표기만 다름)은 1개, 비슷한 계열(예: Oracle ↔ Tibero)은 0.5개로 셉니다.
+  //   같은 기술(표기만 다름)은 1개로 셉니다. 비슷한 계열(예: Oracle ↔ Tibero)의 0.5개 인정은 결재-026에 따라 꺼 둠.
   const seen = new Set(matched);
   const unmatched = (job.stack || []).map(String).filter((t) => { const k = t.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; });
   const similar = matchTotal ? similarMatches(unmatched, profile.stack || []) : [];
   const credit = matched.length + similar.reduce((n, x) => n + (x.verdict === 'same' ? 1 : 0.5), 0);
   const stackScore = matchTotal ? Math.round(Math.min(1, credit / matchTotal) * 40) : 0;
   if (similar.length > 0) {
-    reasons.push(`비슷한 기술 ${similar.map((x) => `${x.job}≈${x.profile}`).slice(0, 3).join(', ')}(AI 판정)`);
+    const same = similar.filter((x) => x.verdict === 'same');
+    const near = similar.filter((x) => x.verdict !== 'same');
+    if (same.length) reasons.push(`표기만 다른 같은 기술 ${same.map((x) => `${x.job}=${x.profile}`).slice(0, 3).join(', ')}(AI 판정)`);
+    if (near.length) reasons.push(`비슷한 기술 ${near.map((x) => `${x.job}≈${x.profile}`).slice(0, 3).join(', ')}(AI 판정)`);
   }
 
   let dutyScore = 0;

@@ -19,6 +19,9 @@ const DAILY_CALLS = Number(process.env.AI_TECH_SIM_DAILY_CALLS) || 20;
 const QUEUE_MAX = 400;
 const FLUSH_DELAY_MS = 3000;
 const VERDICTS = ['same', 'similar', 'different'];
+// 결재-026(11/13 대표 결정): 지금은 '표기만 다른 같은 기술(same)'만 일치로 인정합니다.
+// '비슷한 계열(similar)' 판정은 저장·관리자 확인만 하고 점수에는 넣지 않습니다(나중에 true로 바꾸면 절반 인정).
+const SIMILAR_CREDIT_ON = false;
 const CTRL_RE = /[\u0000-\u001F\u007F​-‏‪-‮⁦-⁩]/g;
 
 const verdictByKey = new Map(); // pairKey → 'same' | 'similar' | 'different'
@@ -73,7 +76,7 @@ function similarMatches(unmatchedJobTags = [], profileStack = []) {
     for (const p of profileStack) {
       const v = lookup(j, p);
       if (v === 'same') { best = { job: j, profile: p, verdict: 'same' }; break; }
-      if (v === 'similar' && !best) best = { job: j, profile: p, verdict: 'similar' };
+      if (v === 'similar' && SIMILAR_CREDIT_ON && !best) best = { job: j, profile: p, verdict: 'similar' };
     }
     if (best) out.push(best);
   }
@@ -177,5 +180,5 @@ async function setVerdict(key, verdict) {
 
 module.exports = {
   loadTechSimilarity, similarMatches, lookup, flush, listJudgments, setVerdict, pairKey,
-  FEATURE, DAILY_CALLS, PAIRS_PER_CALL,
+  FEATURE, DAILY_CALLS, PAIRS_PER_CALL, SIMILAR_CREDIT_ON,
 };
