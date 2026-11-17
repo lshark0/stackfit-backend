@@ -328,6 +328,10 @@ app.get('/uploads/:filename', async (req, res) => {
   }
   const ext = path.extname(safeName).toLowerCase();
   res.setHeader('Content-Type', MIME_BY_EXT[ext] || 'application/octet-stream');
+  // 브라우저가 화면에 못 그리는 문서(Word·PPT·한글·압축)는 내려받기로 응답합니다(외부 뷰어 미사용, 결재-029).
+  if (['.doc', '.docx', '.ppt', '.pptx', '.hwp', '.zip'].includes(ext)) {
+    res.setHeader('Content-Disposition', `attachment; filename="${safeName.replace(/[^\w.-]/g, '_')}"`);
+  }
   res.send(Buffer.from(data));
 });
 app.use(express.static(path.join(__dirname, 'public'), {
