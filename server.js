@@ -399,6 +399,12 @@ app.use(publicPagesRoutes); // /jobs, /jobs/:id, /sitemap.xml, /robots.txt (로�
 app.use((req, res) => res.status(404).json({ error: 'Not found' }));
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
+  // 요청 본문을 읽다 난 오류(잘못된 JSON·너무 큰 본문·지원하지 않는 압축 등)는 body-parser가 4xx 상태를 붙여 줍니다.
+  // 서버 잘못이 아니므로 500 대신 그 상태로 짧게 답하고, 오류 전체(스택)는 로그에 남기지 않습니다.
+  const status = Number(err && (err.status || err.statusCode));
+  if (status >= 400 && status < 500) {
+    return res.status(status).json({ error: status === 413 ? '요청 내용이 너무 큽니다.' : '요청 형식이 올바르지 않습니다.' });
+  }
   console.error(err);
   res.status(500).json({ error: '서버 오류가 발생했습니다.' });
 });
