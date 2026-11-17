@@ -2,7 +2,7 @@ const express = require('express');
 const { get, all } = require('../db');
 const { requireAuth, requireRole } = require('../middleware/requireAuth');
 const { wrapAllRoutes } = require('../middleware/asyncHandler');
-const { signedFileUrl } = require('../fileAccess');
+const { signedFileUrl, resumeVisibleSet } = require('../fileAccess');
 const { recommendTalentsForJob, recommendJobsForProfile } = require('../recommend');
 const { publicTalent } = require('../contact');
 
@@ -49,10 +49,15 @@ router.get('/talents', requireAuth, requireRole('company'), async (req, res) => 
 
   const target = { ...job, stack: JSON.parse(job.stack_json), certs: JSON.parse(job.certs_json || '[]') };
   const talents = await recommendTalentsForJob(target, parseLimit(req.query.limit));
+  const resumeOk = await resumeVisibleSet(req.user.id, talents.map((t) => t.user_id));
   res.json({
     job: { id: job.id, title: job.title },
     jobs: openJobs.map((j) => ({ id: j.id, title: j.title })),
-    talents: talents.map((t) => ({ ...publicTalent(t), resume_url: signedFileUrl(t.resume_filename) })),
+    talents: talents.map((t) => ({
+      ...publicTalent(t),
+      // 경력기술서는 내 공고에 지원했거나 내 제안을 수락한 프리랜서만
+      resume_url: resumeOk.has(Number(t.user_id)) ? signedFileUrl(t.resume_filename) : null,
+    })),
   });
 });
 

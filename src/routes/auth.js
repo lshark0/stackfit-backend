@@ -11,6 +11,7 @@ const identity = require('../identity');
 const securityLog = require('../securityLog');
 const mfa = require('../mfa');
 const emailVerify = require('../emailVerify');
+const { revokeTokens, forgetUser } = require('../tokenRevocation');
 
 const router = express.Router();
 wrapAllRoutes(router);
@@ -357,7 +358,10 @@ router.post('/change-password', requireAuth, async (req, res) => {
   }
   const { hash, salt } = hashPassword(newPassword);
   await run('UPDATE users SET password_hash=?, password_salt=? WHERE id=?', [hash, salt, user.id]);
-  res.json({ ok: true });
+  // 다른 기기에 남아 있는 예전 로그인을 모두 끊고, 지금 기기에는 새 토큰을 줍니다(보안-004).
+  await revokeTokens(user.id);
+  const token = mfa.sessionToken(user, !!req.user.mfa);
+  res.json({ ok: true, token });
 });
 
 // 회원탈퇴 — 이메일 계정은 비밀번호 확인, 소셜 계정은 확인 없이 즉시 삭제 (연관 데이터는 CASCADE로 함께 삭제됨)
@@ -371,6 +375,7 @@ router.delete('/me', requireAuth, async (req, res) => {
     }
   }
   await run('DELETE FROM users WHERE id = ?', [user.id]);
+  forgetUser(user.id);
   res.json({ ok: true });
 });
 

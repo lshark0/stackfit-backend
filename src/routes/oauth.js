@@ -7,6 +7,7 @@ const { PROVIDERS, isConfigured, buildAuthorizeUrl, exchangeCode } = require('..
 const { isAdminEmail } = require('../middleware/requireAdmin');
 const { recordSignupAttribution } = require('../attribution');
 const securityLog = require('../securityLog');
+const { revokeTokens } = require('../tokenRevocation');
 const mfa = require('../mfa');
 
 const router = express.Router();
@@ -68,6 +69,7 @@ router.get('/:provider/callback', async (req, res) => {
              email_verified_at=?, email_verify_hash=NULL, email_verify_expires=NULL WHERE id=?`,
           [provider, profile.id, hash, salt, new Date().toISOString(), existing.id]
         );
+        await revokeTokens(existing.id); // 그 비밀번호로 이미 로그인해 둔 기기도 끊습니다(보안-004)
         await securityLog.logEvent('oauth_link_reset_password', {
           email: existing.email, ip: securityLog.clientIp(req), userId: existing.id,
           detail: `${provider} 연동 — 이메일 미인증 계정의 비밀번호 폐기`,

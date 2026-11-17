@@ -45,4 +45,4 @@ docker run -p 4000:4000 -e JWT_SECRET=local-test-secret stackfit-backend
 - [ ] `JWT_SECRET`을 무작위 값으로 설정했는지 (기본값 그대로 쓰지 말 것)
 - [ ] `/api/health`가 정상 응답하는지
 - [ ] 프론트엔드 서버 연결 설정에 `.../api`까지 포함해서 입력했는지 (health 경로 제외)
-- [ ] 데모 계정(`lee@stackfit.dev`, `hr@hanbit.dev`)으로 로그인이 되는지
+- [ ] 새로 가입한 시험 계정으로 로그인이 되는지

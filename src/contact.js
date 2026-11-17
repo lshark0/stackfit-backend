@@ -56,7 +56,8 @@ function normalizeBirthDate(v) {
 function publicTalent(t) {
   if (!t) return t;
   // eslint-disable-next-line no-unused-vars
-  const { phone, email, resume_data, share_phone, share_email, birth_date, gender, ...rest } = t;
+  // resume_filename(저장 파일명)도 내보내지 않습니다 — 경력기술서 링크는 열람 자격을 확인한 곳에서만 resume_url로 발급
+  const { phone, email, resume_data, resume_filename, share_phone, share_email, birth_date, gender, ...rest } = t;
   const accepting = Number(t.accept_proposals ?? 1) === 1;
   return {
     ...rest,

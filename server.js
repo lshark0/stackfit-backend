@@ -120,8 +120,13 @@ app.use(
 
 app.use(express.json({ limit: '200kb' })); // 과도하게 큰 JSON payload로 인한 DoS 방지
 
-// CORS: 허용할 origin을 환경변수로 지정 가능 (콤마로 구분). 미지정 시 전체 허용(개발 편의).
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
+// CORS: 허용할 origin을 환경변수로 지정 가능 (콤마로 구분).
+// 미지정이면 운영(Render)에서는 김프리 자체 주소만 허용하고(Play 스토어 앱도 같은 웹사이트를 띄우므로 같은 주소),
+// 개발 환경에서는 전체 허용합니다.
+const DEFAULT_ORIGINS = process.env.RENDER
+  ? [`https://${PRIMARY_HOST}`, `https://www.${PRIMARY_HOST}`, `https://${RENDER_HOST}`].join(',')
+  : '';
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || DEFAULT_ORIGINS)
   .split(',')
   .map((s) => s.trim())
   .filter(Boolean);

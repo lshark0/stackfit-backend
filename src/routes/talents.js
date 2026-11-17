@@ -1,6 +1,6 @@
 const express = require('express');
 const { run, get, all } = require('../db');
-const { signedFileUrl } = require('../fileAccess');
+const { signedFileUrl, resumeVisibleSet } = require('../fileAccess');
 const { requireAuth, requireRole } = require('../middleware/requireAuth');
 const { wrapAllRoutes } = require('../middleware/asyncHandler');
 const { computeMatch, matchedStack, stackCounts } = require('../match');
@@ -222,6 +222,7 @@ router.get('/:userId', requireAuth, requireRole('company'), async (req, res) => 
   }
 
   const rating = await getRatingSummary(freelancerId);
+  const resumeOk = (await resumeVisibleSet(req.user.id, [freelancerId])).has(Number(freelancerId));
   const portfolioRows = await all(
     'SELECT * FROM portfolios WHERE freelancer_id = ? ORDER BY created_at DESC, id DESC',
     [freelancerId]
@@ -236,7 +237,10 @@ router.get('/:userId', requireAuth, requireRole('company'), async (req, res) => 
     saved,
     // 이 기업의 제안을 프리랜서가 실제로 수락한 경우에만 연락처를 내려줍니다.
     ...contactFields(t, !!(await get("SELECT id FROM proposals WHERE company_id=? AND freelancer_id=? AND status='accepted' LIMIT 1", [req.user.id, freelancerId]))),
-    resume_url: signedFileUrl(t.resume_filename),
+    // 경력기술서는 내 공고에 지원했거나 내 제안을 수락한 프리랜서만(연락처 공개 정책과 같은 기준)
+    ...(resumeOk
+      ? { resume_url: signedFileUrl(t.resume_filename), resume_locked: false }
+      : { resume_url: null, resume_original_name: null, resume_locked: !!t.resume_filename }),
     portfolios: sortPortfoliosByPeriod(portfolioRows).map((p) => ({ ...p, stack: JSON.parse(p.stack_json) })),
     ...rating,
   });

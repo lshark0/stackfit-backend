@@ -451,6 +451,7 @@ router.delete('/duplicate-freelancers/:id', requireAuth, requireAdmin, async (re
     return res.status(400).json({ error: '휴대폰 번호가 다른 계정이라 한 번 더 확인이 필요해요.', code: 'CONFIRM_DIFFERENT_PHONE' });
   }
   await run('DELETE FROM users WHERE id = ?', [id]);
+  require('../tokenRevocation').forgetUser(id);
   res.json({ ok: true });
 });
 
