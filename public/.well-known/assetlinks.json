@@ -3,7 +3,7 @@
     "relation": ["delegate_permission/common.handle_all_urls"],
     "target": {
       "namespace": "android_app",
-      "package_name": "com.markettier.itfree",
+      "package_name": "kr.co.kimfree.app",
       "sha256_cert_fingerprints": [
         "여기에_Play_Console_앱서명키_SHA256_지문을_넣으세요_PLAYSTORE.md_4단계_참고"
       ]

@@ -5,7 +5,7 @@
 Android Studio 없이 구글이 만든 무료 웹 도구 **PWABuilder**로 진행합니다.
 
 - 배포 주소: `https://kimfree.co.kr` (대표 도메인. 기존 `https://stackfit-backend.onrender.com`으로 열면 이 주소로 이동)
-- 권장 패키지 ID: **`com.markettier.itfree`** (한 번 정하면 영구히 변경 불가)
+- 패키지 ID: **`kr.co.kimfree.app`** (2026-11-18 Play Console 앱 만들기에서 확정, 영구히 변경 불가)
 - 앱 아이콘: `public/icons/icon-512.png`
 
 ---
@@ -24,12 +24,14 @@ Android Studio 없이 구글이 만든 무료 웹 도구 **PWABuilder**로 진�
 1. https://play.google.com/console/signup → **조직** 선택 → D-U-N-S 번호 입력 → $25 결제
 2. 본인·조직 인증(신분증, 사업자 정보)이 끝날 때까지 며칠 걸릴 수 있습니다.
 
+> 2026-11-18: 조직 계정 '마켓리어' 생성·계정 확인 완료.
+
 ## 2단계 — PWABuilder로 Android 패키지(.aab) 만들기
 
 1. https://www.pwabuilder.com 에 `https://kimfree.co.kr` 입력 → **Start**
 2. **Package for stores → Android → Generate Package**
 3. 옵션
-   - Package ID: `com.markettier.itfree`
+   - Package ID: `kr.co.kimfree.app` (Play Console에 등록한 것과 정확히 같아야 함)
    - App name: `김프리` / Launcher name: `김프리`
    - Signing key: **Create new** (자동 생성)
 4. 다운로드된 zip 안의 `.aab`, `signing.keystore`, `signing-key-info.txt`를 **안전한 곳 2군데 이상에 백업**합니다.
@@ -37,7 +39,7 @@ Android Studio 없이 구글이 만든 무료 웹 도구 **PWABuilder**로 진�
 
 ## 3단계 — Play Console에 앱 만들기 · 업로드
 
-1. **앱 만들기** → 앱 이름 `김프리`, 기본 언어 한국어, 앱, 무료
+1. **앱 만들기** → 앱 이름 `김프리`, 패키지 이름 `kr.co.kimfree.app`, 기본 언어 한국어, 앱, 무료
 2. **테스트 → 내부 테스트 → 새 버전 만들기** → `.aab` 업로드
    (처음 올릴 때 **Play 앱 서명** 사용에 동의합니다. 구글이 최종 서명키를 보관합니다.)
 
