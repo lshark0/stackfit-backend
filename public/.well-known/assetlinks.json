@@ -1,10 +1,13 @@
 [
   {
-    "relation": ["delegate_permission/common.handle_all_urls"],
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
     "target": {
       "namespace": "android_app",
       "package_name": "kr.co.kimfree.app",
       "sha256_cert_fingerprints": [
+        "98:8E:77:6F:01:0B:55:9B:A5:CB:D5:91:C4:85:07:5F:04:D5:71:AB:79:66:66:62:15:A0:E5:2D:87:BA:6F:B7",
         "08:51:4D:64:B0:B7:2B:E7:08:79:73:D1:6A:0F:93:61:92:97:26:21:57:BE:EA:72:A8:9F:09:56:4D:AA:45:B7"
       ]
     }
