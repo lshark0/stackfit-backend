@@ -1,5 +1,6 @@
 const express = require('express');
 const { normalizeEducation, parseEducation } = require('../education');
+const { getKimfreeHistory } = require('../kimfreeHistory');
 const crypto = require('crypto');
 const multer = require('multer');
 const { run, get, all } = require('../db');
@@ -129,6 +130,8 @@ router.get('/', requireAuth, async (req, res) => {
       education: parseEducation(p.education_json),
       pref_regions: parseRegions(p.pref_regions_json),
       resume_url: signedFileUrl(p.resume_filename),
+      // 기업에게 '김프리 완료'로 보이는 프로젝트(내 프로필에서 미리 확인)
+      kimfree_history: await getKimfreeHistory(req.user.id),
     });
   }
   const c = await get('SELECT * FROM companies WHERE user_id = ?', [req.user.id]);

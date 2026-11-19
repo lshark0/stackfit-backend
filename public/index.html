@@ -476,6 +476,8 @@
   .sbadge.applied{background:var(--blue-soft); color:var(--blue-deep);}
   .sbadge.proposed{background:var(--purple-soft); color:var(--purple-deep);}
   .sbadge.verified{background:var(--cyan-soft); color:#0E7A6E;}
+  .sbadge.kfdone{background:var(--green-soft); color:var(--green-deep);}
+  .kf-card{border-left:3px solid var(--green-deep);}
   .sbadge.pending{background:#FDF0D9; color:var(--amber-deep);}
   .sbadge.pass{background:var(--green-soft); color:var(--green-deep);}
   .sbadge.fail{background:var(--paper-dim); color:var(--slate);}
@@ -1386,6 +1388,24 @@ async function showMatchReason(btn, jobId, talentId){
     btn.disabled = false; btn.textContent = '✨ 다시 시도';
   }
 }
+// 김프리에서 계약하고 기업이 완료를 확인한 프로젝트 수 배지(프리랜서가 직접 적는 수행 프로젝트와 구분)
+function kimfreeDoneBadge(n){
+  return n>0 ? `<span class="sbadge kfdone" title="김프리에서 계약하고 기업이 완료를 확인한 프로젝트">${I.badgeCheck}김프리 완료 ${n}건</span>` : '';
+}
+// 김프리 완료 프로젝트 카드 목록(인재 상세·내 프로필 공용). 기업 이름·단가는 보여 주지 않습니다.
+function kimfreeHistoryHtml(list){
+  return (list||[]).map(h=>`
+    <div class="card kf-card">
+      <div class="card-top"><div style="min-width:0;"><div class="card-title">${esc(h.title)}</div>
+        <div style="margin-top:5px; display:flex; flex-wrap:wrap; gap:5px; align-items:center;">
+          <span class="sbadge kfdone">${I.badgeCheck}김프리 완료</span>
+          ${h.company_verified?`<span class="sbadge verified">사업자 확인 기업</span>`:''}
+        </div></div></div>
+      ${(h.span||h.period)?`<div class="meta-row"><span>${I.clock}${esc(h.span||'')}${h.period?`${h.span?' · ':''}계약 기간 ${esc(h.period)}`:''}</span></div>`:''}
+      ${(h.stack||[]).length?`<div class="tag-row">${h.stack.map(x=>`<span class="tag">${esc(x)}</span>`).join('')}</div>`:''}
+      ${h.review?`<div class="page-sub" style="margin-top:8px;">기업 평가 ★ ${esc(String(h.review.score))}${h.review.again===true?' · 다시 함께 일하고 싶어요':''}</div>`:''}
+    </div>`).join('');
+}
 function recoTalentCard(t, jobId){
   return `<div class="card clickable" onclick="openDetail('talentDetail', ${t.user_id}, 'reco')">
     <div class="card-top">
@@ -1395,6 +1415,7 @@ function recoTalentCard(t, jobId){
           <div class="card-title">${esc(t.name)} ${gradeBadge(t.grade)}</div>
           <div style="margin-top:5px; display:flex; flex-wrap:wrap; gap:5px; align-items:center;">
             ${dutyBadge(t.role_title)}
+            ${kimfreeDoneBadge(t.kimfree_done)}
             ${t.accept_proposals===0?`<span class="sbadge fail">제안 받지 않음</span>`:''}
           </div>
         </div>
@@ -1418,6 +1439,7 @@ function talentCard(t){
           <div style="margin-top:5px; display:flex; flex-wrap:wrap; gap:5px; align-items:center;">
             ${dutyBadge(t.role_title)}
             ${t.verified?`<span class="sbadge verified" title="관리자가 경력 증빙 서류를 확인했어요">${I.verified}경력 검증</span>`:''}
+            ${kimfreeDoneBadge(t.kimfree_done)}
             ${t.proposed?`<span class="sbadge proposed">${I.sent}제안완료</span>`
               : t.accept_proposals===0?`<span class="sbadge fail">제안 받지 않음</span>`:''}
           </div>
@@ -4193,6 +4215,7 @@ async function screenTalentDetail(){
         <div style="margin-top:7px; display:flex; flex-wrap:wrap; gap:5px; align-items:center;">
           ${gradeBadge(t.grade)}
           ${t.verified?`<span class="sbadge verified" title="관리자가 경력 증빙 서류를 확인했어요">${I.verified}경력 검증</span>`:''}
+          ${kimfreeDoneBadge(t.kimfree_done)}
           ${t.proposed?`<span class="sbadge proposed">${I.sent}제안완료</span>`
             : !t.accept_proposals?`<span class="sbadge fail">제안 받지 않음</span>`:''}
         </div>
@@ -4222,6 +4245,10 @@ async function screenTalentDetail(){
       </div>` : ''}
     ${educationListHtml(t.education)}
     ${reviewSummaryHtml(reviewSum, '인재')}
+    ${(t.kimfree_history||[]).length ? `
+      <div class="section-label with-ic">${I.badgeCheck}김프리에서 완료한 프로젝트 (${t.kimfree_history.length}건)</div>
+      <div class="page-sub" style="margin:-4px 0 8px;">김프리에서 계약하고 기업이 완료를 확인한 프로젝트예요.</div>
+      ${kimfreeHistoryHtml(t.kimfree_history)}` : ''}
     <div class="section-label with-ic">${I.checklist}수행 프로젝트 ${(t.portfolios||[]).length ? `(${t.portfolios.length}건)` : ''}</div>
     ${(t.portfolios||[]).length
       ? t.portfolios.map(p=>`
@@ -6812,6 +6839,12 @@ async function screenProfileEdit(){
       <label class="form-label">경력기술서</label>
       <div id="pf-resume-section">${resumeSectionHtml(p.resume_url, p.resume_original_name)}</div>
     </div>
+    ${(server.kimfree_history||[]).length ? `
+    <div class="form-field">
+      <label class="form-label">김프리에서 완료한 프로젝트 <span style="color:var(--slate); font-weight:400;">(${server.kimfree_history.length}건)</span></label>
+      <div class="page-sub" style="margin-bottom:8px;">김프리에서 계약하고 기업이 완료를 확인하면 자동으로 추가되고, 기업에게 '김프리 완료'로 보여요(기업 이름·단가는 보이지 않아요).</div>
+      ${kimfreeHistoryHtml(server.kimfree_history)}
+    </div>` : ''}
     <div class="form-field">
       <label class="form-label">수행 프로젝트 ${portfolios.length ? `<span style="color:var(--slate); font-weight:400;">(${portfolios.length}건)</span>` : ''}</label>
       ${portfolios.length > 1 ? `

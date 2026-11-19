@@ -11,6 +11,7 @@ const { publicTalent, contactFields } = require('../contact');
 const { addNotification } = require('../notify');
 const { scoreMatch } = require('../recommend');
 const { parseEducation } = require('../education');
+const { getKimfreeHistory, getKimfreeDoneCounts } = require('../kimfreeHistory');
 
 const router = express.Router();
 wrapAllRoutes(router);
@@ -85,6 +86,7 @@ router.get('/', requireAuth, requireRole('company'), async (req, res) => {
 
   // N+1 방지: 평점을 한 번의 쿼리로 일괄 조회한 뒤 메모리에서 조합합니다.
   const ratingById = await getRatingSummaries(talents.map((t) => t.user_id));
+  const doneById = await getKimfreeDoneCounts(talents.map((t) => t.user_id)); // 김프리 완료 건수
   const result = talents.map((t) => {
     const rating = ratingById[t.user_id] || { rating_avg: null, rating_count: 0 };
     return {
@@ -94,6 +96,7 @@ router.get('/', requireAuth, requireRole('company'), async (req, res) => {
       matchedStack: jobStack ? matchedStack(jobStack, t.stack) : [],
       proposed: proposedIds.has(t.user_id),
       saved: savedIds.has(t.user_id),
+      kimfree_done: doneById[t.user_id] || 0,
       ...rating,
       ...recoFields(scoreJob, t, t.stack, rating),
     };
@@ -125,6 +128,7 @@ router.get('/recent-views', requireAuth, requireRole('company'), async (req, res
   const savedRows = await all('SELECT freelancer_id FROM saved_talents WHERE company_id = ?', [req.user.id]);
   const savedIds = new Set(savedRows.map(s => s.freelancer_id));
   const ratingById = await getRatingSummaries(rows.map((t) => t.user_id));
+  const doneById = await getKimfreeDoneCounts(rows.map((t) => t.user_id)); // 김프리 완료 건수
   res.json({
     matchJob,
     matchJobs,
@@ -138,6 +142,7 @@ router.get('/recent-views', requireAuth, requireRole('company'), async (req, res
         matchedStack: jobStack ? matchedStack(jobStack, stack) : [],
         proposed: proposedIds.has(t.user_id),
         saved: savedIds.has(t.user_id),
+        kimfree_done: doneById[t.user_id] || 0,
         ...(ratingById[t.user_id] || { rating_avg: null, rating_count: 0 }),
       };
     }),
@@ -157,6 +162,7 @@ router.get('/saved', requireAuth, requireRole('company'), async (req, res) => {
   const proposalRows = await all('SELECT freelancer_id FROM proposals WHERE company_id = ?', [req.user.id]);
   const proposedIds = new Set(proposalRows.map(p => p.freelancer_id));
   const ratingById = await getRatingSummaries(rows.map((t) => t.user_id));
+  const doneById = await getKimfreeDoneCounts(rows.map((t) => t.user_id)); // 김프리 완료 건수
   res.json({
     matchJob,
     matchJobs,
@@ -170,6 +176,7 @@ router.get('/saved', requireAuth, requireRole('company'), async (req, res) => {
         matchedStack: jobStack ? matchedStack(jobStack, stack) : [],
         proposed: proposedIds.has(t.user_id),
         saved: true,
+        kimfree_done: doneById[t.user_id] || 0,
         ...(ratingById[t.user_id] || { rating_avg: null, rating_count: 0 }),
         ...recoFields(scoreJob, t, stack, ratingById[t.user_id] || { rating_avg: null, rating_count: 0 }),
       };
@@ -222,6 +229,7 @@ router.get('/:userId', requireAuth, requireRole('company'), async (req, res) => 
   }
 
   const rating = await getRatingSummary(freelancerId);
+  const kimfreeHistory = await getKimfreeHistory(freelancerId);
   const resumeOk = (await resumeVisibleSet(req.user.id, [freelancerId])).has(Number(freelancerId));
   const portfolioRows = await all(
     'SELECT * FROM portfolios WHERE freelancer_id = ? ORDER BY created_at DESC, id DESC',
@@ -242,6 +250,9 @@ router.get('/:userId', requireAuth, requireRole('company'), async (req, res) => 
       ? { resume_url: signedFileUrl(t.resume_filename), resume_locked: false }
       : { resume_url: null, resume_original_name: null, resume_locked: !!t.resume_filename }),
     portfolios: sortPortfoliosByPeriod(portfolioRows).map((p) => ({ ...p, stack: JSON.parse(p.stack_json) })),
+    // 김프리에서 계약·완료가 확인된 프로젝트(프리랜서가 직접 적는 수행 프로젝트와 따로 보여 줌)
+    kimfree_history: kimfreeHistory,
+    kimfree_done: kimfreeHistory.length,
     ...rating,
   });
 });
