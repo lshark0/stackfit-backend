@@ -3400,9 +3400,63 @@ async function saveProfile(){
   }catch(e){ toast(e.message); }
 }
 
-async function postJob(){
+/* ---------------- 공고 등록 전 빠진 항목 점검 (개선-017) ---------------- */
+// 새 공고를 등록하기 직전에, 비었거나 모호해서 추천·지원에 불리한 항목을 규칙으로 찾아 한 번 안내합니다.
+// 막지는 않습니다 — '이대로 등록'을 누르면 그대로 등록됩니다. (공고 수정 화면에서는 띄우지 않음)
+function jobPostGaps(){
+  const val = id => { const el = document.getElementById(id); return el ? String(el.value || '').trim() : ''; };
+  const gaps = [];
+  if(!pendingJobStack.length) gaps.push({ field:'pj-stack-tags', label:'필요 기술스택', tip:'기술이 비어 있으면 맞는 프리랜서에게 추천·새 공고 알림이 가지 않아요.' });
+  const period = val('pj-period');
+  if(!period) gaps.push({ field:'pj-period', label:'근무 기간', tip:'기간(예: 6개월)이 있어야 지원자가 일정을 판단할 수 있어요.' });
+  else if(!/\d/.test(period)) gaps.push({ field:'pj-period', label:'근무 기간', tip:`'${period}'처럼 숫자가 없으면 기간을 가늠하기 어려워요. 대략이라도(예: 3~6개월) 적어 주세요.` });
+  const rate = val('pj-rate');
+  if(!rate) gaps.push({ field:'pj-rate', label:'단가', tip:'단가가 비어 있으면 희망 단가가 맞는 프리랜서를 추천에서 골라낼 수 없어요.' });
+  else if(!/\d/.test(rate)) gaps.push({ field:'pj-rate', label:'단가', tip:`'${rate}'처럼 숫자가 없으면 희망 단가 비교가 빠져요. 범위(예: 550~650만원/월)라도 적어 주세요.` });
+  const type = val('pj-type');
+  const workText = `${type} ${val('pj-location')} ${val('pj-location-detail')}`;
+  if(!type) gaps.push({ field:'pj-type', label:'근무 형태', tip:"'상주'·'재택'·'혼합' 중 하나를 적으면 선호가 맞는 프리랜서에게 추천돼요." });
+  else if(!/상주|출근|오피스|사무실|재택|원격|리모트|remote|혼합|병행|하이브리드|hybrid/i.test(workText)) gaps.push({ field:'pj-type', label:'근무 형태', tip:"상주·재택·혼합 중 어느 쪽인지 알 수 없어요. 낱말 하나만 넣어 주세요(예: 상주 · 주5일)." });
+  if(!val('pj-location')) gaps.push({ field:'pj-location', label:'근무지', tip:'지역이 없으면 근무 가능 지역이 맞는 프리랜서를 찾을 수 없어요.' });
+  if(!val('pj-start')) gaps.push({ field:'pj-start', label:'투입 예정일', tip:"비워 두면 '바로 투입'으로 보고 추천해요. 투입 시기가 정해졌다면 날짜를 넣어 주세요." });
+  if(val('pj-desc').length < 30) gaps.push({ field:'pj-desc', label:'상세 내용', tip:'업무 범위·우대사항을 몇 줄 더 적으면 지원자가 늘고 AI 추천 이유도 더 정확해져요.' });
+  return gaps;
+}
+// 점검 결과 안내창. 항목을 누르면 그 입력칸으로 이동합니다. submitFn: 'postJob' | 'proxyPostJob'
+function openJobPrecheck(gaps, submitFn){
+  document.getElementById('confirmMsg').innerHTML = `
+    <div style="text-align:left;">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+        <div style="font-size:17px; font-weight:800; color:var(--ink);">등록 전에 한 번 확인해 주세요</div>
+        <span onclick="closeConfirm()" style="cursor:pointer; color:var(--slate); padding:2px;">${I.x}</span>
+      </div>
+      <div style="font-size:12.5px; color:var(--slate); margin-bottom:12px;">비었거나 모호한 항목 ${gaps.length}개 · 채우면 맞는 프리랜서에게 더 잘 추천돼요</div>
+      <div style="background:#EEF4FF; border-radius:14px; padding:6px 14px; max-height:42vh; overflow-y:auto;">
+        ${gaps.map((g,i)=>`<div onclick="jobPrecheckFocus('${g.field}')" style="padding:9px 0; cursor:pointer; ${i?'border-top:1px solid rgba(20,23,28,.07);':''}">
+          <div style="display:flex; justify-content:space-between; align-items:center; font-size:13px; font-weight:700; color:var(--ink);">${esc(g.label)}<span style="font-size:12px; color:var(--cyan); font-weight:700;">채우기</span></div>
+          <div style="font-size:12px; color:var(--slate); line-height:1.5; margin-top:2px;">${esc(g.tip)}</div>
+        </div>`).join('')}
+      </div>
+      <button class="btn btn-primary" style="margin-top:14px; width:100%;" onclick="jobPrecheckFocus('${gaps[0].field}')">보완할게요</button>
+      <button class="btn btn-outline" style="margin-top:8px; width:100%;" onclick="closeConfirm(); ${submitFn}(true)">이대로 등록</button>
+    </div>`;
+  const actions = document.querySelector('#confirmOverlay .confirm-actions');
+  if(actions) actions.style.display = 'none';
+  document.getElementById('confirmOverlay').classList.add('open');
+}
+function jobPrecheckFocus(id){
+  closeConfirm();
+  const el = document.getElementById(id);
+  if(!el) return;
+  const box = el.closest('.form-field') || el;
+  box.scrollIntoView({ behavior:'smooth', block:'center' });
+  if(typeof el.focus === 'function' && el.tagName !== 'DIV') setTimeout(() => el.focus(), 300);
+}
+
+async function postJob(skipPrecheck){
   const title = document.getElementById('pj-title').value.trim();
   if(!title){ toast('공고 제목을 입력해주세요'); return; }
+  if(!skipPrecheck){ const gaps = jobPostGaps(); if(gaps.length){ openJobPrecheck(gaps, 'postJob'); return; } }
   const stack = [...pendingJobStack];
   const certs = [...pendingJobCerts];
   try{
@@ -3512,10 +3566,11 @@ async function submitBizCheck(){
     render();
   }catch(e){ toast(e.message); }
 }
-async function proxyPostJob(){
+async function proxyPostJob(skipPrecheck){
   if(!proxyCompany){ go('adminProxyJobs'); return; }
   const title = document.getElementById('pj-title').value.trim();
   if(!title){ toast('공고 제목을 입력해주세요'); return; }
+  if(!skipPrecheck){ const gaps = jobPostGaps(); if(gaps.length){ openJobPrecheck(gaps, 'proxyPostJob'); return; } }
   try{
     await apiFetch('/admin/proxy/jobs', {method:'POST', body:{
       companyId: proxyCompany.id, consent: true,
