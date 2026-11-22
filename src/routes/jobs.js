@@ -42,11 +42,17 @@ const router = express.Router();
 wrapAllRoutes(router);
 
 // 토큰이 있으면 req.user를 채우되, 없어도 통과시킴 (공고 목록은 비로그인도 조회 가능)
+// 폐기된 토큰(비밀번호 변경 전 발급·탈퇴 계정)은 로그인하지 않은 것으로 봅니다(requireAuth와 같은 기준).
 function optionalAuth(req, _res, next) {
   const header = req.headers.authorization || '';
   const token = header.startsWith('Bearer ') ? header.slice(7) : null;
-  req.user = token ? verifySessionToken(token) : null;
-  next();
+  const payload = token ? verifySessionToken(token) : null;
+  req.user = null;
+  if (!payload) return next();
+  require('../tokenRevocation').isTokenActive(payload).then((ok) => {
+    req.user = ok ? payload : null;
+    next();
+  }, next);
 }
 
 function baseJob(job, companyName, rating) {
