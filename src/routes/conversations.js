@@ -5,6 +5,7 @@ const { wrapAllRoutes } = require('../middleware/asyncHandler');
 const { pushTo } = require('../notify');
 const { getInterview, saveInterview, cancelInterview } = require('../interviews');
 const { detectContacts, isPairConnected } = require('../contactGuard');
+const { BLOCKED_MSG, isBlockedBetween, myBlockedIds } = require('../blocks');
 
 const router = express.Router();
 wrapAllRoutes(router);
@@ -27,7 +28,10 @@ async function listMessages(convId) {
 
 router.get('/', requireAuth, async (req, res) => {
   const col = req.user.role === 'freelancer' ? 'freelancer_id' : 'company_id';
-  const convs = await all(`SELECT * FROM conversations WHERE ${col} = ? ORDER BY created_at DESC, id DESC`, [req.user.id]);
+  const allConvs = await all(`SELECT * FROM conversations WHERE ${col} = ? ORDER BY created_at DESC, id DESC`, [req.user.id]);
+  // 내가 차단한 상대와의 대화는 목록에서 숨깁니다(차단 해제하면 다시 보임, 기록은 지우지 않음).
+  const iBlocked = await myBlockedIds(req.user.id);
+  const convs = allConvs.filter((c) => !iBlocked.has(Number(req.user.role === 'freelancer' ? c.company_id : c.freelancer_id)));
   if (convs.length === 0) return res.json({ conversations: [] });
 
   // N+1 방지: 상대방 이름 / 공고 제목 / 메시지를 각각 한 번의 쿼리로 모아온 뒤 메모리에서 조합합니다.
@@ -91,6 +95,7 @@ router.post('/', requireAuth, async (req, res) => {
     const freelancer = await get('SELECT user_id FROM freelancer_profiles WHERE user_id = ?', [fId]);
     if (!freelancer) return res.status(404).json({ error: '프리랜서를 찾을 수 없습니다.' });
   }
+  if (await isBlockedBetween(cId, fId)) return res.status(403).json({ error: BLOCKED_MSG, code: 'BLOCKED' });
 
   // 공고를 지정한 경우, 실제 존재하며 그 기업의 공고가 맞는지 확인합니다.
   let safeJobId = null;
@@ -166,6 +171,10 @@ router.get('/:id/messages', requireAuth, async (req, res) => {
     // 매칭(제안 수락·합격) 전 대화에는 사기 주의 안내를 화면에 띄우기 위해 알려줍니다.
     connected: await isPairConnected(conv.company_id, conv.freelancer_id),
     counterpartName: senderRow ? senderRow.name : null,
+    counterpartId,
+    // 차단 관계면 화면에서 입력창 대신 안내를 보여 줍니다. iBlocked: 내가 차단(해제 버튼 표시)
+    blocked: await isBlockedBetween(conv.company_id, conv.freelancer_id),
+    iBlocked: (await myBlockedIds(req.user.id)).has(Number(counterpartId)),
     jobTitle: job ? job.title : null,
   });
 });
@@ -216,6 +225,9 @@ router.post('/:id/messages', requireAuth, async (req, res) => {
   const conv = await get('SELECT * FROM conversations WHERE id = ?', [req.params.id]);
   if (!conv || (conv.company_id !== req.user.id && conv.freelancer_id !== req.user.id)) {
     return res.status(404).json({ error: '대화를 찾을 수 없습니다.' });
+  }
+  if (await isBlockedBetween(conv.company_id, conv.freelancer_id)) {
+    return res.status(403).json({ error: BLOCKED_MSG, code: 'BLOCKED' });
   }
 
   // 연락처는 가리지 않습니다. 매칭 전에 연락처가 오가면 사기 주의 안내를 띄우고, 지표용으로 종류만 기록합니다.

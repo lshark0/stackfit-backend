@@ -431,3 +431,13 @@ CREATE TABLE IF NOT EXISTS tech_similarity (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
+
+-- 상대 회원 차단(개선-018): blocker가 blocked를 차단. 둘 사이 메시지·제안·지원을 막고 서로의 추천·검색에서 뺌
+CREATE TABLE IF NOT EXISTS user_blocks (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  blocker_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  blocked_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (blocker_id, blocked_id)
+);
+CREATE INDEX IF NOT EXISTS idx_user_blocks_blocked ON user_blocks(blocked_id);

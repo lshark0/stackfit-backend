@@ -6,6 +6,7 @@ const { signedFileUrl, resumeVisibleSet } = require('../fileAccess');
 const { recommendTalentsForJob, recommendJobsForProfile } = require('../recommend');
 const { publicTalent } = require('../contact');
 const { getKimfreeDoneCounts } = require('../kimfreeHistory');
+const { blockedIdSet } = require('../blocks');
 
 const router = express.Router();
 wrapAllRoutes(router);
@@ -21,7 +22,7 @@ router.get('/jobs', requireAuth, requireRole('freelancer'), async (req, res) => 
   if (!p) return res.json({ jobs: [] });
 
   const profile = { ...p, stack: JSON.parse(p.stack_json), certs: JSON.parse(p.certs_json || '[]') };
-  const jobs = await recommendJobsForProfile(profile, parseLimit(req.query.limit));
+  const jobs = await recommendJobsForProfile(profile, parseLimit(req.query.limit), await blockedIdSet(req.user.id));
   res.json({ jobs });
 });
 
@@ -49,7 +50,7 @@ router.get('/talents', requireAuth, requireRole('company'), async (req, res) => 
   );
 
   const target = { ...job, stack: JSON.parse(job.stack_json), certs: JSON.parse(job.certs_json || '[]') };
-  const talents = await recommendTalentsForJob(target, parseLimit(req.query.limit));
+  const talents = await recommendTalentsForJob(target, parseLimit(req.query.limit), await blockedIdSet(req.user.id));
   const resumeOk = await resumeVisibleSet(req.user.id, talents.map((t) => t.user_id));
   const doneById = await getKimfreeDoneCounts(talents.map((t) => t.user_id)); // 김프리 완료 건수
   res.json({

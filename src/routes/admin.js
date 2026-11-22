@@ -351,6 +351,21 @@ router.put('/tech-similarity', requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
+// 상대 회원 차단 건수(개선-018): 남용·괴롭힘 확인용. 누가 누구를 차단했는지는 보여 주지 않고 건수만.
+// multiBlocked = 서로 다른 회원 3명 이상에게 차단당한 회원 수(문제 회원일 수 있어 신고 내역과 함께 확인)
+async function blockStats() {
+  const rows = await all('SELECT blocked_id, created_at FROM user_blocks');
+  const weekAgo = Date.now() - 7 * 24 * 3600 * 1000;
+  const toMs = (v) => (v instanceof Date ? v.getTime() : Date.parse(/[zZ]|[+-]\d\d:?\d\d$/.test(String(v)) ? String(v) : String(v).replace(' ', 'T') + 'Z'));
+  const byBlocked = {};
+  for (const r of rows) byBlocked[r.blocked_id] = (byBlocked[r.blocked_id] || 0) + 1;
+  return {
+    total: rows.length,
+    last7: rows.filter((r) => toMs(r.created_at) >= weekAgo).length,
+    multiBlocked: Object.values(byBlocked).filter((n) => n >= 3).length,
+  };
+}
+
 router.get('/security-events', requireAuth, requireAdmin, async (req, res) => {
   const events = await listSecurityEvents(Number.parseInt(req.query.limit, 10) || 200);
   const dayAgo = Date.now() - 24 * 3600 * 1000;
@@ -362,6 +377,7 @@ router.get('/security-events', requireAuth, requireAdmin, async (req, res) => {
       denied24h: recent.filter((e) => e.event === 'admin_denied').length,
       adminLogins24h: recent.filter((e) => e.event === 'login_success' && /관리자/.test(e.detail)).length,
     },
+    blocks: await blockStats(),
     events,
   });
 });

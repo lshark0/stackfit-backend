@@ -329,6 +329,7 @@
   .pf-tile{margin:0;}
   .pf-big{font-family:var(--mono); font-size:22px; font-weight:800; color:var(--ink);}
   .pf-cap{font-size:13px; font-weight:800; color:var(--ink); margin:4px 0 2px;}
+  .chat-blocked{padding:14px 16px; border-top:1px solid var(--line); background:var(--card); color:var(--slate-light); font-size:13px; line-height:1.55; text-align:center;}
   .chat-guard{display:flex; gap:9px; align-items:flex-start; margin:8px 0 6px; padding:10px 12px; border-radius:12px; background:var(--cyan-soft); color:#0E5F56; font-size:12.5px; line-height:1.55;}
   .chat-guard svg{flex:0 0 auto; width:16px; height:16px; margin-top:2px;}
   .qchat-overlay{position:absolute; inset:0; z-index:57; background:rgba(20,23,28,.45); display:flex; align-items:flex-end;}
@@ -4547,6 +4548,7 @@ async function submitReview(projectId){
 async function screenReceivedProposals(){
   const nc = await unreadCount();
   const data = await apiFetch('/proposals/received');
+  data.proposals.forEach(p => { blockNameById[p.company_id] = p.company_name; });
   const pending = data.proposals.filter(p => p.status === 'sent').length;
   const statusBadge = {
     sent: `<span class="sbadge pending">${I.clockSm}응답 대기</span>`,
@@ -4597,6 +4599,7 @@ async function screenReceivedProposals(){
         : p.status === 'declined' ? `
           <div class="reco-empty" style="margin-top:10px; text-align:left;">거절한 제안이에요.${p.decline_reason? `<br>사유: <b>${esc(p.decline_reason)}</b>` : ''}</div>`
         : `<button class="btn btn-outline" style="margin-top:10px;" onclick="startChatWithCompany(${p.company_id}${p.job_id?`, ${p.job_id}`:''})">채팅으로 이어가기</button>`}
+        <div style="text-align:right; margin-top:8px;"><span style="font-size:12px; color:var(--slate-light); cursor:pointer; text-decoration:underline;" onclick="blockUser(${Number(p.company_id)}, 'receivedProposals')">이 기업 차단</span></div>
       </div>`).join('') || emptyArt(ART.noAlerts, '아직 받은 제안이 없어요', '프로필을 채우면 기업의 제안을 받을 확률이 높아져요.')}
   </div>`;
 }
@@ -5209,16 +5212,46 @@ async function screenChatRoom(){
   chatRoomInfo = { convId: state.param, counterpartName: data.counterpartName || '', jobTitle: data.jobTitle || '' };
   return `${statusbar()}
   <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('chatList')">${I.back}</div>
-    <div style="min-width:0;"><div class="page-title" style="font-size:16px;">${esc(data.counterpartName || '대화')}</div>${data.jobTitle ? `<div class="page-sub" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${esc(data.jobTitle)}</div>` : ''}</div></div></div>
+    <div style="min-width:0; flex:1;"><div class="page-title" style="font-size:16px;">${esc(data.counterpartName || '대화')}</div>${data.jobTitle ? `<div class="page-sub" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${esc(data.jobTitle)}</div>` : ''}</div>
+    ${data.counterpartId && !data.iBlocked ? `<button class="btn btn-outline" style="width:auto; padding:5px 10px; font-size:12px; flex:0 0 auto; color:var(--slate-light);" onclick="blockUser(${Number(data.counterpartId)}, 'chatList')">차단</button>` : ''}</div></div>
   <div class="iv-bar" id="ivBar">${interviewBarHtml(data.interview, state.param)}</div>
   <div class="content" id="chatScroll">
     ${data.connected ? '' : `<div class="chat-guard">${I.verified}<div><b>안전하게 대화하세요.</b> 계약 전에 선입금·장비 구매·신분증이나 금융정보를 요구하면 사기일 수 있어요. 상대가 '사업자 확인 기업'·'경력 검증' 배지가 있는지 확인하고, 이상하면 고객센터 &gt; 문의·신고로 알려주세요.</div></div>`}
     <div class="bubble-wrap">${chatBubblesHtml(data.messages)}</div>
   </div>
   <div class="chat-edit-bar" id="chatEditBar" style="display:none;"><span>${I.edit || '✎'} 메시지 수정 중</span><button onclick="cancelEditMessage()">취소</button></div>
-  <div class="chat-input-bar">
+  ${data.blocked ? `<div class="chat-blocked">${data.iBlocked
+      ? `차단한 회원이에요. 메시지·제안·지원을 주고받을 수 없어요. <button class="btn btn-outline" style="width:auto; padding:5px 12px; font-size:12px; margin-left:6px;" onclick="unblockUser(${Number(data.counterpartId)}, 'chatRoom')">차단 해제</button>`
+      : '이 회원과는 더 이상 메시지를 주고받을 수 없어요.'}</div>`
+  : `<div class="chat-input-bar">
     <input id="chatInputEl" class="chat-input" placeholder="메시지를 입력하세요" onkeydown="chatKeydown(event, ${state.param})">
     <button class="send-btn" id="chatSendBtn" onclick="sendMessage(${state.param})">${I.send}</button>
+  </div>`}`;
+}
+
+// 상대 회원 차단(개선-018): 차단하면 서로 메시지·제안·지원을 주고받을 수 없고, 서로의 추천·검색에서 빠집니다.
+// 상대에게는 차단 사실을 알리지 않습니다. 마이페이지 > 차단한 회원에서 언제든 해제할 수 있어요.
+let blockNameById = {}; // 차단 확인창에 보여 줄 이름(화면을 그릴 때 채움)
+async function blockUser(userId, after){
+  const name = blockNameById[userId] || (chatRoomInfo && chatRoomInfo.counterpartName) || '이 회원';
+  if(!confirm(`${name}님을 차단할까요?\n\n· 서로 메시지·제안·지원을 주고받을 수 없어요\n· 서로의 추천·검색 목록에서 보이지 않아요\n· 상대에게는 알리지 않아요\n\n마이페이지 > 차단한 회원에서 언제든 해제할 수 있어요.`)) return;
+  try{ await apiFetch('/blocks/' + userId, {method:'POST'}); toast('차단했어요'); go(after || 'chatList'); }
+  catch(e){ toast(e.message); }
+}
+async function unblockUser(userId, after){
+  try{ await apiFetch('/blocks/' + userId, {method:'DELETE'}); toast('차단을 해제했어요'); if(after === 'chatRoom') render(); else go(after || 'blockedUsers'); }
+  catch(e){ toast(e.message); }
+}
+async function screenBlockedUsers(){
+  const data = await apiFetch('/blocks');
+  return `${statusbar()}
+  <div class="app-header"><div class="back-row"><div class="back-btn" onclick="go('mypage')">${I.back}</div><div class="page-title">차단한 회원</div></div></div>
+  <div class="content">
+    <div class="page-sub" style="margin-bottom:12px;">차단한 회원과는 메시지·제안·지원을 주고받을 수 없고, 서로의 추천·검색 목록에서 보이지 않아요. 상대에게는 알리지 않아요.</div>
+    ${data.blocks.map(b => `<div class="list-item" style="cursor:default;"><div class="li-l"><div class="li-icon">${b.role === 'company' ? I.building : I.user}</div>
+      <div><div class="li-tt">${esc(b.name)}</div><div class="page-sub" style="margin-top:2px;">${b.role === 'company' ? '기업' : '프리랜서'} · ${(parseServerTime(b.created_at)||new Date()).toLocaleDateString('ko-KR')} 차단</div></div></div>
+      <button class="btn btn-outline" style="width:auto; padding:6px 12px; font-size:12px; flex:0 0 auto;" onclick="unblockUser(${Number(b.user_id)}, 'blockedUsers')">해제</button></div>`).join('')
+      || emptyArt(ART.noChat, '차단한 회원이 없어요', '채팅 화면 위쪽의 [차단]으로 원치 않는 회원을 차단할 수 있어요.')}
   </div>`;
 }
 
@@ -5261,6 +5294,7 @@ async function screenMypage(){
       <div><div class="li-tt">경력 검증</div><div class="page-sub" style="margin-top:2px;">${Number(profile.verified)===1 ? '검증 완료 · 배지 표시 중' : '증빙 서류로 경력 검증 배지 받기'}</div></div></div>${I.chevR}</div>` : ''}
     <div class="list-item" onclick="go('plans')"><div class="li-l"><div class="li-icon">${I.sparkle}</div>
       <div><div class="li-tt">${isCompany ? '기업 구독' : '프리랜서 프리미엄'}</div><div class="page-sub" style="margin-top:2px;">${isCompany ? '프리미엄 등록·제안권·분석 리포트 월 묶음 · 출시 예정' : '상단 노출·우선 알림·지원서 강조 · 출시 예정'}</div></div></div>${I.chevR}</div>
+    <div class="list-item" onclick="go('blockedUsers')"><div class="li-l"><div class="li-icon">${I.user}</div><div class="li-tt">차단한 회원</div></div>${I.chevR}</div>
     ${me.user.hasPassword ? `<div class="list-item" onclick="go('changePassword')"><div class="li-l"><div class="li-icon">${I.gear}</div><div class="li-tt">비밀번호 변경</div></div>${I.chevR}</div>` : ''}
     ${state.isAdmin && !me.user.mfaVerified ? `
     <div class="section-label with-ic">${I.gear}관리자</div>
@@ -6159,6 +6193,7 @@ async function screenAdminSecurity(){
       <div class="hs"><div class="hs-num">${s.summary.locked24h}</div><div class="hs-lbl">계정 잠금 (24h)</div></div>
       <div class="hs"><div class="hs-num">${s.summary.denied24h}</div><div class="hs-lbl">관리자 접근 거부</div></div>
     </div>
+    ${s.blocks ? `<div class="page-sub" style="margin-top:10px;">회원 차단: 전체 <b>${s.blocks.total}</b>건 · 최근 7일 <b>${s.blocks.last7}</b>건${s.blocks.multiBlocked ? ` · <span style="color:var(--danger);">3명 이상에게 차단된 회원 <b>${s.blocks.multiBlocked}</b>명 — 신고 관리에서 확인</span>` : ''}</div>` : ''}
     <div class="chip-row" style="margin-top:14px;">${filters.map(([k,l])=>`<div class="chip ${k===adminSecurityFilter?'active':''}" onclick="setAdminSecurityFilter('${k}')">${l}</div>`).join('')}</div>
     ${events.length ? events.map(e => {
       const [label, cls] = SECURITY_EVENT_LABELS[e.event] || [e.event, 'pending'];
@@ -7261,7 +7296,7 @@ async function render(){
       signup: screenSignup, login: screenLogin,
       home: screenHome, jobs: screenJobs, jobDetail: screenJobDetail,
       talent: screenTalent, talentDetail: screenTalentDetail, projects: screenProjects, projectArchive: screenProjectArchive, applicants: screenApplicants, allApplicants: screenAllApplicants,
-      chatList: screenChatList, chatRoom: screenChatRoom, interviewForm: screenInterviewForm, mypage: screenMypage,
+      chatList: screenChatList, chatRoom: screenChatRoom, blockedUsers: screenBlockedUsers, interviewForm: screenInterviewForm, mypage: screenMypage,
       profileEdit: screenProfileEdit, alerts: screenAlerts, jobPost: screenJobPost,
       companyProfileEdit: screenCompanyProfileEdit,
       oauthRole: screenOauthRole,

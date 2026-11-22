@@ -15,6 +15,7 @@ const { grantReferralRewardLater } = require('../referralReward');
 const { notifyAdmins } = require('../notify');
 const { notifyNewJobLater } = require('../coldStart');
 const { normalizeDate } = require('../workConditions');
+const { blockedIdSet } = require('../blocks');
 
 // 잡코리아 문의·신고 양식과 동일한 첨부 가능 파일 종류(용량 10MB)
 const REPORT_ATTACH_EXT = ['.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.hwp', '.jpg', '.jpeg', '.gif', '.png', '.pdf', '.zip'];
@@ -94,9 +95,14 @@ router.get('/', optionalAuth, async (req, res) => {
   const { q, category, duty, grade, location } = req.query;
   // 기업 회원은 "등록한 공고" 화면에서 자신의 공고만, 마감 여부와 관계없이 모두 봐야 합니다.
   // (마감된 공고를 확인/재등록할 곳이 없다는 문제를 막기 위함) 그 외(프리랜서·비로그인)는 열려있는 공고만 봅니다.
-  const rows = req.user && req.user.role === 'company'
+  let rows = req.user && req.user.role === 'company'
     ? await all('SELECT * FROM jobs WHERE company_id = ? ORDER BY created_at DESC, id DESC', [req.user.id])
     : await all("SELECT * FROM jobs WHERE status = 'open' ORDER BY created_at DESC, id DESC");
+  // 로그인한 프리랜서에게는 차단 관계인 기업의 공고를 빼고 보여 줍니다(개선-018).
+  if (req.user && req.user.role === 'freelancer') {
+    const blocked = await blockedIdSet(req.user.id);
+    if (blocked.size) rows = rows.filter((j) => !blocked.has(Number(j.company_id)));
+  }
 
   // N+1 방지: 회사명/평점을 각각 한 번의 쿼리로 일괄 조회한 뒤 메모리에서 조합합니다.
   const companyIds = [...new Set(rows.map((j) => j.company_id))];

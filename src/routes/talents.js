@@ -11,6 +11,7 @@ const { publicTalent, contactFields } = require('../contact');
 const { addNotification } = require('../notify');
 const { scoreMatch } = require('../recommend');
 const { parseEducation } = require('../education');
+const { blockedIdSet, isBlockedBetween } = require('../blocks');
 const { getKimfreeHistory, getKimfreeDoneCounts } = require('../kimfreeHistory');
 
 const router = express.Router();
@@ -55,7 +56,8 @@ function recoFields(scoreJob, t, stack, rating) {
 router.get('/', requireAuth, requireRole('company'), async (req, res) => {
   const { q, category, jobId, grade, duty } = req.query;
   const rows = await all('SELECT * FROM freelancer_profiles');
-  let talents = rows.map(t => ({ ...t, stack: JSON.parse(t.stack_json) }));
+  const blocked = await blockedIdSet(req.user.id); // 차단 관계인 인재는 검색에서 뺌(개선-018)
+  let talents = rows.filter(t => !blocked.has(Number(t.user_id))).map(t => ({ ...t, stack: JSON.parse(t.stack_json) }));
 
   if (q) {
     const needle = String(q).toLowerCase();
@@ -205,7 +207,7 @@ router.get('/:userId', requireAuth, requireRole('company'), async (req, res) => 
   if (!Number.isInteger(freelancerId)) return res.status(400).json({ error: '올바르지 않은 사용자 ID입니다.' });
 
   const t = await get('SELECT * FROM freelancer_profiles WHERE user_id = ?', [freelancerId]);
-  if (!t) return res.status(404).json({ error: '프로필을 찾을 수 없습니다.' });
+  if (!t || await isBlockedBetween(req.user.id, freelancerId)) return res.status(404).json({ error: '프로필을 찾을 수 없습니다.' });
   const myProposal = await get('SELECT status FROM proposals WHERE company_id=? AND freelancer_id=? ORDER BY id DESC LIMIT 1', [req.user.id, freelancerId]); // 다시 함께 일하기로 여러 건이면 최근 것
   const proposed = !!myProposal;
   const saved = !!(await get('SELECT id FROM saved_talents WHERE company_id=? AND freelancer_id=?', [req.user.id, freelancerId]));

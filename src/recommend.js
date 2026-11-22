@@ -119,8 +119,9 @@ function scoreMatch(job, profile, rating) {
 const acceptsOffers = (p) => (Number(p.accept_proposals ?? 1) === 1 ? 1 : 0);
 
 // [기업용] 특정 공고에 맞는 프리랜서를 자동 추천합니다.
-async function recommendTalentsForJob(job, limit = 5) {
-  const rows = await all('SELECT * FROM freelancer_profiles');
+// excludeIds: 빼야 할 회원 id 모음(차단 관계, 개선-018)
+async function recommendTalentsForJob(job, limit = 5, excludeIds = null) {
+  const rows = (await all('SELECT * FROM freelancer_profiles')).filter((r) => !(excludeIds && excludeIds.has(Number(r.user_id))));
   if (rows.length === 0) return [];
 
   const profiles = rows.map((t) => ({ ...t, stack: JSON.parse(t.stack_json), certs: parseList(t.certs_json) }));
@@ -139,8 +140,8 @@ async function recommendTalentsForJob(job, limit = 5) {
 }
 
 // [프리랜서용] 내 프로필에 맞는 공고를 자동 추천합니다.
-async function recommendJobsForProfile(profile, limit = 5) {
-  const rows = await all("SELECT * FROM jobs WHERE status = 'open'");
+async function recommendJobsForProfile(profile, limit = 5, excludeIds = null) {
+  const rows = (await all("SELECT * FROM jobs WHERE status = 'open'")).filter((r) => !(excludeIds && excludeIds.has(Number(r.company_id))));
   if (rows.length === 0) return [];
 
   const jobs = rows.map((j) => ({ ...j, stack: JSON.parse(j.stack_json), certs: parseList(j.certs_json) }));
