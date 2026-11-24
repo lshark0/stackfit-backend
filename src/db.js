@@ -155,6 +155,8 @@ if (USE_POSTGRES) {
     await ensureColumnPg('freelancer_profiles', 'updated_at', 'TEXT');
     // 추천 점수의 근무 조건 요소: 공고 투입 예정일, 프리랜서 투입 가능일·선호 근무 형태·근무 가능 지역
     await ensureColumnPg('jobs', 'start_date', 'TEXT');
+    // 공고 계약 형태(개선-019): client=발주처 직접, prime=수행사(원청), partner=협력사 경유, 비어 있으면 미기재
+    await ensureColumnPg('jobs', 'contract_type', 'TEXT');
     await ensureColumnPg('freelancer_profiles', 'available_from', 'TEXT');
     await ensureColumnPg('freelancer_profiles', 'pref_work_type', 'TEXT');
     await ensureColumnPg('freelancer_profiles', 'pref_regions_json', "TEXT NOT NULL DEFAULT '[]'");
@@ -310,6 +312,8 @@ if (USE_POSTGRES) {
     addCol('freelancer_profiles', 'updated_at', 'TEXT');
     // 추천 점수의 근무 조건 요소: 공고 투입 예정일, 프리랜서 투입 가능일·선호 근무 형태·근무 가능 지역
     addCol('jobs', 'start_date', 'TEXT');
+    // 공고 계약 형태(개선-019): client=발주처 직접, prime=수행사(원청), partner=협력사 경유, 비어 있으면 미기재
+    addCol('jobs', 'contract_type', 'TEXT');
     addCol('freelancer_profiles', 'available_from', 'TEXT');
     addCol('freelancer_profiles', 'pref_work_type', 'TEXT');
     addCol('freelancer_profiles', 'pref_regions_json', "TEXT NOT NULL DEFAULT '[]'");

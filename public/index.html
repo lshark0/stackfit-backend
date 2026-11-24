@@ -1178,7 +1178,7 @@ function tabs(nc){
 function tabbar(active, chatUnread){
   const n = Number(chatUnread || 0);
   return `<div class="tabbar">${tabs().map(t=>{
-    const onclick = t.k==='jobs' ? "jobQuery=''; jobCat='전체'; jobGrade='전체'; jobDuty=''; jobLocation=''; go('jobs')" : `go('${t.k}')`;
+    const onclick = t.k==='jobs' ? "jobQuery=''; jobCat='전체'; jobGrade='전체'; jobDuty=''; jobLocation=''; jobDirectOnly=false; go('jobs')" : `go('${t.k}')`;
     const badge = (t.k==='chatList' && n>0) ? `<span class="tab-badge">${n>99?'99+':n}</span>` : '';
     return `<button class="tab-btn ${t.k===active?'active':''}" data-tab="${t.k}" onclick="${onclick}">${t.i}${badge}<span class="tab-lbl">${t.l}</span></button>`;
   }).join('')}</div>`;
@@ -1267,6 +1267,18 @@ function gradeBadge(grade){
   return `<span class="gbadge g${rank}"><span class="pips">${pips}</span>${esc(grade)}</span>`;
 }
 
+// 공고 계약 형태(개선-019) — 공고를 올린 기업이 프로젝트에서 어느 위치인지(서버 CONTRACT_OPTIONS와 같은 값).
+const CONTRACT_LABEL = { client:'발주처 직접', prime:'수행사(원청)', partner:'협력사 경유' };
+const CONTRACT_HELP = {
+  client:'프로젝트를 맡기는 회사(발주처)와 바로 계약해요.',
+  prime:'발주처에서 프로젝트를 직접 맡은 회사(수행사·원청)와 계약해요.',
+  partner:'수행사의 협력사를 거쳐 계약해요. 단가·대금 지급 조건을 미리 확인하세요.',
+};
+function contractBadge(type){
+  if(!CONTRACT_LABEL[type]) return '';
+  const c = type==='partner' ? 'var(--slate)' : 'var(--cyan)';
+  return `<span title="${esc(CONTRACT_HELP[type])}" style="display:inline-flex; align-items:center; padding:2px 8px; border-radius:999px; border:1px solid ${c}; color:${c}; font-size:10.5px; font-weight:700; white-space:nowrap;">${CONTRACT_LABEL[type]}</span>`;
+}
 function ratingBadge(avg, count){
   if(!avg || !count) return `<span style="font-family:var(--mono); font-size:10.5px; color:var(--slate-light);">아직 리뷰 없음</span>`;
   return `<span style="font-family:var(--mono); font-size:10.5px; color:var(--amber-deep); font-weight:700;">★ ${avg.toFixed(1)} <span style="color:var(--slate); font-weight:400;">(${count})</span></span>`;
@@ -1303,7 +1315,7 @@ function jobCard(j){
       ${state.role==='freelancer' ? applicantBadge(j.applicantCount) : ''}
       ${state.role==='company' ? `<span class="im">${I.eyeSm}<b>${j.viewCount||0}</b>회 조회</span><span class="im">${I.usersSm}<b>${j.applicantCount||0}</b>명 지원</span>` : ''}
     </div>
-    <div class="meta-row" style="margin-top:6px;">${j.status==='closed' ? '' : ddayBadge(j.d_day)}${ratingBadge(j.rating_avg, j.rating_count)}</div>
+    <div class="meta-row" style="margin-top:6px;">${j.status==='closed' ? '' : ddayBadge(j.d_day)}${contractBadge(j.contract_type)}${ratingBadge(j.rating_avg, j.rating_count)}</div>
     ${state.role==='freelancer' && j.score!=null ? recoBreakdown(j.breakdown, j.score, '기업 평점', j.rating_avg, j.rating_count) : ''}
     ${state.role==='freelancer' ? gauge(j) : ''}
   </div>`;
@@ -3036,7 +3048,7 @@ function jobListHtml(jobs){
   return open.map(jobCard).join('') + (closed.length ? `<div class="section-label">마감된 공고 ${closed.length}건</div>${closed.map(jobCard).join('')}` : '');
 }
 /* ---- Job search / filter (partial refresh, keeps input focus) ---- */
-let jobQuery="", jobCat="전체", jobGrade="전체", jobDuty="", jobLocation="";
+let jobQuery="", jobCat="전체", jobGrade="전체", jobDuty="", jobLocation="", jobDirectOnly=false;
 async function refreshJobList(){
   const el = document.getElementById('jobList');
   if(!el) return;
@@ -3048,6 +3060,7 @@ async function refreshJobList(){
     if(jobGrade && jobGrade!=='전체') qs.set('grade', jobGrade);
     if(jobDuty) qs.set('duty', jobDuty);
     if(jobLocation) qs.set('location', jobLocation);
+    if(jobDirectOnly) qs.set('contract', 'direct');
     const data = await apiFetch('/jobs?' + qs.toString());
     // 검색·필터를 바꾸면 머리글의 'N개의 공고'도 결과 수에 맞춰 고칩니다.
     const sub = document.querySelector('.app-header .page-sub');
@@ -3220,6 +3233,7 @@ function captureJobDraft(){
     title: val('pj-title'), period: val('pj-period'), rate: val('pj-rate'),
     work_type: val('pj-type'), location: document.getElementById('pj-location') ? jobLocationValue() : null, duty: val('pj-duty'),
     grade: val('pj-grade'), deadline: val('pj-deadline'), start_date: val('pj-start'), description: val('pj-desc'),
+    contract_type: val('pj-contract'),
   };
   if(Object.values(d).every(v => v === null)) return;
   jobDraft = d;
@@ -3441,6 +3455,7 @@ function jobPostGaps(){
   if(!type) gaps.push({ field:'pj-type', label:'근무 형태', tip:"'상주'·'재택'·'혼합' 중 하나를 적으면 선호가 맞는 프리랜서에게 추천돼요." });
   else if(!/상주|출근|오피스|사무실|재택|원격|리모트|remote|혼합|병행|하이브리드|hybrid/i.test(workText)) gaps.push({ field:'pj-type', label:'근무 형태', tip:"상주·재택·혼합 중 어느 쪽인지 알 수 없어요. 낱말 하나만 넣어 주세요(예: 상주 · 주5일)." });
   if(!val('pj-location')) gaps.push({ field:'pj-location', label:'근무지', tip:'지역이 없으면 근무 가능 지역이 맞는 프리랜서를 찾을 수 없어요.' });
+  if(!val('pj-contract')) gaps.push({ field:'pj-contract', label:'계약 형태', tip:"발주처 직접·수행사(원청)·협력사 경유 중 어디인지 밝히면 프리랜서가 믿고 지원하기 쉬워요. 공고 탐색의 '직접·원청 계약만' 필터에도 나와요." });
   if(!val('pj-start')) gaps.push({ field:'pj-start', label:'투입 예정일', tip:"비워 두면 '바로 투입'으로 보고 추천해요. 투입 시기가 정해졌다면 날짜를 넣어 주세요." });
   if(val('pj-desc').length < 30) gaps.push({ field:'pj-desc', label:'상세 내용', tip:'업무 범위·우대사항을 몇 줄 더 적으면 지원자가 늘고 AI 추천 이유도 더 정확해져요.' });
   return gaps;
@@ -3495,10 +3510,11 @@ async function postJob(skipPrecheck){
       grade: document.getElementById('pj-grade').value,
       deadline: document.getElementById('pj-deadline').value.trim(),
       start_date: document.getElementById('pj-start').value,
+      contract_type: document.getElementById('pj-contract').value,
       description: document.getElementById('pj-desc').value.trim(),
     }});
     toast('공고가 등록됐어요');
-    jobQuery=''; jobCat='전체'; jobGrade='전체'; jobDuty=''; jobLocation='';
+    jobQuery=''; jobCat='전체'; jobGrade='전체'; jobDuty=''; jobLocation=''; jobDirectOnly=false;
     go('jobs');
   }catch(e){
     if(e.code === 'BIZ_REQUIRED'){ toast('맨 위에서 사업자등록을 먼저 확인해주세요'); captureJobDraft(); await render(); scrollToBizCard(); return; }
@@ -3606,6 +3622,7 @@ async function proxyPostJob(skipPrecheck){
       grade: document.getElementById('pj-grade').value,
       deadline: document.getElementById('pj-deadline').value.trim(),
       start_date: document.getElementById('pj-start').value,
+      contract_type: document.getElementById('pj-contract').value,
       description: document.getElementById('pj-desc').value.trim(),
     }});
     toast(`${proxyCompany.name}의 공고를 대신 등록했어요`);
@@ -3631,6 +3648,7 @@ async function updateJob(id){
       grade: document.getElementById('pj-grade').value,
       deadline: document.getElementById('pj-deadline').value.trim(),
       start_date: document.getElementById('pj-start').value,
+      contract_type: document.getElementById('pj-contract').value,
       description: document.getElementById('pj-desc').value.trim(),
     }});
     toast('공고가 수정됐어요');
@@ -4054,6 +4072,7 @@ async function screenJobs(){
   if(jobGrade && jobGrade!=='전체') qs.set('grade', jobGrade);
   if(jobDuty) qs.set('duty', jobDuty);
   if(jobLocation) qs.set('location', jobLocation);
+  if(jobDirectOnly) qs.set('contract', 'direct');
   const [data, recentJobs] = await Promise.all([
     apiFetch('/jobs?' + qs.toString()),
     isCompany ? Promise.resolve([]) : apiFetch('/jobs/recent-views').then(r=>r.jobs).catch(()=>[]),
@@ -4077,6 +4096,9 @@ async function screenJobs(){
         ${LOCATION_OPTIONS.map(r=>`<option value="${r}" ${r===jobLocation?'selected':''}>${locationLabel(r)}</option>`).join('')}
       </select>
     </div>
+    ${!isCompany ? `<label style="display:flex; align-items:center; gap:7px; margin:-2px 0 10px; font-size:12.5px; color:var(--ink); cursor:pointer;">
+      <input type="checkbox" ${jobDirectOnly?'checked':''} onchange="jobDirectOnly=this.checked; refreshJobList();" style="width:16px; height:16px; accent-color:var(--cyan);">
+      직접·원청 계약만 <span style="color:var(--slate); font-size:11.5px;">(발주처 직접·수행사 공고, 협력사 경유 제외)</span></label>` : ''}
     ${recentJobs.length ? `
     <div class="section-label">최근 본 공고</div>
     <div class="hrow">${recentJobs.map(miniJobCard).join('')}</div>` : ''}
@@ -4130,6 +4152,7 @@ async function screenJobDetail(){
       <div class="kv-box"><div class="kv-lbl">투입 예정</div><div class="kv-val">${j.start_date ? esc(availLabel(j.start_date)) : '협의'}</div></div>
       <div class="kv-box"><div class="kv-lbl">근무형태</div><div class="kv-val">${esc(j.work_type)}</div></div>
       <div class="kv-box"><div class="kv-lbl">근무지</div><div class="kv-val">${esc(j.location)}</div></div>
+      <div class="kv-box"><div class="kv-lbl">계약 형태</div><div class="kv-val">${CONTRACT_LABEL[j.contract_type] ? contractBadge(j.contract_type) : '미기재'}</div></div>
       ${j.duty?`<div class="kv-box"><div class="kv-lbl">업무</div><div class="kv-val">${dutyBadge(j.duty)}</div></div>`:''}
       ${j.grade?`<div class="kv-box"><div class="kv-lbl">등급</div><div class="kv-val">${gradeBadge(j.grade)}</div></div>`:''}
       <div class="kv-box"><div class="kv-lbl">지원마감</div><div class="kv-val">${j.status==='closed' ? `<span class="sbadge fail">${I.xCircle}마감됨</span>` : (ddayBadge(j.d_day) || esc(j.d_day))}</div></div>
@@ -4377,7 +4400,7 @@ async function screenProjects(){
         ? `${emptyArt(ART.noProjects, '아직 계약된 프로젝트가 없어요', myJobs.jobs.length
             ? `등록한 공고 <b>${myJobs.jobs.length}건</b>에서 지원자를 수락하면<br>프로젝트가 자동으로 생성돼요.`
             : '먼저 공고를 등록하고 지원자를 받아보세요.')}
-           <button class="btn btn-primary" onclick="jobQuery=''; jobCat='전체'; jobGrade='전체'; jobDuty=''; jobLocation=''; go('jobs')">${myJobs.jobs.length ? '공고 관리로 이동' : '공고 등록하러 가기'}</button>`
+           <button class="btn btn-primary" onclick="jobQuery=''; jobCat='전체'; jobGrade='전체'; jobDuty=''; jobLocation=''; jobDirectOnly=false; go('jobs')">${myJobs.jobs.length ? '공고 관리로 이동' : '공고 등록하러 가기'}</button>`
         : emptyArt(ART.noProjects, '진행 중인 프로젝트가 없어요', '지원이 수락되면 프로젝트가 자동으로 생성돼요.'))}
   </div>${tabbar('projects')}`;
 }
@@ -7261,6 +7284,11 @@ async function screenJobPost(){
         ${LOCATION_OPTIONS.map(r=>`<option value="${r}" ${r===loc.region?'selected':''}>${locationLabel(r)}</option>`).join('')}
       </select>
       <input id="pj-location-detail" class="form-input" style="margin-top:8px;" maxlength="30" placeholder="상세 위치 (선택) 예: 종로구, 판교, 원격 병행" value="${esc(loc.detail)}"></div>
+    <div class="form-field"><label class="form-label">계약 형태</label><select id="pj-contract" class="form-input">
+      <option value="">선택 안 함</option>
+      ${Object.keys(CONTRACT_LABEL).map(k=>`<option value="${k}" ${job&&job.contract_type===k?'selected':''}>${CONTRACT_LABEL[k]}</option>`).join('')}
+    </select>
+      <div class="page-sub" style="margin-top:5px;">우리 회사가 이 프로젝트의 발주처인지, 발주처에서 직접 맡은 수행사(원청)인지, 협력사로 참여하는지 골라 주세요. 공고에 표시돼요.</div></div>
     <div class="form-field"><label class="form-label">업무</label>${dutySelect('pj-duty', job && job.duty, '선택 안 함')}</div>
     <div class="form-field"><label class="form-label">등급</label><select id="pj-grade" class="form-input">
       <option value="">선택 안 함</option>

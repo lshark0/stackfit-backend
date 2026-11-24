@@ -38,6 +38,9 @@ function fixFilenameEncoding(name) {
 const DUTY_OPTIONS = ['PM', 'PL', 'TA', 'SA', 'SE', 'DBA', '개발자', 'QA', '보안', '감리', '기타'];
 const GRADE_OPTIONS = ['초급', '중급', '고급', '특급'];
 const pickFrom = (value, options, fallback) => (options.includes(value) ? value : fallback);
+// 공고 계약 형태(개선-019) — 공고를 올린 기업이 프로젝트에서 어느 위치인지.
+// client=발주처 직접, prime=수행사(원청), partner=협력사 경유. 비어 있으면 '미기재'(null).
+const CONTRACT_OPTIONS = ['client', 'prime', 'partner'];
 
 const router = express.Router();
 wrapAllRoutes(router);
@@ -92,7 +95,7 @@ const LOCATION_REGIONS = ['서울', '경기', '인천', '부산', '대구', '광
   '강원', '충북', '충남', '전북', '전남', '경북', '경남', '제주', '협의'];
 
 router.get('/', optionalAuth, async (req, res) => {
-  const { q, category, duty, grade, location } = req.query;
+  const { q, category, duty, grade, location, contract } = req.query;
   // 기업 회원은 "등록한 공고" 화면에서 자신의 공고만, 마감 여부와 관계없이 모두 봐야 합니다.
   // (마감된 공고를 확인/재등록할 곳이 없다는 문제를 막기 위함) 그 외(프리랜서·비로그인)는 열려있는 공고만 봅니다.
   let rows = req.user && req.user.role === 'company'
@@ -132,6 +135,12 @@ router.get('/', optionalAuth, async (req, res) => {
   }
   if (grade && grade !== '전체') {
     jobs = jobs.filter(j => j.grade === grade);
+  }
+  // '직접·원청 계약만': 발주처 직접 또는 수행사(원청) 공고만(협력사 경유·미기재 제외, 개선-019)
+  if (contract === 'direct') {
+    jobs = jobs.filter(j => j.contract_type === 'client' || j.contract_type === 'prime');
+  } else if (CONTRACT_OPTIONS.includes(contract)) {
+    jobs = jobs.filter(j => j.contract_type === contract);
   }
   if (location && location !== '전체') {
     const needle = String(location).trim().toLowerCase();
@@ -313,7 +322,7 @@ router.get('/:id', optionalAuth, async (req, res) => {
 
 // 공고 저장(기업 본인 등록과 관리자 대리 등록이 함께 씁니다). 제목이 없으면 null.
 async function createJob(companyId, body, { proxyBy = null } = {}) {
-  const { title, stack, certs, period, rate, work_type, location, category, description, deadline, duty, grade, start_date } = body || {};
+  const { title, stack, certs, period, rate, work_type, location, category, description, deadline, duty, grade, start_date, contract_type } = body || {};
   if (!title || typeof title !== 'string' || !title.trim()) return null;
   const clamp = (v, max, fallback) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : fallback);
   const safeStack = (Array.isArray(stack) ? stack : [])
@@ -327,8 +336,8 @@ async function createJob(companyId, body, { proxyBy = null } = {}) {
   const safeDeadline = typeof deadline === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(deadline.trim()) ? deadline.trim() : null;
 
   const r = await run(
-    `INSERT INTO jobs (company_id, title, stack_json, certs_json, period, rate, work_type, location, category, description, deadline, duty, grade, start_date, proxy_by)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    `INSERT INTO jobs (company_id, title, stack_json, certs_json, period, rate, work_type, location, category, description, deadline, duty, grade, start_date, proxy_by, contract_type)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     [
       companyId,
       clamp(title, 120, title.trim()),
@@ -345,6 +354,7 @@ async function createJob(companyId, body, { proxyBy = null } = {}) {
       pickFrom(grade, GRADE_OPTIONS, null),
       normalizeDate(start_date) || null,
       proxyBy,
+      pickFrom(contract_type, CONTRACT_OPTIONS, null),
     ]
   );
   const job = await get('SELECT * FROM jobs WHERE id = ?', [r.lastInsertRowid]);
@@ -376,7 +386,7 @@ router.put('/:id', requireAuth, requireRole('company'), async (req, res) => {
   const job = await get('SELECT * FROM jobs WHERE id = ? AND company_id = ?', [jobId, req.user.id]);
   if (!job) return res.status(404).json({ error: '공고를 찾을 수 없거나 수정 권한이 없어요.' });
 
-  const { title, stack, certs, period, rate, work_type, location, category, description, deadline, duty, grade, start_date } = req.body || {};
+  const { title, stack, certs, period, rate, work_type, location, category, description, deadline, duty, grade, start_date, contract_type } = req.body || {};
   if (!title || typeof title !== 'string' || !title.trim()) {
     return res.status(400).json({ error: '공고 제목은 필수입니다.' });
   }
@@ -395,9 +405,11 @@ router.put('/:id', requireAuth, requireRole('company'), async (req, res) => {
   const safeGrade = grade === undefined ? job.grade : pickFrom(grade, GRADE_OPTIONS, null);
   // 투입 예정일: 값이 없으면 기존 값 유지, 빈 문자열이면 '협의'로 되돌림(null)
   const safeStart = start_date === undefined ? job.start_date : (normalizeDate(start_date) || null);
+  // 계약 형태: 값이 없으면 기존 값 유지, 목록에 없는 값(빈 문자열 등)이면 '미기재'(null)
+  const safeContract = contract_type === undefined ? job.contract_type : pickFrom(contract_type, CONTRACT_OPTIONS, null);
 
   await run(
-    `UPDATE jobs SET title=?, stack_json=?, certs_json=?, period=?, rate=?, work_type=?, location=?, category=?, description=?, deadline=?, duty=?, grade=?, start_date=? WHERE id=?`,
+    `UPDATE jobs SET title=?, stack_json=?, certs_json=?, period=?, rate=?, work_type=?, location=?, category=?, description=?, deadline=?, duty=?, grade=?, start_date=?, contract_type=? WHERE id=?`,
     [
       clamp(title, 120, job.title),
       JSON.stringify(safeStack),
@@ -412,6 +424,7 @@ router.put('/:id', requireAuth, requireRole('company'), async (req, res) => {
       safeDuty,
       safeGrade,
       safeStart,
+      safeContract,
       jobId,
     ]
   );
@@ -433,8 +446,8 @@ router.post('/:id/duplicate', requireAuth, requireRole('company'), async (req, r
   }
 
   const r = await run(
-    `INSERT INTO jobs (company_id, title, stack_json, certs_json, period, rate, work_type, location, category, description, deadline, duty, grade, start_date)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    `INSERT INTO jobs (company_id, title, stack_json, certs_json, period, rate, work_type, location, category, description, deadline, duty, grade, start_date, contract_type)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     [
       req.user.id,
       `${job.title} (복사본)`.slice(0, 120),
@@ -450,6 +463,7 @@ router.post('/:id/duplicate', requireAuth, requireRole('company'), async (req, r
       job.duty,
       job.grade,
       job.start_date,
+      job.contract_type || null,
     ]
   );
   const created = await get('SELECT * FROM jobs WHERE id = ?', [r.lastInsertRowid]);
