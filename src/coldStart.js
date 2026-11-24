@@ -6,6 +6,7 @@
 const { get, all, run } = require('./db');
 const { addNotification, pushTo } = require('./notify');
 const { pairDetail } = require('./recommend');
+const { blockedIdSet } = require('./blocks');
 
 const MATCH_MIN_SCORE = 65;      // 이 점수 이상인 프리랜서에게만 알림(2026-11-06 대표 결정 70→65)
 // 스택(배점 40)이 75% 이상 맞는데 업무·등급이 달라 65점에 못 미치는 경우도 놓치지 않도록 하는 보조 기준.
@@ -50,7 +51,9 @@ async function notifyNewJob(jobId) {
 
   const since = kstDayStart();
   let sent = 0;
+  const blocked = await blockedIdSet(job.company_id); // 차단 관계인 프리랜서에게는 보내지 않음(개선-018)
   for (const [fid, t] of targets) {
+    if (blocked.has(Number(fid))) continue;
     const opt = await get('SELECT COALESCE(job_alerts, 1) AS on_ FROM freelancer_profiles WHERE user_id = ?', [fid]);
     if (!opt || Number(opt.on_) !== 1) continue;
     const { c } = await get("SELECT COUNT(*) AS c FROM notifications WHERE user_id = ? AND tag = '새 공고' AND created_at >= ?", [fid, since]);

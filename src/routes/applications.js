@@ -9,6 +9,7 @@ const { publicTalent } = require('../contact');
 const { freelancerMissingFields } = require('../profileCheck');
 const { pairScore } = require('../recommend');
 const { normalizeSource } = require('../contactSource');
+const { BLOCKED_MSG, isBlockedBetween } = require('../blocks');
 
 const router = express.Router();
 wrapAllRoutes(router);
@@ -31,6 +32,8 @@ router.post('/jobs/:id/apply', requireAuth, requireRole('freelancer'), async (re
 
   const existing = await get('SELECT id FROM applications WHERE job_id=? AND freelancer_id=?', [jobId, req.user.id]);
   if (existing) return res.status(409).json({ error: '이미 지원한 공고입니다.' });
+  // 둘 중 한쪽이 상대를 차단했으면 지원할 수 없습니다(개선-018).
+  if (await isBlockedBetween(job.company_id, req.user.id)) return res.status(403).json({ error: BLOCKED_MSG, code: 'BLOCKED' });
 
   // 기업이 지원자를 제대로 판단할 수 있도록, 프로필이 모두 채워져 있어야 지원할 수 있습니다.
   const myProfile = await get('SELECT * FROM freelancer_profiles WHERE user_id = ?', [req.user.id]);

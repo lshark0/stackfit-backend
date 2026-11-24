@@ -7,6 +7,7 @@ const { contactFields } = require('../contact');
 const { pairScore } = require('../recommend');
 const { normalizeSource } = require('../contactSource');
 const { quotaFor, recordSend } = require('../proposalQuota');
+const { BLOCKED_MSG, isBlockedBetween, myBlockedIds } = require('../blocks');
 
 const router = express.Router();
 wrapAllRoutes(router);
@@ -27,6 +28,8 @@ router.post('/talents/:userId/propose', requireAuth, requireRole('company'), asy
   if (Number(talent.accept_proposals ?? 1) !== 1) {
     return res.status(403).json({ error: '이 인재는 현재 제안을 받지 않고 있어요.', code: 'NOT_ACCEPTING' });
   }
+  // 둘 중 한쪽이 상대를 차단했으면 제안을 보낼 수 없습니다(개선-018).
+  if (await isBlockedBetween(req.user.id, freelancerId)) return res.status(403).json({ error: BLOCKED_MSG, code: 'BLOCKED' });
 
   // 공고를 지정한 경우, 본인 기업의 실제 공고가 맞는지 확인합니다.
   let safeJobId = null;
@@ -187,8 +190,10 @@ router.get('/proposals/received', requireAuth, requireRole('freelancer'), async 
     [req.user.id]
   );
   // 제안에 연결된 공고 정보를 함께 내려, 프리랜서가 조건을 보고 판단할 수 있게 합니다.
+  // 내가 차단한 기업의 제안은 숨깁니다(개선-018, 차단 해제하면 다시 보임).
+  const iBlocked = await myBlockedIds(req.user.id);
   res.json({
-    proposals: rows.map((r) => ({
+    proposals: rows.filter((r) => !iBlocked.has(Number(r.company_id))).map((r) => ({
       ...r,
       stack: r.stack_json ? JSON.parse(r.stack_json) : [],
     })),
