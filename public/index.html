@@ -2095,7 +2095,10 @@ function saveServerUrl(){
 
 async function applyToJob(id){
   try{
-    await apiFetch(`/jobs/${id}/apply`, {method:'POST', body:{ source: contactSourceFor('jobDetail', id) }});
+    // '바로 지원하기' 팝업에서 적은 전할 말·투입 가능일(개선-020). 프로필을 채우러 갔다 와도 그대로 보냅니다.
+    const draft = (applyDraft && applyDraft.jobId === id) ? applyDraft : {};
+    await apiFetch(`/jobs/${id}/apply`, {method:'POST', body:{ source: contactSourceFor('jobDetail', id), note: draft.note || '', availableFrom: draft.avail || '' }});
+    applyDraft = null;
     toast('지원이 완료됐어요');
     go('jobDetail', id);
   }catch(e){
@@ -2116,6 +2119,21 @@ async function applyToJob(id){
 let applyConfirmChecked = true;
 let applyConfirmProfile = null;
 let applyConfirmReturnJobId = null; // 팝업에서 프로필 수정하러 간 경우, 저장 후 이 공고의 팝업으로 되돌아옴
+// 지원할 때 함께 보내는 '이 공고에 전할 말'(200자)·투입 가능일(개선-020). 팝업을 다시 그려도 적은 내용이 남도록 따로 보관합니다.
+let applyDraft = null;
+const APPLY_NOTE_MAX = 200;
+function onApplyNoteInput(el){
+  if(!applyDraft) return;
+  applyDraft.note = el.value.slice(0, APPLY_NOTE_MAX);
+  const c = document.getElementById('apply-note-count');
+  if(c) c.textContent = `${applyDraft.note.length}/${APPLY_NOTE_MAX}`;
+}
+function onApplyAvailInput(el){ if(applyDraft) applyDraft.avail = el.value; }
+function setApplyAvailNow(){
+  if(!applyDraft) return;
+  applyDraft.avail = kstToday();
+  const el = document.getElementById('apply-avail'); if(el) el.value = applyDraft.avail;
+}
 function fmtSavedAt(ts){
   const d = parseServerTime(ts);
   if(!d) return '아직 저장 안 함';
@@ -2125,6 +2143,11 @@ function fmtSavedAt(ts){
 async function openApplyConfirm(jobId){
   applyConfirmChecked = true;
   applyConfirmProfile = await apiFetch('/profile').catch(()=>null);
+  // 투입 가능일은 프로필의 투입 가능일로 미리 채워 두고(지났으면 비움), 공고마다 바꿀 수 있게 합니다.
+  if(!applyDraft || applyDraft.jobId !== jobId){
+    const pa = applyConfirmProfile && applyConfirmProfile.available_from;
+    applyDraft = { jobId, note: '', avail: (pa && pa > kstToday()) ? pa : '' };
+  }
   renderApplyConfirm(jobId);
 }
 function renderApplyConfirm(jobId){
@@ -2148,6 +2171,21 @@ function renderApplyConfirm(jobId){
           <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--slate); padding:3px 0;"><span>연락처</span><span style="color:var(--ink); font-weight:600;">${esc(phone)}</span></div>
           <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--slate); padding:3px 0;"><span>이메일</span><span style="color:var(--ink); font-weight:600;">${esc(email)}</span></div>
         </div>
+      </div>
+      <div style="margin-top:12px;">
+        <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:5px;">
+          <label for="apply-note" style="font-size:12.5px; font-weight:700; color:var(--ink);">이 공고에 전할 말 <span style="font-weight:500; color:var(--slate);">(선택)</span></label>
+          <span id="apply-note-count" style="font-size:11px; color:var(--slate-light);">${(applyDraft&&applyDraft.note||'').length}/${APPLY_NOTE_MAX}</span>
+        </div>
+        <textarea id="apply-note" class="form-input" rows="3" maxlength="${APPLY_NOTE_MAX}" oninput="onApplyNoteInput(this)" placeholder="예: 비슷한 규모의 차세대 프로젝트에서 같은 역할을 2년 했어요. 상주 가능합니다." style="width:100%; resize:none; font-size:13px; line-height:1.5;">${esc(applyDraft&&applyDraft.note||'')}</textarea>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px; gap:8px;">
+          <label for="apply-avail" style="font-size:12.5px; font-weight:700; color:var(--ink); white-space:nowrap;">투입 가능일 <span style="font-weight:500; color:var(--slate);">(선택)</span></label>
+          <div style="display:flex; align-items:center; gap:6px; min-width:0;">
+            <input id="apply-avail" class="form-input" type="date" value="${esc(applyDraft&&applyDraft.avail||'')}" oninput="onApplyAvailInput(this)" onchange="onApplyAvailInput(this)" style="padding:7px 8px; font-size:12.5px; min-width:0; width:150px;">
+            <span onclick="setApplyAvailNow()" style="font-size:12px; color:var(--cyan); font-weight:700; cursor:pointer; white-space:nowrap;">즉시</span>
+          </div>
+        </div>
+        <div class="page-sub" style="margin-top:6px; font-size:11.5px;">기업 담당자의 지원자 카드에 함께 보여요. 연락처는 적지 않아도 돼요.</div>
       </div>
       <div onclick="toggleApplyConsent(${jobId})" style="display:flex; align-items:center; justify-content:space-between; padding:12px 2px 4px; cursor:pointer;">
         <div style="display:flex; align-items:center; gap:7px; font-size:12.5px; font-weight:600; color:var(--ink);">
@@ -5089,6 +5127,17 @@ async function screenMyApplications(){
   </div>${tabbar('home')}`;
 }
 
+// 지원자가 지원할 때 함께 보낸 전할 말·투입 가능일(개선-020). 둘 다 없으면 아무것도 그리지 않습니다.
+function applyNoteBox(a){
+  const note = a.apply_note ? String(a.apply_note) : '';
+  const avail = a.apply_available_from ? availLabel(a.apply_available_from) : '';
+  if(!note && !avail) return '';
+  return `<div class="apply-note-box" style="margin-top:10px; background:var(--paper-dim); border-radius:10px; padding:9px 11px; font-size:12.5px; color:var(--ink); line-height:1.55;">
+    ${avail ? `<div style="font-size:12px; color:var(--slate); ${note?'margin-bottom:4px;':''}">이 공고 투입 가능 <b style="color:var(--ink);">${esc(avail)}</b></div>` : ''}
+    ${note ? `<div style="white-space:pre-wrap; word-break:break-word;">💬 ${esc(note)}</div>` : ''}
+  </div>`;
+}
+
 /* ---- [기업] 전체 지원자 (홈 대시보드 '지원자'에서 진입) ---- */
 async function screenAllApplicants(){
   const nc = await unreadCount();
@@ -5127,6 +5176,7 @@ async function screenAllApplicants(){
           </div>
           ${stackTags(a.stack, a.matchedStack)}
           ${gauge(a)}
+          ${applyNoteBox(a)}
         </div>`).join('')}
     `).join('') || emptyArt(ART.noTalents, '아직 지원자가 없어요', '인재풀에서 직접 포지션을 제안해볼 수도 있어요.')}
     <div style="height:20px;"></div>
@@ -5162,6 +5212,7 @@ async function screenApplicants(){
         </div>
         ${stackTags(a.stack, a.matchedStack)}
         ${gauge(a)}
+        ${applyNoteBox(a)}
         <div class="meta-row">
           <span class="rate">${esc(a.rate)}</span>
           ${a.resume_url? `<span style="display:flex; align-items:center; gap:8px;"><a href="${viewerUrl(a.resume_url)}" target="_blank" style="color:var(--ink); font-weight:600;">📄 경력기술서 보기</a><span onclick="downloadResume('${jsAttrStr(a.resume_url)}', '${jsAttrStr(a.resume_original_name||'경력기술서')}')" style="color:var(--slate); font-weight:600; cursor:pointer;">⬇ 다운로드</span></span>` : `<span style="color:var(--slate-light);">경력기술서 미첨부</span>`}

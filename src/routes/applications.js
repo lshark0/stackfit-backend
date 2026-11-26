@@ -14,6 +14,23 @@ const { BLOCKED_MSG, isBlockedBetween } = require('../blocks');
 const router = express.Router();
 wrapAllRoutes(router);
 
+// 지원할 때 함께 보내는 '전할 말'(개선-020): 앞뒤 공백·제어 문자를 정리하고 200자까지만 받습니다. 비면 null.
+const APPLY_NOTE_MAX = 200;
+function normalizeApplyNote(v) {
+  const s = String(v == null ? '' : v)
+    .replace(/[\u0000-\u0009\u000B-\u001F\u007F]/g, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+  return s ? s.slice(0, APPLY_NOTE_MAX) : null;
+}
+// 이 공고 투입 가능일: 'YYYY-MM-DD' 형식의 실제 날짜만 받습니다(형식이 틀리면 null = 미기재).
+function normalizeApplyDate(v) {
+  const s = String(v || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+  const d = new Date(s + 'T00:00:00Z');
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s ? s : null;
+}
+
 router.post('/jobs/:id/apply', requireAuth, requireRole('freelancer'), async (req, res) => {
   const jobId = Number(req.params.id);
   const job = await get('SELECT * FROM jobs WHERE id = ?', [jobId]);
@@ -46,8 +63,13 @@ router.post('/jobs/:id/apply', requireAuth, requireRole('freelancer'), async (re
     });
   }
 
-  await run('INSERT INTO applications (job_id, freelancer_id, match_score, source) VALUES (?,?,?,?)',
-    [jobId, req.user.id, pairScore(job, myProfile), normalizeSource((req.body || {}).source)]);
+  const body = req.body || {};
+  if (String(body.note == null ? '' : body.note).trim().length > APPLY_NOTE_MAX) {
+    return res.status(400).json({ error: `전할 말은 ${APPLY_NOTE_MAX}자 이내로 적어주세요.` });
+  }
+  await run('INSERT INTO applications (job_id, freelancer_id, match_score, source, note, available_from) VALUES (?,?,?,?,?,?)',
+    [jobId, req.user.id, pairScore(job, myProfile), normalizeSource(body.source),
+      normalizeApplyNote(body.note), normalizeApplyDate(body.availableFrom)]);
 
   const profile = await get('SELECT name FROM freelancer_profiles WHERE user_id = ?', [req.user.id]);
   await addNotification(job.company_id, {
@@ -115,7 +137,8 @@ async function ensureAcceptedProject(job, freelancerId) {
 
 router.get('/me/applications', requireAuth, requireRole('freelancer'), async (req, res) => {
   const rows = await all(
-    `SELECT a.id AS application_id, a.status AS application_status, a.created_at, j.*, c.name AS org
+    `SELECT a.id AS application_id, a.status AS application_status, a.created_at,
+            a.note AS apply_note, a.available_from AS apply_available_from, j.*, c.name AS org
      FROM applications a
      JOIN jobs j ON j.id = a.job_id
      LEFT JOIN companies c ON c.user_id = j.company_id
@@ -148,6 +171,7 @@ router.get('/me/applications', requireAuth, requireRole('freelancer'), async (re
 router.get('/company/applicants', requireAuth, requireRole('company'), async (req, res) => {
   const rows = await all(
     `SELECT a.id AS application_id, a.status, a.created_at AS applied_at, a.freelancer_id,
+            a.note AS apply_note, a.available_from AS apply_available_from,
             j.id AS job_id, j.title AS job_title, j.stack_json AS job_stack_json, f.*
      FROM applications a
      JOIN jobs j ON j.id = a.job_id
@@ -180,7 +204,8 @@ router.get('/jobs/:id/applicants', requireAuth, requireRole('company'), async (r
   if (!job) return res.status(404).json({ error: '공고를 찾을 수 없습니다.' });
   const jobStack = JSON.parse(job.stack_json);
   const rows = await all(
-    `SELECT a.id AS application_id, a.status, a.created_at, a.freelancer_id, f.*
+    `SELECT a.id AS application_id, a.status, a.created_at, a.freelancer_id,
+            a.note AS apply_note, a.available_from AS apply_available_from, f.*
      FROM applications a LEFT JOIN freelancer_profiles f ON f.user_id = a.freelancer_id
      WHERE a.job_id = ? ORDER BY a.created_at DESC`,
     [req.params.id]

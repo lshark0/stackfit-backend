@@ -112,6 +112,9 @@ if (USE_POSTGRES) {
     await ensureColumnPg('contract_surveys', 'fit_vs_prev', 'INTEGER');
     await ensureColumnPg('contract_surveys', 'prev_contacts', 'INTEGER');
     await ensureColumnPg('applications', 'source', 'TEXT');
+    // 지원할 때 함께 보내는 '이 공고에 전할 말'(200자 이내)과 이 공고 투입 가능일(개선-020)
+    await ensureColumnPg('applications', 'note', 'TEXT');
+    await ensureColumnPg('applications', 'available_from', 'TEXT');
     await ensureColumnPg('proposals', 'source', 'TEXT');
     await ensureColumnPg('messages', 'deleted_at', 'TEXT');
     await ensureColumnPg('users', 'claim_pending', 'INTEGER NOT NULL DEFAULT 0');
@@ -270,6 +273,8 @@ if (USE_POSTGRES) {
     addCol('contract_surveys', 'fit_vs_prev', 'INTEGER');
     addCol('contract_surveys', 'prev_contacts', 'INTEGER');
     addCol('applications', 'source', 'TEXT');
+    addCol('applications', 'note', 'TEXT'); // 지원할 때 전할 말(200자 이내, 개선-020)
+    addCol('applications', 'available_from', 'TEXT'); // 이 공고 투입 가능일 YYYY-MM-DD(개선-020)
     addCol('proposals', 'source', 'TEXT');
     addCol('messages', 'deleted_at', 'TEXT');
     addCol('users', 'claim_pending', 'INTEGER NOT NULL DEFAULT 0');
